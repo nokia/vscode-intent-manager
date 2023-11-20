@@ -1,0 +1,218 @@
+{
+  "name": "nokia-intent-manager",
+  "displayName": "NOKIA_IM",
+  "description": "NOKIA IM vsCode Developer Plugin",
+  "version": "1.0.2",
+  "icon": "media/NSP_Logo.png",
+  "publisher": "Nokia",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onFileSystem:im",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "snippets": [
+      {
+        "language": "javascript",
+        "path": "./snippets.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "nokia-intent-manager.uploadLocal",
+        "category": "IntentManager",
+        "title": "Upload",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "nokia-intent-manager.openInBrowser",
+        "category": "IntentManager",
+        "title": "Open in Browser",
+        "icon": "$(home)"
+      },
+      {
+        "command": "nokia-intent-manager.newVersion",
+        "category": "IntentManager",
+        "title": "IM: Create New Version"
+      },
+      {
+        "command": "nokia-intent-manager.clone",
+        "category": "IntentManager",
+        "title": "IM: Clone Intent-type"
+      },
+      {
+        "command": "nokia-intent-manager.newIntent",
+        "category": "IntentManager",
+        "title": "IM: Create new Intent-type",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "nokia-intent-manager.audit",
+        "category": "IntentManager",
+        "title": "Audit",
+        "icon": "$(search)"
+      },
+      {
+        "command": "nokia-intent-manager.logs",
+        "category": "IntentManager",
+        "title": "Logs",
+        "icon": "$(debug)"
+      },
+      {
+        "command": "nokia-intent-manager.sync",
+        "category": "IntentManager",
+        "title": "Sync",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "nokia-intent-manager.intentStatus",
+        "category": "IntentManager",
+        "title": "Update intent state",
+        "icon": "$(symbol-property)"
+      },
+      {
+        "command": "nokia-intent-manager.createIntentFromYang",
+        "category": "IntentManager",
+        "title": "IM: Create intent-type from Yang"
+      },
+      {
+        "command": "nokia-intent-manager.createIntentFromScratch",
+        "category": "IntentManager",
+        "title": "IM: Create New intent-type"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceScheme != im && resourceFilename == meta-info.json",
+          "command": "nokia-intent-manager.uploadLocal",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceScheme == im",
+          "command": "nokia-intent-manager.openInBrowser",
+          "group": "navigation"
+        },
+        {
+          "when": "resource =~ /^im:\\/intent-types+\\//",
+          "command": "nokia-intent-manager.newIntent",
+          "group": "navigation"
+        },
+        {
+          "when": "resource =~ /^im:\\/intents+\\//",
+          "command": "nokia-intent-manager.logs",
+          "group": "navigation"
+        },
+        {
+          "when": "resource =~ /^im:\\/intents+\\//",
+          "command": "nokia-intent-manager.audit",
+          "group": "navigation"
+        },
+        {
+          "when": "resource =~ /^im:\\/intents+\\//",
+          "command": "nokia-intent-manager.sync",
+          "group": "navigation"
+        },
+        {
+          "when": "resource =~ /^im:\\/intents+\\//",
+          "command": "nokia-intent-manager.intentStatus",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+            "command": "nokia-intent-manager.newVersion",
+            "group": "nokia_im@1",
+            "when": "resource =~ /^im:\\/intent-types\\/[^\/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.clone",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intent-types\\/[^\/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.createIntentFromYang",
+          "group": "nokia_im@1",
+          "when": "resourceExtname == .yang"
+        },
+        {
+          "command": "nokia-intent-manager.createIntentFromScratch",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intent-types$/"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "IntentManager",
+      "properties": {
+        "intentManager.NSPIP":{
+          "type": "string",
+          "default": "localhost",
+          "format":"ipv4",
+          "description": "NSP IP address."
+        },
+        "intentManager.port":{
+          "type": "string",
+          "default": "8545",
+          "enum":["443", "8545"],
+          "enumDescriptions": [
+            "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
+            "8545 used in older NSP releases, to be deprecated."
+          ],
+          "description": "NSP IM port."
+        },
+        "intentManager.user":{
+          "type": "string",
+          "default": "user",
+          "description": "NSP user."
+        },
+        "intentManager.password":{
+          "type": "string",
+          "default": "password",
+          "description": "NSP user password."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "build": "./node_modules/typescript/bin/tsc",
+    "compile": "./node_modules/typescript/bin/tsc -p ./",
+    "watch": "./node_modules/typescript/bin/tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --packages=external",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "test-compile": "./node_modules/typescript/bin/tsc -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/glob": "^8.0.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.1.0",
+    "typescript": "^4.9.3",
+    "@vscode/test-electron": "^2.2.0"
+  },
+  "dependencies": {
+    "base-64": "^1.0.0",
+    "lodash":"^4.17.0",
+    "node-fetch": "2.6.6",
+    "nunjucks": "^3.2.0",
+    "vscode-uri": "^3.0.0",
+    "yaml": "^2.2.0",
+		"@vscode/codicons": "0.0.20"
+  }
+}

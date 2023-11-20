@@ -1,0 +1,67 @@
+{
+	 "Get Manager Config": {
+	 	"scope": "javascript",
+		"prefix": "getManager<",
+	 	"body": [
+	 		"//BEGIN: Get Manager Config example function\nfunction getManagerConfig(deviceIp) {\n    var managerInfos = mds.getAllManagersWithDevice(deviceIp);\n    if (managerInfos == null || managerInfos.isEmpty()) {\n        throw new RuntimeException(\"Manager not found for device \" + deviceIp);    \n    }    \n    var managerInfo = managerInfos.get(0);\n    var managerConfig = {\n        ip: managerInfo.getIp(),\n        port: managerInfo.getPort(),\n        name: managerInfo.getName(),\n        protocol: 'http'\n    };\n    log.info(null, \"[Example] getManagerConfig() managerConfig:\" + JSON.stringify(managerConfig));\n    return managerConfig;\n}\n//ENDOF: End of Get Manager Config example function"
+	 	],
+	 	"description": "Get the mediator info based on a node's IP address"
+	 },
+     "Get MDC mediator": {
+        "scope": "javascript",
+       "prefix": "mdcMediator",
+        "body": [
+            "//BEGIN: Example snippet for MDC mediator\n  var MEDIATOR_PROTOCOL = \"http\";\n  var MEDIATOR_IP = \"nsp-mdt-mdc-mediator-svc\";\n  var MEDIATOR_PORT = 80;\n  \n  var siteId = \"10.10.10.1\";\n\n  var managerConfig = getManagerConfig(siteId);\n\n  restClient.setIp(managerConfig.ip);\n  restClient.setPort(managerConfig.port);\n  restClient.setProtocol(managerConfig.protocol);\n  \n  var result = synchronizeResultFactory.createSynchronizeResult();  \n  var targetUrl = \"restconf/data/network-device-mgr:network-devices/network-device=${deviceName}/root/\";\n  var siteId = \"10.10.10.1\";\n  \n  targetUrl = utilityService.processTemplate(targetUrl, {\n    deviceName: siteId\n  });  \n\n  var jsonRequest = { \"ietf-yang-patch:yang-patch\": { \"patch-id\": \"patch-1\", \"edit\": [ { \"operation\": \"merge\", \"target\": \"nokia-conf:/configure/port=1%2F1%2F1\", \"edit-id\": \"edit-1\", \"value\": { \"port-id\": \"1/1/1\", \"description\": \"test from IM\" } } ] } }\n  \n  restClient.patch(targetUrl,\"application/yang-patch+json\", JSON.stringify(jsonRequest),\"application/yang-data+json\", function (exception, httpStatus, response) {\n      if (exception != null || httpStatus >= 400) {\n        result.setSuccess(false);\n        result.setErrorCode(httpStatus);\n        result.setErrorDetail(httpStatus + (exception == null ? \"\" : \" - \" + exception) + \" - \" + response);\n        return result\n      } else {\n        result.setSuccess(true);\n      }\n      jsonResponse = JSON.parse(response);\n  });\n//ENDOF: Example snippet for MDC mediator"
+        ],
+        "description": "MDC mediator example"
+    },
+    "Get NFM-P mediator": {
+       "scope": "javascript",
+      "prefix": "nfmpMediator",
+       "body": [
+           "//BEGIN: Example snippet for NFM-P mediator\nvar MEDIATOR_PROTOCOL = \"http\";\nvar MEDIATOR_IP = \"nsp-mdt-nfmp-mediator-svc\";\nvar MEDIATOR_PORT = 80;\nvar PATH_SYNCHRONIZE = \"synchronize\";\nvar PATH_COMPARE = \"compare\";\nvar PATH_SEARCH = \"search\";\nvar PATH_DELETE = \"delete/\";\nvar siteId = \"8.8.8.8\";\nvar PATH_SYNCHRONIZE = \"synchronize\";\n\nvar managerConfig = getManagerConfig(siteId);\n\nrestClient.setIp(managerConfig.ip);\nrestClient.setPort(managerConfig.port);\nrestClient.setProtocol(managerConfig.protocol);\n\nvar result = synchronizeResultFactory.createSynchronizeResult();\nvar payload = { \"objectFullName\": \"network:8.8.8.8:shelf-1:cardSlot-1:card:daughterCardSlot-1:daughterCard:port-1\", \"distinguishedName\": \"network:8.8.8.8:shelf-1:cardSlot-1:card:daughterCardSlot-1:daughterCard:port-1\", \"configInfo\": { \"objectClassName\": \"equipment.PhysicalPort\", \"actionBitmask\": [ \"modify\" ], \"containedClassProperties\": { \"description\": \"set by IM\" } } };\n  \nrestClient.patch(PATH_SYNCHRONIZE, \"application/json\", JSON.stringify(payload), \"application/json\", function (exception, httpStatus, response) {\nif (exception != null || httpStatus >= 400) {\n  result.setSuccess(false);\n  result.setErrorCode(httpStatus);\n  result.setErrorDetail(httpStatus + (exception == null ? \"\" : \" - \" + exception) + \" - \" + response);\n  return result\n} else {\n  result.setSuccess(true);\n}\njsonResponse = JSON.parse(response);\n});\n//ENDOF: Example snippet for NFM-P mediator"
+       ],
+       "description": "NFM-P mediator example"
+   },
+   "Get NSP mediator": {
+      "scope": "javascript",
+     "prefix": "nspMediator",
+      "body": [
+          "//BEGIN: Example snippet for NSP mediator where a WFM workflow is invoked\nvar result = synchronizeResultFactory.createSynchronizeResult();\n  \nvar NSP_MEDIATOR_IP = \"nsp-mdt-nsp-mediator-svc\";\nvar NSP_MEDIATOR_PORT = 80; \nvar NSP_MEDIATOR_PROTOCOL = \"http\";\n  \nrestClient.setIp(NSP_MEDIATOR_IP);\nrestClient.setPort(NSP_MEDIATOR_PORT);\nrestClient.setProtocol(NSP_MEDIATOR_PROTOCOL);\n\nvar payload = { \"workflow_id\": \"2466f709-16d3-483d-84ce-488edf01628b\", \"input\": { \"var1\": \"test\" }, \"params\": { \"env\": \"DefaultEnv\" }, \"output\": {}, \"notifyKafka\": true };\n\nvar wfmUrl = \"https://workflow-manager/wfm/api/v1/execution/synchronous\"\nrestClient.post(wfmUrl, \"application/json\", JSON.stringify(payload), \"application/json\", function (exception, httpStatus, response) {\n  if (exception != null || httpStatus >= 400) {\n    result.setSuccess(false);\n    result.setErrorCode(httpStatus);\n    result.setErrorDetail(httpStatus + \" - \" + exception);\n  } else {\n    result.setSuccess(true);\n  }\n }\n);\n//ENDOF: Example snippet for NSP mediator"
+      ],
+      "description": "NSP mediator example"
+    },
+    "auditFactory.createAuditInput": {
+     "scope": "javascript",
+    "prefix": "auditFactory.createAuditInput",
+     "body": [
+         "auditFactory.createAuditInput(target, intent, intentTopology, networkState);"
+     ],
+     "description": "This service can be used to create objects for reporting the response of audit operation."
+    },
+    "auditFactory.createAuditReport": {
+        "scope": "javascript",
+    "prefix": "auditFactory.createAuditReport",
+        "body": [
+            "auditFactory.createAuditReport(intentType, target);"
+        ],
+        "description": "Create Audit report object to update misaligned attributes and object for an intent while performing audit."
+    },
+    "auditFactory.createMisAlignedAttribute": {
+        "scope": "javascript",
+    "prefix": "auditFactory.createMisAlignedAttribute",
+        "body": [
+            "auditFactory.createMisAlignedAttribute(name, expectedValue, actualValue, deviceName);"
+        ],
+        "description": "Create misAlignedAttributes for an intent while performing audit."
+    },
+    "auditFactory.createMisAlignedObject": {
+        "scope": "javascript",
+    "prefix": "auditFactory.createMisAlignedObject",
+        "body": [
+            "auditFactory.createMisAlignedObject(objectId, isConfigured, deviceName);"
+        ],
+        "description": "Create misAlignedObject or an intent while performing audit."
+    }
+  
+}
