@@ -44,4 +44,11 @@ Bug fixes:
 
 Bug fixes:
 * Handling disconnects from NSP.
-* Logs to work with 23.11 (OSDversion 2.10.0)
+* Logs to work with 23.11 (OSDversion 2.10.0).
+
+## [1.0.3]
+
+Bug fixes:
+* Fixing issue with empty resources folder.
+* Remove and re-create views with the same now is now fixed.
+* Copy "resources" with content.

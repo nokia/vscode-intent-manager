@@ -282,7 +282,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		let isview = false;
 		let viewdata = "{}";
 		if (name.includes("intent-type-resources")) { // Generate URL and load intent-type content for resource update
-			this.intents["im:/intent-types/"+intent].intentContent["ibn-administration:intent-type"]["resource"].push({"name": decodeURIComponent(name.split("/").pop()),"value": ""});
+			if (this.intents["im:/intent-types/"+intent].intentContent["ibn-administration:intent-type"].hasOwnProperty("resource")){
+				this.intents["im:/intent-types/"+intent].intentContent["ibn-administration:intent-type"]["resource"].push({"name": decodeURIComponent(name.split("/").pop()),"value": data});
+			} else {
+				this.intents["im:/intent-types/"+intent].intentContent["ibn-administration:intent-type"]["resource"]=[{"name": decodeURIComponent(name.split("/").pop()),"value": data}];
+			}
 			body=this.intents["im:/intent-types/"+intent].intentContent;
 		} else if (name.includes("yang-modules")){ // Generate URL and load intent-type content for Yang model update
 			this.intents["im:/intent-types/"+intent].intentContent["ibn-administration:intent-type"]["module"].push({"name": decodeURIComponent(name.split("/").pop()), "yang-content": "module example-system {\n       yang-version 1.1;\n       namespace \"urn:example:system\";\n       prefix \"sys\";\n\n       organization \"Example Inc.\";\n       contact \"joe@example.com\";\n       description\n         \"The module for entities implementing the Example system.\";\n\n       revision 2007-06-09 {\n         description \"Initial revision.\";\n       }\n\n       container system {\n         leaf host-name {\n           type string;\n           description\n             \"Hostname for this system.\";\n         }\n\n         leaf-list domain-search {\n           type string;\n           description\n             \"List of domain names to search.\";\n         }\n\n         container login {\n           leaf message {\n             type string;\n             description\n               \"Message given at start of login session.\";\n           }\n           list user {\n             key \"name\";\n             leaf name {\n               type string;\n             }\n             leaf full-name {\n               type string;\n             }\n             leaf class {\n               type string;\n             }\n           }\n         }\n       }\n     }"});
@@ -1243,7 +1247,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		console.log(method, url, response.status);
 
 		//Removing the resource from the extension registry.
+		console.log("Deleting registry for: "+name);
 		delete this.intents[name];
+		if (name.includes("views")){
+			const schmUri = name.replace("viewConfig","schemaForm");
+			delete this.intents[schmUri];
+		}
+		
 
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 		vscode.window.showInformationMessage("Resource "+resource_name+" from intent "+intent+" intent successfully deleted");
@@ -1806,12 +1816,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			// adding resources
 			result.push(["intent-type-resources",vscode.FileType.Directory]);
 			let resources = [];
-			for (const resource of json["ibn-administration:intent-type"]["resource"]) {
-				const intentTypeURI = vscode.Uri.parse(uri.toString()+"/intent-type-resources/"+encodeURIComponent(resource.name)).toString();
-				console.warn('intent-type URI', intentTypeURI);
+			if (json["ibn-administration:intent-type"].hasOwnProperty("resource")){
+				for (const resource of json["ibn-administration:intent-type"]["resource"]) {
+					const intentTypeURI = vscode.Uri.parse(uri.toString()+"/intent-type-resources/"+encodeURIComponent(resource.name)).toString();
+					console.warn('intent-type URI', intentTypeURI);
 
-				this.intents[intentTypeURI]= new FileStat(resource.name, Date.parse(json["ibn-administration:intent-type"].date), Date.parse(json["ibn-administration:intent-type"].date), 0, false, json["ibn-administration:intent-type"].version,resource.value);
-				resources.push(resource.name);
+					this.intents[intentTypeURI]= new FileStat(resource.name, Date.parse(json["ibn-administration:intent-type"].date), Date.parse(json["ibn-administration:intent-type"].date), 0, false, json["ibn-administration:intent-type"].version,resource.value);
+					resources.push(resource.name);
+				}
 			};
 			this.intents[uri.toString()+"/intent-type-resources"]= new FileStat("intent-type-resources", Date.parse(json["ibn-administration:intent-type"].date), Date.parse(json["ibn-administration:intent-type"].date), 0, false, json["ibn-administration:intent-type"].version,JSON.stringify(resources));
 
@@ -1893,8 +1905,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 			if (key in this.intents) {
 				if (key.includes("schemaForm") || key.includes("settings")) this.intents[key].permissions=vscode.FilePermission.Readonly;
+				console.log("this is where we return: "+key);
 				return this.intents[key];
 			} else if (key+".viewConfig" in this.intents) {
+				console.log("this is where we return 2: "+key+".viewConfig");
 				return this.intents[key+".viewConfig"];
 			}
 			console.warn('unknown intent/intent-type');
