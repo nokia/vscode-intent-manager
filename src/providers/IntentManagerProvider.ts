@@ -921,7 +921,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				  return regex.test(text) ? null : '{lowercasename}_v{version}'; 
 			  }});
 			meta['intent-type']=intentnameversion?.split("_v")[0];
-			meta['version']=intentnameversion?.split("_v")[1];
+			meta['version']=parseInt(intentnameversion?.split("_v")[1]);
 		}
 
 		// get auth-token
@@ -1557,6 +1557,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			throw vscode.FileSystemError.Unavailable('Error while auditing');
 		}
 		let json: any = await response.json();
+		var path = require('path');
 		if (Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-attribute")||Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-object")){
 			vscode.window.showWarningMessage("Intent Misaligned","Details","Cancel").then( async (selectedItem) => {
 				if ('Details' === selectedItem) {

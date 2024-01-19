@@ -52,3 +52,8 @@ Bug fixes:
 * Fixing issue with empty resources folder.
 * Remove and re-create views with the same now is now fixed.
 * Copy "resources" with content.
+
+## [1.0.4]
+
+Bug fixes:
+* Minor fixes for local intent upload and auditing view.
