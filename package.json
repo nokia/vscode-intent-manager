@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "1.0.4",
+  "version": "1.1.1",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "engines": {
@@ -29,6 +29,12 @@
         "category": "IntentManager",
         "title": "Upload",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "workbench.files.action.compareWithSaved",
+        "category": "IntentManager",
+        "title": "Compare changes",
+        "icon": "$(request-changes)"
       },
       {
         "command": "nokia-intent-manager.openInBrowser",
@@ -92,6 +98,11 @@
         {
           "when": "resourceScheme != im && resourceFilename == meta-info.json",
           "command": "nokia-intent-manager.uploadLocal",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceScheme == im && activeEditorIsDirty == true",
+          "command": "workbench.files.action.compareWithSaved",
           "group": "navigation"
         },
         {
@@ -176,6 +187,18 @@
           "type": "string",
           "default": "password",
           "description": "NSP user password."
+        },
+        "intentManager.timeout": {
+          "type": "number",
+          "default": 20000,
+          "description": "Connection timeout in ms"
+        },
+        "intentManager.ignoreLabels": {
+          "type": "array",
+            "items": {
+                "type": "string"
+          },
+          "description": "Intent-types with these labels will be hidden."
         }
       }
     }

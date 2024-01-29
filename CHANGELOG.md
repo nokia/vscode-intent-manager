@@ -57,3 +57,9 @@ Bug fixes:
 
 Bug fixes:
 * Minor fixes for local intent upload and auditing view.
+
+## [1.1.1]
+
+Updates:
+* For unsaved files, we add the compare functionality so the user can see all modifications before saving.
+* In settings, the user can define a list of labels to be ignored by the plugin, to reduce the amount of intent-types shown in the intent-types and intents list. When modified, the user will have to reload the vsCode window.

@@ -96,6 +96,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	restport: string;
 	authToken: any|undefined;
 
+	timeout: number;
+	fileIgnore: Array<string>;
+
 	nsp_version: string;
 
 	intents: {[name: string]: FileStat};
@@ -106,12 +109,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 	
-	constructor (nspAddr: string, username: string, password: string, port: string) {
+	constructor (nspAddr: string, username: string, password: string, port: string, timeout: number, fileIgnore: Array<string>) {
 		console.log("creating IntentManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
 		this.password = password;
 		this.nsp_version = "";
+		this.timeout = timeout;
+		this.fileIgnore = fileIgnore;
 		
 
 		// To be updated to only use standard ports.
@@ -158,7 +163,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
                 const base64 = require('base-64');
 
                 const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), 10000);
+                setTimeout(() => timeout.abort(), this.timeout);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
                 fetch(url, {
@@ -219,7 +224,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	private async _callNSP(url:string, options:any): Promise<void>{
 		const fetch = require('node-fetch');
 		const timeout = new AbortController();
-        setTimeout(() => timeout.abort(), 20000);
+        setTimeout(() => timeout.abort(), this.timeout);
 		options['signal']=timeout.signal;
 		let response: any = new Promise((resolve, reject) => {
 		 	fetch(url, options)
@@ -1695,7 +1700,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (uri.toString() === "im:/") { // Return two main folders. Nothing to be loaded from IM
 			return [['intent-types', vscode.FileType.Directory],['intents', vscode.FileType.Directory]];
 		} else if ((uri.toString() === "im:/intent-types") || (uri.toString() === "im:/intents")) { // Return full list of intent-types when opening intent types or intents folders
-			url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn-administration:ibn-administration/intent-type-catalog?fields=intent-type(name;date;version;lifecycle-state;mapping-engine)";
+			url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn-administration:ibn-administration/intent-type-catalog?fields=intent-type(name;date;version;lifecycle-state;mapping-engine;label)";
 		} else if ((uri.toString().startsWith("im:/intent-types/")) && (uri.toString().split("/").length===3)) { // Load full list of intent type scripts and resources
 			url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+uri.toString().split("/").pop().replace("_v",","); 
 			getviews = true;
@@ -1752,7 +1757,19 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		let result: [string, vscode.FileType][]=[];
 		// Load data from IM and create folders / files depending on the selected directory
 		if ((uri.toString() === "im:/intent-types") || (uri.toString() === "im:/intents")) {
-			result = (json["ibn-administration:intent-type-catalog"]["intent-type"] ?? []).map<[string, vscode.FileType]> (entry => [entry.name+"_v"+entry.version, vscode.FileType.Directory]);
+			
+			function checkLabels(obj,ignoreLabels){
+				console.log(ignoreLabels);
+				var filteredArray = ignoreLabels.label.filter(value => obj.includes(value));;
+				if (filteredArray.length==0){
+					//console.log("Returning "+ignoreLabels.name);
+					return ignoreLabels;
+				}
+			}
+	
+			let filteredList = json["ibn-administration:intent-type-catalog"]["intent-type"].filter(checkLabels.bind(this,this.fileIgnore));
+			
+			result = (filteredList ?? []).map<[string, vscode.FileType]> (entry => [entry.name+"_v"+entry.version, vscode.FileType.Directory]);
 		} else if ((uri.toString().startsWith("im:/intent-types/")) && (uri.toString().split("/").length===3)) {
 			// adding Yang modules
 			result.push(["yang-modules",vscode.FileType.Directory]);
