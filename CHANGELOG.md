@@ -63,3 +63,8 @@ Bug fixes:
 Updates:
 * For unsaved files, we add the compare functionality so the user can see all modifications before saving.
 * In settings, the user can define a list of labels to be ignored by the plugin, to reduce the amount of intent-types shown in the intent-types and intents list. When modified, the user will have to reload the vsCode window.
+
+## [1.1.2]
+
+Updates:
+* Hide clear text password in settings.

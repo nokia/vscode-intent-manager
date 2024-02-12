@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "engines": {
@@ -165,12 +165,14 @@
         "intentManager.NSPIP":{
           "type": "string",
           "default": "localhost",
+          "scope": "application",
           "format":"ipv4",
           "description": "NSP IP address."
         },
         "intentManager.port":{
           "type": "string",
           "default": "8545",
+          "scope": "application",
           "enum":["443", "8545"],
           "enumDescriptions": [
             "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
@@ -181,20 +183,24 @@
         "intentManager.user":{
           "type": "string",
           "default": "user",
+          "scope": "application",
           "description": "NSP user."
         },
         "intentManager.password":{
-          "type": "string",
-          "default": "password",
+          "type": "null",
+          "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
+          "scope": "application",
           "description": "NSP user password."
         },
         "intentManager.timeout": {
           "type": "number",
           "default": 20000,
+          "scope": "application",
           "description": "Connection timeout in ms"
         },
         "intentManager.ignoreLabels": {
           "type": "array",
+          "scope": "application",
             "items": {
                 "type": "string"
           },

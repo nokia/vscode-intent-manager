@@ -10,12 +10,11 @@ export function activate(context: vscode.ExtensionContext) {
 	const config = vscode.workspace.getConfiguration('intentManager');
 	const nspAddr = config.get("NSPIP");
 	const username = config.get("user");
-	const secret = config.get("password");
-	const port = config.get("port");
+	const secretStorage: vscode.SecretStorage = context.secrets;	const port = config.get("port");
 	const timeout : number = config.get("timeout") ?? 20000;
 	const fileIgnore : Array<string> = config.get("ignoreLabels") ?? [];
 
-	const imProvider = new IntentManagerProvider(nspAddr, username, secret, port, timeout, fileIgnore);
+	const imProvider = new IntentManagerProvider(nspAddr, username, secretStorage, port, timeout, fileIgnore);
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('im', imProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(imProvider));
 	
@@ -129,6 +128,16 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.intentStatus', () => {
 		imProvider.updateIntentNetworkStatus();
 	}));
+
+	vscode.commands.registerCommand('nokia-intent-manager.setPassword', async () => {
+		const passwordInput: string = await vscode.window.showInputBox({
+		  password: true, 
+		  title: "Password"
+		}) ?? '';
+		if(passwordInput !== ''){
+			secretStorage.store("nsp_im_password", passwordInput);
+		};
+	  });
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.clone', async (...args) => {
 		console.log(args[0]);

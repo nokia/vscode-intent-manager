@@ -103,20 +103,22 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	intents: {[name: string]: FileStat};
 	intentCatalog = [];
+	secretStorage: vscode.SecretStorage;
 
 	extContext: vscode.ExtensionContext;
 
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 	
-	constructor (nspAddr: string, username: string, password: string, port: string, timeout: number, fileIgnore: Array<string>) {
+	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, timeout: number, fileIgnore: Array<string>) {
 		console.log("creating IntentManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
-		this.password = password;
+		this.password = "";
 		this.nsp_version = "";
 		this.timeout = timeout;
 		this.fileIgnore = fileIgnore;
+		this.secretStorage = secretStorage;
 		
 
 		// To be updated to only use standard ports.
@@ -154,6 +156,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
             }
         }
 
+		this.password = await this.secretStorage.get("nsp_im_password");
+
         if (!this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
                 console.log("No valid auth-token; getting a new one...");
@@ -178,6 +182,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
                 }).then(response => {
                     console.log("POST", url, response.status);
                     if (!response.ok) {
+						vscode.window.showErrorMessage("IM: NSP Auth Error");
                         reject("Authentication Error!");
                         throw new Error("Authentication Error!");
                     }
