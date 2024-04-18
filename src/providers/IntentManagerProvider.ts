@@ -655,42 +655,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	/*
 		Method:
-			_getWebviewContentLogs
-
-		Description:
-			Generate webView for OpenSearch Logs coming from a particular intent instance. This is a beta functionality.
-	*/
-
-	private async _getWebviewContentLogs(intent: string,intenttype: string,result: JSON,panel: vscode.WebviewPanel): Promise<string> {
-
-		let html=`<!doctype html><html> <head> <title>Intent Logs</title> <meta name="description" content="Intent Logs report"> <meta name="keywords" content="Intent Logs report"> <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href='https://fonts.googleapis.com/css?family=Space Mono' rel='stylesheet'><style> .console { position: absolute; font-family: 'Space Mono'; width: 90%; height: 90%; box-sizing: border-box; margin-top: 2%; margin-left: 2%;}.console header { border-top-left-radius: 15px; border-top-right-radius: 15px; background-color: #555; height: 45px; line-height: 45px; text-align: center; color: #DDD;}.console .consolebody { border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; box-sizing: border-box; padding: 20px; height: calc(100% - 40px); overflow: scroll; overflow-wrap: break-word; background-color: #000; color: #63de00;}.console .consolebody p { font-size: 12px; margin: 0px; padding: 0px; margin-bottom: 5px;}</style> </head> <body> <div class="console"> <header> <p>`+intenttype+` `+intent+` logs </p> </header> <div class="consolebody">`;
-		
-		if (result.length === 0 ){
-			html=html+`<p>> No logs available in the system </p>`;
-		}
-
-		console.log(result.length);
-
-		result.sort((a,b) => new Date(b['_source']['@datetime']) - new Date(a['_source']['@datetime']));		
-
-		for (const hit of result){
-			
-			var loginfo=JSON.parse(hit['_source'].log);
-			const d = new Date(loginfo['date']);
-			if ((loginfo['message']) && (loginfo['message'].length!==0)){
-				console.log(loginfo['message']);
-				console.log(hit);
-				html=html+`<p>>[`+d.toISOString()+`] : `+loginfo['message']+` </p>`;
-			}
-		}
-		
-
-		html=html+`</div></div></body></html>`;
-		return html;
-	}
-
-	/*
-		Method:
 			getCustomeState
 
 		Description:
@@ -1459,64 +1423,107 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	*/
 
 	async getLogs():Promise<void> {
-
-		const editor = vscode.window.activeTextEditor;
-		let document = editor.document;
-
-		const documentPath = decodeURIComponent(document.uri.toString());
-
-		const intent = documentPath.split("/").pop();
-		const intenttype = documentPath.split("/")[2].split("_v")[0];
-
-		// Request done to the dev tools API within OpenSearch. Beta query (to test and evaluate if requires updates).
-
-		let url = "https://"+this.nspAddr+"/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
-		const method = 'POST';
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
 		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-
-		// checking NSP release to match the correct OSD version. To investigate.
-		let osdversion='2.6.0';
-		if (this.nsp_version.includes("23.11")){
-			osdversion='2.10.0';
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
 
-		let headers = {
-			'Content-Type': 'application/json',
-			'Cache-Control': 'no-cache',
-			'Osd-Version': osdversion,
-			'Authorization': 'Bearer ' + token
-		};
+		const editor = vscode.window.activeTextEditor;
+		if (editor) {
+			const filepath = decodeURIComponent(editor.document.uri.toString());
 
-		let response: any = await this._callNSP(url, {
-			method: method,
-			headers: headers,
-			body: '{"query": {"match_phrase": {"log": "\\"target\\":\\"'+intent+'\\""}},"sort": {"@datetime": "desc"},"size": 20}'
-		});
+			const intent = filepath.split("/").pop();
+			const intenttype = filepath.split("/")[2].split("_v")[0];
 
-		if (!response){
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			// Request done to the dev tools API within OpenSearch.
+			// Beta query (to test and evaluate if requires updates).
+			let url = "https://"+this.nspAddr+"/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
+
+			// checking NSP release to match the correct OSD version. To investigate.
+			let osdversion='2.6.0';
+			if (this.nsp_version.includes("23.11")) {
+				osdversion='2.10.0';
+			} else if (this.nsp_version.includes("24.")) {
+				osdversion='2.10.0';
+			}
+
+			let headers = {
+				'Content-Type': 'application/json',
+				'Cache-Control': 'no-cache',
+				'Osd-Version': osdversion,
+				'Authorization': 'Bearer ' + token
+			};
+
+			const body = {
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"match_phrase": {
+									"log": "\"target\":\""+intent+"\""
+								}
+							},
+							{
+								"range": {
+									"@datetime": {
+										"gte": "now-5m",
+										"lte": "now"
+									}
+								}
+							}
+						]
+					}
+				},
+				"sort": {
+					"@datetime": "desc"
+				},
+				"size": 500
+			}
+			let response: any = await this._callNSP(url, {
+				method: 'POST',
+				headers: headers,
+				body: JSON.stringify(body)
+			});
+
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
+			
+			if (!response.ok) {
+				vscode.window.showErrorMessage('Error while getting logs');
+				throw vscode.FileSystemError.Unavailable('Error while getting logs');
+			}
+			let json: any = await response.json();
+
+			let data: Array<Object> = json["hits"]["hits"];
+			if (data.length === 0 ) {
+				vscode.window.showWarningMessage("No intent operation logs for the last 5 minutes");
+			} else {
+				let logs : Array<any> = [];
+				for (const entry of data) {
+					logs.push(JSON.parse(entry['_source'].log));
+				}
+				logs.sort((a,b) => a['date']-b['date']);
+
+				const channel = vscode.window.createOutputChannel(intenttype+" "+intent, 'log');
+				channel.clear();
+				let pdate = logs[0]['date'];
+				for (const logentry of logs) {
+					const timestamp = new Date(logentry['date']);
+					const level = logentry['level'];
+					const message = logentry['message'].replace(/^\[.*\]/,"").trim();
+					// insert empty line, if more than 30sec between two log entries
+					if (logentry['date'] > pdate+30000) {
+						channel.appendLine("");
+					}
+					channel.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t" +message);
+					pdate = logentry['date'];
+				}
+				channel.show(true);
+			}
 		}
-
-		console.log(response);
-		console.log('{"query": {"match_phrase": {"log": "\\"target\\":\\"'+intent+'\\""}},"sort": {"@datetime": "desc"},"size": 20}');
-		console.log(method, url, response.status);
-		
-		if (!response.ok) {
-			vscode.window.showErrorMessage('Error while getting logs');
-			throw vscode.FileSystemError.Unavailable('Error while getting logs');
-		}
-		let json: any = await response.json();
-		const panel = vscode.window.createWebviewPanel(
-			'intentLogs',
-			intent+' Logs',
-			vscode.ViewColumn.Two
-		);
-		panel.webview.html = await this._getWebviewContentLogs(intent,intenttype,json["hits"]["hits"],panel);
 	}
 
 	/*

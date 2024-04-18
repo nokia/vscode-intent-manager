@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "engines": {
@@ -138,14 +138,14 @@
       ],
       "explorer/context": [
         {
-            "command": "nokia-intent-manager.newVersion",
-            "group": "nokia_im@1",
-            "when": "resource =~ /^im:\\/intent-types\\/[^\/]+$/"
+          "command": "nokia-intent-manager.newVersion",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intent-types\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.clone",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intent-types\\/[^\/]+$/"
+          "when": "resource =~ /^im:\\/intent-types\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.createIntentFromYang",
@@ -162,31 +162,34 @@
     "configuration": {
       "title": "IntentManager",
       "properties": {
-        "intentManager.NSPIP":{
+        "intentManager.NSPIP": {
           "type": "string",
           "default": "localhost",
           "scope": "application",
-          "format":"ipv4",
+          "format": "ipv4",
           "description": "NSP IP address."
         },
-        "intentManager.port":{
+        "intentManager.port": {
           "type": "string",
           "default": "8545",
           "scope": "application",
-          "enum":["443", "8545"],
+          "enum": [
+            "443",
+            "8545"
+          ],
           "enumDescriptions": [
             "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
             "8545 used in older NSP releases, to be deprecated."
           ],
           "description": "NSP IM port."
         },
-        "intentManager.user":{
+        "intentManager.user": {
           "type": "string",
           "default": "user",
           "scope": "application",
           "description": "NSP user."
         },
-        "intentManager.password":{
+        "intentManager.password": {
           "type": "null",
           "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
           "scope": "application",
@@ -201,8 +204,8 @@
         "intentManager.ignoreLabels": {
           "type": "array",
           "scope": "application",
-            "items": {
-                "type": "string"
+          "items": {
+            "type": "string"
           },
           "description": "Intent-types with these labels will be hidden."
         }
@@ -223,25 +226,29 @@
     "test-compile": "./node_modules/typescript/bin/tsc -p ./"
   },
   "devDependencies": {
-    "@types/vscode": "^1.75.0",
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
+    "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
+    "@vscode/test-electron": "^2.2.0",
     "eslint": "^8.28.0",
     "glob": "^8.0.3",
     "mocha": "^10.1.0",
-    "typescript": "^4.9.3",
-    "@vscode/test-electron": "^2.2.0"
+    "typescript": "^4.9.3"
   },
   "dependencies": {
+    "@vscode/codicons": "0.0.20",
+    "@vscode/vsce": "^2.25.0",
     "base-64": "^1.0.0",
-    "lodash":"^4.17.0",
+    "esbuild": "^0.20.2",
+    "lodash": "^4.17.0",
     "node-fetch": "2.6.6",
     "nunjucks": "^3.2.0",
+    "vsce": "^2.15.0",
     "vscode-uri": "^3.0.0",
-    "yaml": "^2.2.0",
-		"@vscode/codicons": "0.0.20"
+    "vse": "^0.5.1",
+    "yaml": "^2.2.0"
   }
 }
