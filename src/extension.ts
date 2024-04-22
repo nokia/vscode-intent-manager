@@ -66,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.uploadLocal', async (...args) => {
 		console.log(args[0]);
-		imProvider.uploadLocalIntent(args[0]);
+		imProvider.uploadLocalIntentType(args[0]);
 	}));
 	
 

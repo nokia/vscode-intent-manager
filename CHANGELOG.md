@@ -68,3 +68,14 @@ Updates:
 
 Updates:
 * Hide clear text password in settings.
+
+## [1.2.0]
+
+Updates:
+* Logging for intent operations using output channels of vscode. Logs are cleaned up and use the correct severity.
+* Moved plugin logging to log output channel of vscode (not console.log/warn/error anymore).
+  * Setup loglevel as desired from UI.
+  * Logging is available in normal production environment (no need to debug the plugin)
+* Main script can be called either script-content.js or script-content.mjs when uploading from local system
+* Support for subfolders under intent-type resources when uploading from local system
+* Error handling improvements for malformed RESTCONF error messages
