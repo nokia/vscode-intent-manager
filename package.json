@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "engines": {
@@ -61,19 +61,19 @@
       {
         "command": "nokia-intent-manager.audit",
         "category": "IntentManager",
-        "title": "Audit",
+        "title": "IM: Audit Intent(s)",
         "icon": "$(search)"
       },
       {
         "command": "nokia-intent-manager.logs",
         "category": "IntentManager",
-        "title": "Logs",
+        "title": "IM: Server Logs",
         "icon": "$(debug)"
       },
       {
         "command": "nokia-intent-manager.sync",
         "category": "IntentManager",
-        "title": "Sync",
+        "title": "IM: Synchronize Intent(s)",
         "icon": "$(sync)"
       },
       {
@@ -96,7 +96,7 @@
     "menus": {
       "editor/title": [
         {
-          "when": "resourceScheme != im && resourceFilename == meta-info.json",
+          "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
           "command": "nokia-intent-manager.uploadLocal",
           "group": "navigation"
         },
@@ -156,6 +156,21 @@
           "command": "nokia-intent-manager.createIntentFromScratch",
           "group": "nokia_im@1",
           "when": "resource =~ /^im:\\/intent-types$/"
+        },
+        {
+          "command": "nokia-intent-manager.logs",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intents+\\// || resource =~ /^im:\\/intent-types/"
+        },
+        {
+          "command": "nokia-intent-manager.audit",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intents+\\//"
+        },
+        {
+          "command": "nokia-intent-manager.sync",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/intents+\\//"
         }
       ]
     },

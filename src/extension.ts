@@ -110,20 +110,9 @@ export function activate(context: vscode.ExtensionContext) {
 		imProvider.openIntentCreation();
 	}));
 
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.audit', async () => {
-		console.log("Audit intent");
-		imProvider.audit();
-	}));
-
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.logs', async () => {
-		console.log("Intent Logs");
-		imProvider.getLogs();
-	}));
-
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.sync', async () => {
-		console.log("Sync intent");
-		imProvider.sync();
-	}));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.audit', async (...args) => imProvider.audit(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.logs', async (...args) => imProvider.logs(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.sync', async (...args) => imProvider.sync(args)));
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.intentStatus', () => {
 		imProvider.updateIntentNetworkStatus();

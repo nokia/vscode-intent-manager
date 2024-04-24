@@ -79,3 +79,10 @@ Updates:
 * Main script can be called either script-content.js or script-content.mjs when uploading from local system
 * Support for subfolders under intent-type resources when uploading from local system
 * Error handling improvements for malformed RESTCONF error messages
+
+## [1.2.1]
+
+Updates:
+* Ignore hidden resource files folders
+* Launch upload from local file-system from meta-info or script-content
+* Logging, Audit and Sync support from workspace, including multi-select

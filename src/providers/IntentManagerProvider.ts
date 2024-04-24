@@ -834,65 +834,71 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		}
 	}
 
-	/*
-		Method:
-			uploadLocalIntentType
-
-		Description:
-			Uploads a local intent-type to NSP Intent Manager. 
-			This is only allowed from the meta-info.json at this stage.
-
-			If meta-info does not contain intent-type name/version, user is prompted to provide
-			information manually (user input form).
-
-			Intent-type resources can be contained in subfolder structures, as per
-			IBN engine support. Intent-script is called script-content.js (default) or
-			script-content.mjs, based on the javascript engine being used.
-	*/
+	/**
+	 * Upload an intent-type from a local workspace folder to NSP Intent Manager.
+	 * This is only allowed from the meta-info or script-content at this stage.
+	 * 
+	 * If meta-info does not contain intent-type name/version, user is prompted
+	 * to provide name and version manually.
+	 * 
+	 * Intent-type resources can be contained in subfolder structures, as per
+	 * IBN engine support. Intent-script can be called `script-content.js`
+	 * (NashornJS, default) or `script-content.mjs` (GraalJS), based on the
+	 * javascript engine being used.
+	 * 
+	 * Remind, files must be saved to disk before uploading. Unsaved changes
+	 * will not be considered for uploading the intent-type.
+	 * 
+	 * @param {vscode.Uri} uri URI of meta-info or script-content
+	 * 
+	 */	
 
 	async uploadLocalIntentType(uri:vscode.Uri): Promise<void>{
 		var fs = require('fs');
 		this.pluginLogs.debug("uploadLocalIntentType("+uri+")");
 
-		// some pre-checks
-		if (!uri.toString().endsWith("meta-info.json")) {
-			vscode.window.showErrorMessage("meta-info.json must be selected to upload intent-type");
-			throw vscode.FileSystemError.FileNotFound("Script not found");
+		// Determine paths for files and folders
+
+		let basePath:string = '';
+		let pathMeta:string = '';
+		let pathScript:string = '';
+		if (uri.toString().endsWith("meta-info.json")) {
+			pathMeta   = uri.toString().replace("%20", " ").replace("file://", "");
+			basePath   = pathMeta.replace("meta-info.json", "");
+			if (fs.existsSync(basePath+"script-content.js"))
+				pathScript = basePath+"script-content.js";
+			else if (fs.existsSync(basePath+"script-content.mjs"))
+				pathScript = basePath+"script-content.mjs";
+			else {
+				vscode.window.showErrorMessage("Script not found");
+				throw vscode.FileSystemError.FileNotFound("Script not found");
+			}
+		} else {
+			pathScript = uri.toString().replace("%20", " ").replace("file://", "");
+			if (pathScript.endsWith("script-content.js"))
+				basePath   = pathScript.replace("script-content.js", "");
+			else if (pathScript.endsWith("script-content.mjs"))
+				basePath   = pathScript.replace("script-content.mjs", "");
+			else {
+				vscode.window.showErrorMessage("meta-info or script-content must be selected to upload intent-type");
+				throw vscode.FileSystemError.FileNotFound("Script/Meta not found");	
+			}
+			pathMeta = basePath+"meta-info.json";
 		}
-
-		const editor = vscode.window.activeTextEditor;
-		if (!editor) {
-			vscode.window.showErrorMessage("meta-info.json must be opened in active TextEditor to upload intent-type");
-			throw vscode.FileSystemError.FileNotFound("Script not found");
-		}
-
-		// load meta, determine paths
-		let   meta=JSON.parse(editor.document.getText());
-
-		const basePath:string = uri.toString().replace("%20", " ").replace("file://", "").replace("meta-info.json", "");
-		let   pathScript:string      = basePath + "script-content.js";
+		
 		const pathResources:string   = basePath + "intent-type-resources";
 		const pathYangModules:string = basePath + "yang-modules";
 		const pathViewConfigs:string = basePath + "views";
 
-		// check files/folders and read folders
-		if (!fs.existsSync(pathScript)) {
-			pathScript = basePath + "script-content.mjs";
-			if (!fs.existsSync(pathScript)) {
-				vscode.window.showErrorMessage("Script not found");
-				throw vscode.FileSystemError.FileNotFound("Script not found");
-			}
-		}
+		// load meta, script, resource-files, yang modules and views
+
+		let meta = JSON.parse(fs.readFileSync(pathMeta, {encoding:'utf8', flag:'r'}));
+		meta["script-content"] = fs.readFileSync(pathScript, {encoding:'utf8', flag:'r'});
 
 		let resources:string[] = [];
 		if (fs.existsSync(pathResources)) {
-			// Preferred implementation below, but runs into issues for some reason:
-			//	fs.readdirSync(pathResources, {recursive: true, withFileTypes: true }).forEach((dirent: fs.Dirent) => {
-			//	if (dirent.isFile()) resources.push(dirent.name);
-			//	});
-
 			fs.readdirSync(pathResources, {recursive: true}).forEach((file: string) => {
-				if (fs.lstatSync(pathResources+'/'+file).isFile())
+				if (fs.lstatSync(pathResources+'/'+file).isFile() && !file.startsWith('.') && !file.includes('/.'))
 					resources.push(file);
 			});
 			this.pluginLogs.info("resources: " + JSON.stringify(resources));
@@ -949,8 +955,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				throw vscode.FileSystemError.FileNotFound("Intent-type name and version must be provided!");
 			}
 		}
-
-		meta["script-content"] = fs.readFileSync(pathScript, {encoding:'utf8', flag:'r'});
 		
 		meta["module"]=[];
 		for (const module of modules) {
@@ -1428,15 +1432,65 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		vscode.window.showInformationMessage("New "+intent.split("_v")[0]+" intent version created");
 	}
 
-	/*
-		Method:
-			getLogs
+	/**
+	 * Get server logs for the intent script execution from OpenSearch. Filtering is applied
+	 * based on intent-type(s) or intent instances being selected.
+	 * 
+	 * Collection will be limited to cover the last 5min only respectively 1000 log entries.
+	 * 
+	 * Whenever there is a pause between two adjacent log entries for 30sec or more, an empty
+	 * line will be added. This is to provide better separation between disjoint intent
+	 * operations.
+	 * 
+	 * Logs are reordered (sorted) by the timestamp generated by the IBN engine. In some cases
+	 * adjacent log entries contain the same timestamp, while displaying logs in the correct
+	 * order can not be granted.
+	 * 
+	 * If no intent-type/intent URI is provided, all execution logs from last 5 minutes
+	 * are queried.
+	 * 
+	 * @param {any[]} args context used to issue command
+	 */	
 
-		Description:
-			Get the logs exposed by log/logger classes from OpenSearch for a particular intent instance (beta).
-	*/
+	async logs(args:any[]):Promise<void> {
+		this.pluginLogs.debug("logs(",args,")");
 
-	async getLogs():Promise<void> {
+		let query = {"bool": {"must": [
+			{"range": {"@datetime": {"gte": "now-5m"}}},
+			{"match_phrase": {"log": "\"category\":\"com.nokia.fnms.controller.ibn.impl.ScriptedEngine\""}},
+			{"bool": {"should": []}}
+		]}};
+
+		let uriList:vscode.Uri[] = [];
+		if (args.length === 2 && Array.isArray(args[1]))
+			uriList = args[1];
+		else if (args.length > 0 && args[0] instanceof vscode.Uri) {
+			uriList = [args[0]];
+		} else {
+			const editor = vscode.window.activeTextEditor;
+			if (editor)
+				uriList = [editor.document.uri];
+		}
+
+		for (const uriEntry of uriList) {
+			let uri = decodeURIComponent(uriEntry.toString());
+			if (uri.startsWith('im:/')) {
+				this.pluginLogs.info("get logs for "+uri);
+				const uriParts = uri.split('/');
+
+				if (uriParts.length>2) {
+					let qentry = {"bool": {"must": [
+						{"match_phrase": {"log": "\"intent_type\":\""+uriParts[2].split('_v')[0]+"\""}},
+						{"match_phrase": {"log": "\"intent_type_version\":\""+uriParts[2].split('_v')[1]+"\""}}
+					]}};
+					if (uri.startsWith('im:/intents') && (uriParts.length===4))
+						qentry.bool.must.push({"match_phrase": {"log": "\"target\":\""+uriParts[3]+"\""}});
+
+					query.bool.must.at(2).bool.should.push(qentry);
+				}
+			}
+		}
+
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
@@ -1444,183 +1498,96 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
 
-		const editor = vscode.window.activeTextEditor;
-		if (editor) {
-			const filepath = decodeURIComponent(editor.document.uri.toString());
+		let url = "https://"+this.nspAddr+"/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
 
-			const intent = filepath.split("/").pop();
-			const intenttype = filepath.split("/")[2].split("_v")[0];
-
-			// Request done to the dev tools API within OpenSearch.
-			// Beta query (to test and evaluate if requires updates).
-			let url = "https://"+this.nspAddr+"/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
-
-			// checking NSP release to match the correct OSD version. To investigate.
-			let osdversion='2.6.0';
-			if (this.nsp_version.includes("23.11")) {
-				osdversion='2.10.0';
-			} else if (this.nsp_version.includes("24.")) {
-				osdversion='2.10.0';
-			}
-
-			let headers = {
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-cache',
-				'Osd-Version': osdversion,
-				'Authorization': 'Bearer ' + token
-			};
-
-			const body = {
-				"query": {
-					"bool": {
-						"must": [
-							{
-								"match_phrase": {
-									"log": "\"target\":\""+intent+"\""
-								}
-							},
-							{
-								"range": {
-									"@datetime": {
-										"gte": "now-5m",
-										"lte": "now"
-									}
-								}
-							}
-						]
-					}
-				},
-				"sort": {
-					"@datetime": "desc"
-				},
-				"size": 500
-			}
-			let response: any = await this._callNSP(url, {
-				method: 'POST',
-				headers: headers,
-				body: JSON.stringify(body)
-			});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (!response.ok) {
-				vscode.window.showErrorMessage('Error while getting logs');
-				throw vscode.FileSystemError.Unavailable('Error while getting logs');
-			}
-			let json: any = await response.json();
-
-			let data: Array<Object> = json["hits"]["hits"];
-			if (data.length === 0 ) {
-				vscode.window.showWarningMessage("No intent operation logs for the last 5 minutes");
-			} else {
-				let logs : Array<any> = [];
-				for (const entry of data) {
-					logs.push(JSON.parse(entry['_source'].log));
-				}
-				logs.sort((a,b) => a['date']-b['date']);
-
-				this.serverLogs.clear()
-				this.serverLogs.show(true);
-
-				let pdate = logs[0]['date'];
-				for (const logentry of logs) {
-					const timestamp = new Date(logentry['date']);
-					const level = logentry['level'];
-					const message = logentry['message'].replace(/^\[.*\]/,"").trim();
-					// insert empty line, if more than 30sec between two log entries
-					if (logentry['date'] > pdate+30000) {
-						this.serverLogs.appendLine("");
-					}
-					this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t" +message);
-					pdate = logentry['date'];
-				}
-			}
+		// checking NSP release to match the correct OSD version
+		let osdversion='2.6.0';
+		if (this.nsp_version.includes("23.11")) {
+			osdversion='2.10.0';
+		} else if (this.nsp_version.includes("24.")) {
+			osdversion='2.10.0';
 		}
-	}
-
-	/*
-		Method:
-			audit
-
-		Description:
-			Audits the intent instance and pulls the result to update the intent decoration. It allows to show misalignment details.
-	*/
-
-	async audit(): Promise<void> {
-		const editor = vscode.window.activeTextEditor;
-		let document = editor.document;
-
-		const documentPath = document.uri.toString();
-
-		const intent = documentPath.split("/").pop();
-		const intenttype = documentPath.split("/")[2].split("_v")[0];
-		let url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn:ibn/intent="+intent+","+intenttype+"/audit";
-		const method = 'POST';
-		// get auth-token
-		await this._getAuthToken();
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
 
 		let headers = {
 			'Content-Type': 'application/json',
 			'Cache-Control': 'no-cache',
+			'Osd-Version': osdversion,
 			'Authorization': 'Bearer ' + token
 		};
+
+		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": 1000};
+
 		let response: any = await this._callNSP(url, {
-			method: method,
+			method: 'POST',
 			headers: headers,
-			body: ""
+			body: JSON.stringify(body)
 		});
+
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		if (!response.ok) {
-			vscode.window.showErrorMessage('Error while auditing');
-			throw vscode.FileSystemError.Unavailable('Error while auditing');
+			vscode.window.showErrorMessage('Error while getting logs');
+			throw vscode.FileSystemError.Unavailable('Error while getting logs');
 		}
 		let json: any = await response.json();
-		var path = require('path');
-		if (Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-attribute")||Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-object")){
-			vscode.window.showWarningMessage("Intent Misaligned","Details","Cancel").then( async (selectedItem) => {
-				if ('Details' === selectedItem) {
-					//Beta
-					this.pluginLogs.info(path.join(this.extContext.extensionPath, 'media'));
-					const panel = vscode.window.createWebviewPanel(
-						'auditReport',
-						intent+' Audit',
-						vscode.ViewColumn.Two,
-						{localResourceRoots: [vscode.Uri.file(path.join(this.extContext.extensionPath, 'media'))]}
-					);
-					panel.webview.html = await this._getWebviewContent(intent,intenttype,json["ibn:output"]["audit-report"],panel);
-				} 
-			});;
-			this.intents[documentPath].aligned=false;
+
+		let data: Array<Object> = json["hits"]["hits"];
+		if (data.length === 0 ) {
+			vscode.window.showWarningMessage("No intent operation logs for the last 5 minutes");
 		} else {
-			vscode.window.showInformationMessage("Intent Aligned");
-			this.intents[documentPath].aligned=true;
+			let logs : Array<any> = [];
+			for (const entry of data) {
+				logs.push(JSON.parse(entry['_source'].log));
+			}
+			logs.sort((a,b) => a['date']-b['date']);
+
+			this.serverLogs.clear()
+			this.serverLogs.show(true);
+
+			let pdate = logs[0]['date'];
+			for (const logentry of logs) {
+				const timestamp = new Date(logentry['date']);
+				const level = logentry['level'];
+				const target = logentry['target'];
+				const intent_type = logentry['intent_type'];
+				const intent_type_version = logentry['intent_type_version'];
+				const message = logentry['message'].replace(/^\[.*\]/,"").trim();
+
+				// insert empty line, if more than 30sec between two log entries
+				if (logentry['date'] > pdate+30000) {
+					this.serverLogs.appendLine("");
+				}
+
+				this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type + '_v' + intent_type_version + ' ' + target + "] " + message);
+				pdate = logentry['date'];
+			}
 		}
-		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-		this._eventEmiter.fire(document.uri);
 	}
 
-	/*
-		Method:
-			sync
+	/**
+	 * Execute an audit of the selected intent instance(s).
+	 * Pulls the result(s) to update the intent decoration.
+	 * Show details, if intent is misaligned.
+	 * 
+	 * @param {any[]} args context used to issue command
+	 */		
 
-		Description:
-			Triggers the intent-type synchronize method for the particular intent instance.
-	*/
+	async audit(args:any[]):Promise<void> {
+		this.pluginLogs.debug("audit(",args,")");
 
-	async sync(): Promise<void> {
-		const editor = vscode.window.activeTextEditor;
-		let document = editor.document;
+		const path = require('path');
 
-		const documentPath = document.uri.toString();
+		let uriList:vscode.Uri[] = [];
+		if (args.length === 2 && Array.isArray(args[1]))
+			uriList = args[1];
+		else if (args.length > 0 && args[0] instanceof vscode.Uri) {
+			uriList = [args[0]];
+		} else {
+			const editor = vscode.window.activeTextEditor;
+			if (editor)
+				uriList = [editor.document.uri];
+		}
 
-		const intent = documentPath.split("/").pop();
-		const intenttype = documentPath.split("/")[2].split("_v")[0];
-		let url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn:ibn/intent="+intent+","+intenttype+"/synchronize";
-		const method = 'POST';
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
@@ -1628,35 +1595,118 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
             throw vscode.FileSystemError.Unavailable('NSP is not reachable');
         }
 
-		let headers = {
-			'Content-Type': 'application/json',
-			'Cache-Control': 'no-cache',
-			'Authorization': 'Bearer ' + token
-		};
-		let response: any = await this._callNSP(url, {
-			method: method,
-			headers: headers,
-			body: ""
-		});
-		if (!response)
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		if (!response.ok) {
-			vscode.window.showErrorMessage('Error during Synchronize');
-			throw vscode.FileSystemError.Unavailable('Error during Synchronize');
+		for (const uriEntry of uriList) {
+			const uri = decodeURIComponent(uriEntry.toString());
+			const uriParts = uri.split('/');
+			if (uri.startsWith('im:/intents/') && uriParts.length===4) {
+				const intent = uriParts[3];
+				const intenttype = uriParts[2].split('_v')[0];
+				const url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn:ibn/intent="+intent+","+intenttype+"/audit";
+				const method = 'POST';
+				const headers = {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				};
+
+				let response: any = await this._callNSP(url, {method: method, headers: headers, body: ""});
+				if (!response)
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				if (!response.ok) {
+					vscode.window.showErrorMessage('Error while auditing');
+					throw vscode.FileSystemError.Unavailable('Error while auditing');
+				}
+
+				let json : any = await response.json();
+				if (Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-attribute") ||
+				    Object.keys(json["ibn:output"]["audit-report"]).includes("misaligned-object"))
+				{
+					vscode.window.showWarningMessage("Intent Misaligned","Details","Cancel").then( async (selectedItem) => {
+						if ('Details' === selectedItem) {
+							this.pluginLogs.info(path.join(this.extContext.extensionPath, 'media'));
+							const panel = vscode.window.createWebviewPanel('auditReport', intent+' Audit', vscode.ViewColumn.Two,
+								{localResourceRoots: [vscode.Uri.file(path.join(this.extContext.extensionPath, 'media'))]}
+							);
+							panel.webview.html = await this._getWebviewContent(intent, intenttype, json["ibn:output"]["audit-report"], panel);
+						}
+					});
+					this.intents[uri].aligned=false;
+				} else {
+					vscode.window.showInformationMessage("Intent Aligned");
+					this.intents[uri].aligned=true;
+				}
+				this._eventEmiter.fire(uriEntry);
+			}
 		}
-		vscode.window.showInformationMessage("Intent Synchronized");
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-		this._eventEmiter.fire(document.uri);
 	}
 
-	/*
-		Method:
-			sync
+	/**
+	 * Execute a synchronize of the selected intent instance(s).
+	 * 
+	 * @param {any[]} args context used to issue command
+	 */		
 
-		Description:
-			Opens NSP IM web for an intent-type.
-	*/
+	async sync(args:any[]):Promise<void> {
+		this.pluginLogs.debug("sync(",args,")");
 
+		const path = require('path');
+
+		let uriList:vscode.Uri[] = [];
+		if (args.length === 2 && Array.isArray(args[1]))
+			uriList = args[1];
+		else if (args.length > 0 && args[0] instanceof vscode.Uri) {
+			uriList = [args[0]];
+		} else {
+			const editor = vscode.window.activeTextEditor;
+			if (editor)
+				uriList = [editor.document.uri];
+		}
+
+		// get auth-token
+		await this._getAuthToken();
+		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
+
+		for (const uriEntry of uriList) {
+			const uri = decodeURIComponent(uriEntry.toString());
+			const uriParts = uri.split('/');
+			if (uri.startsWith('im:/intents/') && uriParts.length===4) {
+				const intent = uriParts[3];
+				const intenttype = uriParts[2].split('_v')[0];
+				const url = "https://"+this.nspAddr+":"+this.port+"/restconf/data/ibn:ibn/intent="+intent+","+intenttype+"/synchronize";
+				const method = 'POST';
+				const headers = {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				};
+
+				let response: any = await this._callNSP(url, {method: method, headers: headers, body: ""});
+
+
+				if (!response)
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				if (!response.ok) {
+					vscode.window.showErrorMessage('Error during synchronize');
+					throw vscode.FileSystemError.Unavailable('Error during synchronize');
+				}
+				vscode.window.showInformationMessage("Intent Synchronized");
+				await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+
+				this.intents[uri].aligned=true;
+				this._eventEmiter.fire(uriEntry);
+			}
+		}
+		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+	}
+
+	/**
+	 * Opens NSP WebUI Intent Manager for an intent-type.
+	 */		
+	
 	async openInBrowser(): Promise<void> {
 		const editor = vscode.window.activeTextEditor;
 		if (editor) {
