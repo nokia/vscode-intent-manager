@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "engines": {
@@ -25,9 +25,39 @@
     ],
     "commands": [
       {
+        "command": "nokia-intent-manager.audit",
+        "category": "IntentManager",
+        "title": "Audit intent(s)",
+        "icon": "$(search)"
+      },
+      {
+        "command": "nokia-intent-manager.sync",
+        "category": "IntentManager",
+        "title": "Synchronize intent(s)",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "nokia-intent-manager.logs",
+        "category": "IntentManager",
+        "title": "NSP server-logs",
+        "icon": "$(debug)"
+      },
+      {
+        "command": "nokia-intent-manager.state",
+        "category": "IntentManager",
+        "title": "Set intent state",
+        "icon": "$(symbol-property)"
+      },
+      {
+        "command": "nokia-intent-manager.openInBrowser",
+        "category": "IntentManager",
+        "title": "Open in browser",
+        "icon": "$(home)"
+      },
+      {
         "command": "nokia-intent-manager.uploadLocal",
         "category": "IntentManager",
-        "title": "Upload",
+        "title": "Upload intent-type",
         "icon": "$(cloud-upload)"
       },
       {
@@ -37,60 +67,25 @@
         "icon": "$(request-changes)"
       },
       {
-        "command": "nokia-intent-manager.openInBrowser",
-        "category": "IntentManager",
-        "title": "Open in Browser",
-        "icon": "$(home)"
-      },
-      {
         "command": "nokia-intent-manager.newVersion",
         "category": "IntentManager",
-        "title": "IM: Create New Version"
+        "title": "New intent-type version"
       },
       {
         "command": "nokia-intent-manager.clone",
         "category": "IntentManager",
-        "title": "IM: Clone Intent-type"
+        "title": "Clone intent-type"
       },
       {
         "command": "nokia-intent-manager.newIntent",
         "category": "IntentManager",
-        "title": "IM: Create new Intent-type",
+        "title": "Create new intent",
         "icon": "$(play-circle)"
       },
       {
-        "command": "nokia-intent-manager.audit",
+        "command": "nokia-intent-manager.newIntentType",
         "category": "IntentManager",
-        "title": "IM: Audit Intent(s)",
-        "icon": "$(search)"
-      },
-      {
-        "command": "nokia-intent-manager.logs",
-        "category": "IntentManager",
-        "title": "IM: Server Logs",
-        "icon": "$(debug)"
-      },
-      {
-        "command": "nokia-intent-manager.sync",
-        "category": "IntentManager",
-        "title": "IM: Synchronize Intent(s)",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "nokia-intent-manager.intentStatus",
-        "category": "IntentManager",
-        "title": "Update intent state",
-        "icon": "$(symbol-property)"
-      },
-      {
-        "command": "nokia-intent-manager.createIntentFromYang",
-        "category": "IntentManager",
-        "title": "IM: Create intent-type from Yang"
-      },
-      {
-        "command": "nokia-intent-manager.createIntentFromScratch",
-        "category": "IntentManager",
-        "title": "IM: Create New intent-type"
+        "title": "Create new intent-type"
       }
     ],
     "menus": {
@@ -111,66 +106,73 @@
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/intent-types+\\//",
+          "when": "resource =~ /^im:\\/$/",
           "command": "nokia-intent-manager.newIntent",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/intents+\\//",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.logs",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/intents+\\//",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.audit",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/intents+\\//",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.sync",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/intents+\\//",
-          "command": "nokia-intent-manager.intentStatus",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
+          "command": "nokia-intent-manager.state",
           "group": "navigation"
         }
       ],
       "explorer/context": [
         {
+          "command": "nokia-intent-manager.newIntentType",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/$/"
+        },
+
+        {
           "command": "nokia-intent-manager.newVersion",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intent-types\\/[^/]+$/"
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+$/"
         },
         {
           "command": "nokia-intent-manager.clone",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intent-types\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.createIntentFromYang",
-          "group": "nokia_im@1",
-          "when": "resourceExtname == .yang"
-        },
-        {
-          "command": "nokia-intent-manager.createIntentFromScratch",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intent-types$/"
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+$/"
         },
         {
           "command": "nokia-intent-manager.logs",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intents+\\// || resource =~ /^im:\\/intent-types/"
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+/"
         },
+        
         {
           "command": "nokia-intent-manager.audit",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intents+\\//"
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.sync",
           "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/intents+\\//"
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.state",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.newIntentType",
+          "group": "nokia_im@1",
+          "when": "resourceExtname == .yang"
         }
       ]
     },

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            body {font-family: Verdana, sans-serif;}
+
+            /* Style for buttons to select tab */
+            .tab {
+                overflow: hidden;
+                border: 1px solid #cccccc;
+                background-color: #f0f0f0;
+            }
+
+            .tab button {
+                background-color: inherit;
+                float: left;
+                border: none;
+                outline: none;
+                cursor: pointer;
+                padding: 2px 30px;
+                transition: 0.5s;
+                font-size: 12px;
+                margin-left: auto;            
+            }
+
+            .tab button:hover {
+                background-color: #dddddd;
+            }
+
+            .tab button.active {
+                background-color: #cccccc;
+            }
+
+            /* Tab must be selected to display */
+            .tabcontent {
+                display: none;
+                border: 1px solid #cccccc;
+                border-top: none;
+            }
+
+            /* Table for audit result */
+            table {
+                font-family: Tahoma, sans-serif;
+                font-size: 12px;
+                border-collapse: collapse;
+                width: 100%;
+            }
+            
+            td, th {
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 8px;
+            }
+            
+            tr:nth-child(even) {
+                background-color: lightblue;
+            }
+
+            em {
+                background-color: blue;
+                color: white;
+                font-family:'Courier New', Courier, monospace;
+                font-style:normal;
+                padding: 1px 4px;
+            }
+        </style>
+        <script>
+            function openTab(evt, tabName) {
+              var i, tabcontent, tablinks;
+              tabcontent = document.getElementsByClassName("tabcontent");
+              for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+              }
+              tablinks = document.getElementsByClassName("tablinks");
+              for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+              }
+              document.getElementById(tabName).style.display = "block";
+              evt.currentTarget.className += " active";
+            };
+
+            function clickFirstTab() {
+                document.getElementById("select_tab1").click();                
+            }
+
+        </script>        
+    </head>
+    <body onload="clickFirstTab()">
+        <div style="display: block; margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px; width: 40%;">
+            <svg id="Art" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 129.8"><g id="Logo"><path id="Wordmark" d="m398.2,3.9v121.9s19.1,0,19.1,0V3.9h-19.1ZM194.2,1.9c-37.2,0-66,25.9-66,63s28.9,63,66,63c37.2,0,66.1-24.3,66-63,0-35.2-28.9-63-66-63Zm47,63c0,27.5-21,45.7-47,45.7s-47-18.2-47-45.7,21-45.7,47-45.7,47,18.7,47,45.7ZM0,0v125.8h19.5V42.7s101.2,87.1,101.2,87.1v-26.1L0,0Zm274.6,64.9l70.8,60.9h28.4s-71-60.9-71-60.9L373.9,3.9h-28.4l-70.8,60.9Zm301.4,60.9h-21l-15.4-27h-69.6l-15.4,27h-21l25.4-45h70.5l-35.1-62.5,10.4-18.3h0s0,0,0,0l71.1,125.8Z"/></g></svg>
+        </div>
+
+        <h3>Audit Report</h3>
+
+        <div style="margin-left: 25px; margin-bottom: 25px;">
+            <b>Intent-type:</b> {{ report["intent-type"] }}<br>
+            <b>Target:</b> {{ report["target"] }}
+        </div>
+
+        <div class="tab">
+            <button class="tablinks" id="select_tab1" onclick="openTab(event, 'tab1')">MISALIGNED ATTRIBUTES</button>
+            <button class="tablinks" id="select_tab2" onclick="openTab(event, 'tab2')">MISSING OBJECTS</button>
+            <button class="tablinks" id="select_tab3" onclick="openTab(event, 'tab3')">UNDESIRED OBJECTS</button>
+        </div>
+
+        <div id="tab1" class="tabcontent">
+            <table>
+                <tr>
+                    <th>Site</th>
+                    <th>Path</th>
+                    <th>Desired Value</th>
+                    <th>Observed Value</th>    
+                </tr>
+{% for entry in report["misaligned-attribute"] %}                
+                <tr>
+                    <td>{{ entry["device-name"]    }}</td>
+                    <td>{{ entry["attribute-name"] | safe }}</td>
+                    <td>{{ entry["expected-value"] }}</td>
+                    <td>{{ entry["actual-value"]   }}</td>
+                </tr>
+{% endfor %}
+            </table>
+        </div>
+
+        <div id="tab2" class="tabcontent">
+            <table>
+                <tr>
+                    <th>Site</th>
+                    <th>Path</th>
+                </tr>
+{% for entry in report["misaligned-object"] %}
+{% if entry["is-configured"] == false %}
+                <tr>
+                    <td>{{ entry["device-name"] }}</td>
+                    <td>{{ entry["object-id"] | safe }}</td>
+                </tr>
+{% endif %}
+{% endfor %}
+            </table>
+        </div>
+
+        <div id="tab3" class="tabcontent">
+            <table>
+                <tr>
+                    <th>Site</th>
+                    <th>Path</th>
+                </tr>
+{% for entry in report["misaligned-object"] %}
+{% if entry["is-configured"] == true %}
+                <tr>
+                    <td>{{ entry["device-name"] }}</td>
+                    <td>{{ entry["object-id"] | safe }}</td>
+                </tr>
+{% endif %}
+{% endfor %}
+            </table>
+        </div>
+    </body>
+</html>

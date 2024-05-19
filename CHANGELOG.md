@@ -86,3 +86,8 @@ Updates:
 * Ignore hidden resource files folders
 * Launch upload from local file-system from meta-info or script-content
 * Logging, Audit and Sync support from workspace, including multi-select
+
+## [2.0.0]
+
+Updates:
+* Code refactored to support next-gen JS engine
