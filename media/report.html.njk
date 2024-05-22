@@ -53,14 +53,14 @@
             }
             
             tr:nth-child(even) {
-                background-color: lightblue;
+                background-color: #f0f0f0;
             }
 
             em {
-                background-color: blue;
-                color: white;
-                font-family:'Courier New', Courier, monospace;
+                background-color: yellow;
+                color: black;
                 font-style:normal;
+                font-weight: bold;
                 padding: 1px 4px;
             }
         </style>
@@ -111,6 +111,7 @@
                     <th>Desired Value</th>
                     <th>Observed Value</th>    
                 </tr>
+{% if report["misaligned-attribute"] %}
 {% for entry in report["misaligned-attribute"] %}                
                 <tr>
                     <td>{{ entry["device-name"]    }}</td>
@@ -119,6 +120,7 @@
                     <td>{{ entry["actual-value"]   }}</td>
                 </tr>
 {% endfor %}
+{% endif %}
             </table>
         </div>
 
@@ -127,15 +129,21 @@
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
+                    <th>Configured</th>
                 </tr>
+{% if report["misaligned-object"] %}
 {% for entry in report["misaligned-object"] %}
-{% if entry["is-configured"] == false %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
                     <td>{{ entry["object-id"] | safe }}</td>
-                </tr>
+{% if entry["is-configured"] %}
+                    <td>true</td>
+{% else %}
+                    <td>false</td>
 {% endif %}
+                </tr>
 {% endfor %}
+{% endif %}
             </table>
         </div>
 
@@ -144,15 +152,21 @@
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
+                    <th>Configured</th>
                 </tr>
-{% for entry in report["misaligned-object"] %}
-{% if entry["is-configured"] == true %}
+{% if report["undesired-object"] %}
+{% for entry in report["undesired-object"] %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
                     <td>{{ entry["object-id"] | safe }}</td>
-                </tr>
+                    {% if entry["is-configured"] %}
+                    <td>true</td>
+{% else %}
+                    <td>false</td>
 {% endif %}
+                </tr>
 {% endfor %}
+{% endif %}
             </table>
         </div>
     </body>

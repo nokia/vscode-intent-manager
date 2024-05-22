@@ -31,6 +31,12 @@
         "icon": "$(search)"
       },
       {
+        "command": "nokia-intent-manager.lastAuditReport",
+        "category": "IntentManager",
+        "title": "Last audit report",
+        "icon": "$(search)"
+      },
+      {
         "command": "nokia-intent-manager.sync",
         "category": "IntentManager",
         "title": "Synchronize intent(s)",
@@ -106,7 +112,7 @@
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/$/",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\//",
           "command": "nokia-intent-manager.newIntent",
           "group": "navigation"
         },
@@ -137,7 +143,11 @@
           "group": "nokia_im@1",
           "when": "resource =~ /^im:\\/$/"
         },
-
+        {
+          "command": "nokia-intent-manager.newIntent",
+          "group": "nokia_im@1",
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+/"
+        },
         {
           "command": "nokia-intent-manager.newVersion",
           "group": "nokia_im@1",
@@ -153,7 +163,6 @@
           "group": "nokia_im@1",
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+/"
         },
-        
         {
           "command": "nokia-intent-manager.audit",
           "group": "nokia_im@1",
@@ -168,6 +177,11 @@
           "command": "nokia-intent-manager.state",
           "group": "nokia_im@1",
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+        },
+        {
+          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
+          "command": "nokia-intent-manager.lastAuditReport",
+          "group": "nokia_im@1"
         },
         {
           "command": "nokia-intent-manager.newIntentType",
