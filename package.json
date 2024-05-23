@@ -99,94 +99,99 @@
         {
           "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
           "command": "nokia-intent-manager.uploadLocal",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resourceScheme == im && activeEditorIsDirty == true",
           "command": "workbench.files.action.compareWithSaved",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resourceScheme == im",
           "command": "nokia-intent-manager.openInBrowser",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\//",
           "command": "nokia-intent-manager.newIntent",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.logs",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.audit",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.sync",
-          "group": "navigation"
+          "group": "nokia_im"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.state",
-          "group": "navigation"
+          "group": "nokia_im"
         }
       ],
       "explorer/context": [
         {
+          "command": "nokia-intent-manager.uploadLocal",
+          "group": "nokia_im",
+          "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-zA-Z0-9\\-_]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
+        },
+        {
           "command": "nokia-intent-manager.newIntentType",
-          "group": "nokia_im@1",
+          "group": "nokia_im",
+          "when": "resourceScheme == file && resourceExtname == .yang"
+        },
+        {
+          "command": "nokia-intent-manager.newIntentType",
+          "group": "nokia_im",
           "when": "resource =~ /^im:\\/$/"
         },
         {
           "command": "nokia-intent-manager.newIntent",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.newVersion",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+$/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.clone",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+$/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.logs",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.audit",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.sync",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.state",
-          "group": "nokia_im@1",
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
-          "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.lastAuditReport",
-          "group": "nokia_im@1"
-        },
-        {
-          "command": "nokia-intent-manager.newIntentType",
-          "group": "nokia_im@1",
-          "when": "resourceExtname == .yang"
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+\\/intents\\/[^/]+$/"
         }
       ]
     },
