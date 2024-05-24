@@ -1,0 +1,8 @@
+{
+    "templates": [
+        {
+            "label": "helloWorld",
+            "description": "basic intent-type | mapping-engine js-scripted (Nashorn)"
+        }
+    ]
+}

@@ -91,3 +91,5 @@ Updates:
 
 Updates:
 * Code refactored to support next-gen JS engine
+* More short-cuts added to explorer (including multi-select)
+* Creation of new intent-types using templates

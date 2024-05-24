@@ -60,7 +60,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	timeout: number;
 	fileIgnore: Array<string>;
 
-	nspVersion: string | undefined;
+	nspVersion: number[] | undefined;
 	secretStorage: vscode.SecretStorage;
 
 	serverLogs: vscode.OutputChannel;
@@ -123,7 +123,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.authToken = undefined;
 
-		this.matchIntentType = /^([a-z][A-Za-z_\-]+[_\-]v\d+)$/;
+		this.matchIntentType = /^([a-z][a-z_\-]+[_\-]v\d+)$/;
 		this.intentTypes = {};
 
 		this._eventEmiter = new vscode.EventEmitter();
@@ -321,7 +321,31 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	private async _openWebUI(url:string): Promise<void> {
-		vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+url));
+		if (url.startsWith('/web/'))
+			// New navigation since nsp23.11 uses standard https ports 443
+			url = "https://"+this.nspAddr+url;
+		else if (url.startsWith('/intent-manager/'))
+			// Original WebUI until nsp23.8 uses mdt tomcat port 8547
+			url = "https://"+this.nspAddr+":8547"+url;
+		else
+			url = "https://"+this.nspAddr+url;
+
+		vscode.env.openExternal(vscode.Uri.parse(url));
+	}
+
+	/**
+	 * Checks if NSP is running at least a specific release
+	 * 
+	 * @param {number} major Major NSP REL
+	 * @param {number} minor Minor NSP REL
+	 */
+
+	private _fromRelease(major: number, minor:number): boolean {
+		if (this.nspVersion) {
+			if (this.nspVersion[0] > major) return true;
+			if (this.nspVersion[0]===major && this.nspVersion[1]>=minor) return true;
+		}
+		return false;
 	}
 
 	/**
@@ -339,12 +363,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		if (!response.ok)
-			throw vscode.FileSystemError.Unavailable('Getting NSP release failed');
+			this._raiseRestconfError("Getting NSP release failed!", await response.json());
 		
 		let json = await response.json();
 
 		const version = json["response"]["data"]["nspOSVersion"];		
-		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0];
+		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(parseInt);
 		vscode.window.showInformationMessage("NSP version: "+version);
 	}
 
@@ -409,7 +433,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (report.hasOwnProperty("misaligned-attribute"))
 				for (let object of report["misaligned-attribute"])
-					object["attribute-name"] = this._modelPathHTML(object["attribute-name"]);
+					object["name"] = this._modelPathHTML(object["name"]);
 
 		if (report.hasOwnProperty("misaligned-object"))
 			for (let object of report["misaligned-object"])
@@ -429,16 +453,21 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 *  
 	 * @param {string} errmsg Provide information about what failed
 	 * @param {{[key: string]: any}} response HTTP response to extract error message
+	 * @param {boolean} show Always show error message, for cases where vsCode is NOT handling exceptions
 	 */		
 
-	private _raiseRestconfError(errmsg: string, response: {[key: string]: any}) {
+	private _raiseRestconfError(errmsg: string, response: {[key: string]: any}, show:boolean=false) {
 		if (Object.keys(response).includes("ietf-restconf:errors")) {
 			while (response && (Object.keys(response)[0]!="error"))
 				response = response[Object.keys(response)[0]];
 
-			throw vscode.FileSystemError.Unavailable(errmsg+"\n"+response["error"][0]["error-message"]);
+			errmsg += "\n"+response["error"][0]["error-message"];
 		}
-		throw vscode.FileSystemError.Unavailable(errmsg);
+
+		if (show)
+			vscode.window.showErrorMessage(errmsg);
+
+		throw vscode.FileSystemError.NoPermissions(errmsg);
 	}
 
 	/**
@@ -492,7 +521,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!response)
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (!response.ok)
-				throw vscode.FileSystemError.Unavailable('Get list of intent-types failed');
+				this._raiseRestconfError("Getting list of intent-types failed!", await response.json());
 
 			let json = await response.json();
 			if (json["ibn-administration:output"]["total-count"]>1000) {
@@ -535,7 +564,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				if (!response.ok)
-					throw vscode.FileSystemError.Unavailable('Get intent-type details failed');
+					this._raiseRestconfError("Getting intent-type details failed!", await response.json());
 
 				let json = await response.json();
 				let data = json["ibn-administration:intent-type"];
@@ -588,7 +617,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				if (!response.ok)
-					throw vscode.FileSystemError.Unavailable('Get list of intents failed');
+					this._raiseRestconfError("Getting list of intents failed!", await response.json());
 
 				let json = await response.json();
 				const output = json["ibn:output"];
@@ -631,7 +660,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				if (!response.ok)
-					throw vscode.FileSystemError.Unavailable('Get list of views failed');
+					this._raiseRestconfError("Getting list of views failed!", await response.json());
 	
 				let json = await response.json();
 
@@ -867,7 +896,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						});
 					}
 					if (!intent)
-						throw vscode.FileSystemError.Unavailable('Create intent failed');
+						throw vscode.FileSystemError.Unavailable('Intent creation cancelled!');
 
 					const url = "/restconf/data/ibn:ibn";
 					const body = {
@@ -1044,7 +1073,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!response)
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (!response.ok)
-				throw vscode.FileSystemError.Unavailable('Delete failed');
+				this._raiseRestconfError("Delete intent-type failed!", await response.json());
 
 			// Deletion was successful, let's update the cache
 			if (parts.length>3) {
@@ -1093,7 +1122,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * @param {vscode.Uri} uri URI of the folder to be created
 	*/	
 
-	createDirectory(uri: vscode.Uri): void {
+	async createDirectory(uri: vscode.Uri):  Promise<void> {
 		this.pluginLogs.debug("createDirectory(", uri, ")");
 		throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
 	}	
@@ -1257,8 +1286,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	async uploadLocal(args:any[]): Promise<void> {
 		var fs = require('fs');
 
-		const matchIntentType = /^([a-z][A-Za-z_\-]+_v\d+)$/;
-		const matchImportedIntentType = /^intent\-([a-z][A-Za-z_\-]+\-v\d+)$/;
+		const matchIntentType = /^([a-z][a-z_\-]+_v\d+)$/;
+		const matchImportedIntentType = /^intent\-([a-z][a-z_\-]+\-v\d+)$/;
 
 		const uri:vscode.Uri = this._getUriList(args)[0];
 		const allparts = uri.fsPath.split('/');
@@ -1382,7 +1411,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!response)
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (!response.ok)
-				this._raiseRestconfError("Update intent-type failed!", await response.json());
+				this._raiseRestconfError("Update intent-type failed!", await response.json(), true);
 		} else {
 			vscode.window.showInformationMessage("Upload new Intent-Type");
 			const body = {"ibn-administration:intent-type": meta};
@@ -1391,7 +1420,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!response)
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (!response.ok)
-				this._raiseRestconfError("Create intent-type failed!", await response.json());
+				this._raiseRestconfError("Create intent-type failed!", await response.json(), true);
 		}
 		vscode.window.showInformationMessage("Intent-Type "+intent_type_folder+" successfully uploaded");
 
@@ -1419,7 +1448,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					if (!response)
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 					if (!response.ok)
-						this._raiseRestconfError("Upload view(s) failed!", await response.json());
+						this._raiseRestconfError("Upload view(s) failed!", await response.json(), true);
 				}
 			}
 			vscode.window.showInformationMessage("Intent-Type "+intent_type_folder+" views successfully uploaded");
@@ -1485,13 +1514,16 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		const url = "/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
 		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": 1000};
+		
+		let osdver = "2.6.0";
+		if (this._fromRelease(23,11)) osdver="2.10.0";
 
 		let response: any = await this._callNSP(url, {
 			method: "POST",
 			headers: {
 				"Content-Type":  "application/json",
 				"Cache-Control": "no-cache",
-				"Osd-Version":   "2.10.0",
+				"Osd-Version":   osdver,
 				"Authorization": "Bearer " + token
 			},
 			body: JSON.stringify(body)
@@ -1499,10 +1531,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		if (!response.ok) {
-			vscode.window.showErrorMessage('Error while getting logs');
-			throw vscode.FileSystemError.Unavailable('Error while getting logs');
-		}
+		if (!response.ok)
+			this._raiseRestconfError("Getting logs failed!", await response.json(), true);
 		let json: any = await response.json();
 
 		// let data: Array<Object> = json["hits"]["hits"];
@@ -1527,12 +1557,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = logentry['target'];
 				const intent_type = logentry['intent_type'];
 				const intent_type_version = logentry['intent_type_version'];
-				const message = logentry['message'].slice(logentry['message'].indexOf("]")+1).trim();
+				let message = logentry['message'].slice(logentry['message'].indexOf("]")+1).trim();
 				
 				// insert empty line, if more than 30sec between two log entries
-				if (logentry['date'] > pdate+30000) {
+				if (logentry['date'] > pdate+30000)
 					this.serverLogs.appendLine("");
-				}
+
+				// avoid duplication of logging intent-type/version/target (from sf-logger.js)
+				message = message.replace("["+intent_type+"]", "").replace("["+intent_type_version+"]", "").replace("["+target+"]", "").trim();
 
 				this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type + '_v' + intent_type_version + ' ' + target + "] " + message);
 				pdate = logentry['date'];
@@ -1611,7 +1643,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				if (!response.ok)
-					throw vscode.FileSystemError.Unavailable('Error while getting intent details');
+					this._raiseRestconfError("Getting intent details failed!", await response.json(), true);
 
 				const json : any = await response.json();
 				const report = json["ibn:intent"]["last-audit-report"];
@@ -1622,7 +1654,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					vscode.window.showInformationMessage("Intent "+intent_type+"/"+intent+" is aligned!");
 				}
 			}
-		};
+		}
 
 		this._eventEmiter.fire(uriList);
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
@@ -1673,18 +1705,32 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (uriList.length>0) {
 			const path = uriList[0].toString();
-			const parts = path.split('/').map(decodeURIComponent);
-			const intent_type = parts[1].split('_v')[0];
-			const intent_type_version = parts[1].split('_v')[1];
-
 			this.pluginLogs.debug("openInBrowser(", path, ")");
-			
-			if (parts.length>3 && parts[2]==='intents') {
-				// URL for new navigation since nsp23.11
-				this._openWebUI("/web/intent-manager/intent-types/intents-list/intent-details?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version+"&intentTargetId="+encodeURIComponent(parts[3]));
+
+			if (path === "im:/") {
+				if (this._fromRelease(23,11))
+					// URL for new navigation since nsp23.11
+					this._openWebUI("/web/intent-manager/intent-types");
+				else
+					this._openWebUI("/intent-manager/intentTypes");
 			} else {
-				// URL for new navigation since nsp23.11
-				this._openWebUI("/web/intent-manager/intent-types/intents-list?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version);
+				const parts = path.split('/').map(decodeURIComponent);
+				const intent_type = parts[1].split('_v')[0];
+				const intent_type_version = parts[1].split('_v')[1];
+				
+				if (parts.length>3 && parts[2]==='intents') {
+					if (this._fromRelease(23,11))
+						// URL for new navigation since nsp23.11
+						this._openWebUI("/web/intent-manager/intent-types/intents-list/intent-details?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version+"&intentTargetId="+encodeURIComponent(parts[3]));
+					else
+						this._openWebUI("/intent-manager/intentTypes/"+encodeURIComponent(intent_type)+"/"+intent_type_version+"/intents/"+encodeURIComponent(parts[3]));
+				} else {
+					if (this._fromRelease(23,11))
+						// URL for new navigation since nsp23.11
+						this._openWebUI("/web/intent-manager/intent-types/intents-list?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version);
+					else
+						this._openWebUI("/intent-manager/intentTypes/"+encodeURIComponent(intent_type)+"/"+intent_type_version+"/intents");
+				}
 			}
 		}
 	}
@@ -1706,7 +1752,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 			this.pluginLogs.debug("newIntent(", path, ")");
 
-			this._openWebUI("/web/intent-manager/intent-types/create-intent?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version);
+			if (this._fromRelease(23,11))
+				// URL for new navigation since nsp23.11
+				this._openWebUI("/web/intent-manager/intent-types/create-intent?intentTypeId="+encodeURIComponent(intent_type)+"&version="+intent_type_version);
+			else
+				this._openWebUI("/intent-manager/intentTypes/"+encodeURIComponent(intent_type)+"/"+intent_type_version+"/intents/createIntent");
 		}
 	}
 
@@ -1732,7 +1782,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!response)
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (!response.ok)
-				throw vscode.FileSystemError.Unavailable('Intent-type version creation failed!');
+				this._raiseRestconfError("Intent-type version creation failed!", await response.json(), true);
 
 			await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 			vscode.window.showInformationMessage("New version created for intent-type "+intent_type);
@@ -1763,16 +1813,18 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			});
 
 			if(new_intent_type) {
-				if (this.intentTypes.hasOwnProperty(new_intent_type+"_v1"))
-					throw vscode.FileSystemError.FileExists("The intent "+new_intent_type+" already exists");
+				if (this.intentTypes.hasOwnProperty(new_intent_type+"_v1")) {
+					vscode.window.showErrorMessage("The intent-type "+new_intent_type+" already exists!");
+					throw vscode.FileSystemError.FileExists("The intent-type "+new_intent_type+" already exists!");
+				}
 
 				let url = "/mdt/rest/ibn/save/"+encodeURIComponent(intent_type)+"/"+intent_type_version+"?newIntentTypeName="+new_intent_type;		
 				let response: any = await this._callNSP(url, {method: "POST", body: "{}"});
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				if (!response.ok)
-					throw vscode.FileSystemError.Unavailable('Cloning intent-type failed!');
-	
+					this._raiseRestconfError("Intent-type cloning failed!", await response.json(), true);
+
 				await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 				vscode.window.showInformationMessage("New intent-type "+new_intent_type+" created!");
 			}
@@ -1780,95 +1832,148 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	}
 
 	/**
-	 * Creates intent-type by providing a name and optional YANG modules.
-	 * The new intent-type is generated using a basic template.
+	 * Interactive creation of new intent-type from template.
 	 * 
-	 * @param {any[]} args context used to issue command
+	 * @param {any[]} args context used to issue command (not used yet)
 	 */
 
-	async newIntentType(args:any[]): Promise<void> {
-		var fs = require('fs');
+	async newIntentTypeFromTemplate(args:any[]): Promise<void> {
+		const nunjucks = require("nunjucks");		
+		const fs = require('fs');
 
-		const intentName = await vscode.window.showInputBox({
-			placeHolder: "Intent Name",
-			prompt: "Provide a name for the new intent",
-			value: "default_intent_name"
+		let data:{
+			intent_type: string|undefined,
+			author:string|undefined,
+			template:string|undefined,
+			date:string|undefined
+		} = {
+			intent_type: "default",
+			author: "NSP DevOps",
+			template: "none",
+			date: new Date().toISOString().slice(0,10)
+		}
+
+		// todo: Using multi-step input using QuickPick and InputBox
+		//   https://github.com/microsoft/vscode-extension-samples/tree/main/quickinput-sample
+		//
+		// desired improvements:
+		//   navigation between the steps (forward/backward)
+		//   instant validation (intent-types exist, all small caps, ...)
+
+		data.intent_type = await vscode.window.showInputBox({
+			title: "Create intent-type | Step 1 NAME",
+			prompt: "Provide a name for the new intent-type!",
+			value: data.intent_type
+		});
+		if (!data.intent_type) return;
+
+		if (this.intentTypes.hasOwnProperty(data.intent_type+"_v1"))
+			throw vscode.FileSystemError.FileExists("Intent-type already exists! Use unique intent-type name!");
+
+		data.author = await vscode.window.showInputBox({
+			title: "Create intent-type | Step 2 AUTHOR",
+			prompt: "Provide an author for the new intent",
+			value: data.author
+		});
+		if (!data.author) return;
+
+		const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
+		const items:{label:string, description:string}[] = JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
+
+        const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
+        if (selection) data.template = selection.label; else return;
+
+		const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', data.template);
+		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, 'meta-info.json').fsPath)) {
+			vscode.window.showErrorMessage("meta-info.json not found");
+			return;
+		}
+		let meta:{[key:string]: any};
+		meta = JSON.parse(nunjucks.render(vscode.Uri.joinPath(templatePath, 'meta-info.json').fsPath, data));
+
+		if (!meta.hasOwnProperty("mapping-engine"))
+			meta["mapping-engine"] = 'js-scripted';
+
+		let script: string|undefined;
+		switch (meta["mapping-engine"]) {
+			case 'js-scripted':
+				script = 'script-content.js';
+				break;
+			case 'js-scripted-graal':
+				script = 'script-content.js';
+				break;
+		}
+		if (!script) {
+			vscode.window.showErrorMessage("Unsupported mapping-engine "+meta["mapping-engine"]+"!");
+			return;
+		}
+		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, script).fsPath)) {
+			vscode.window.showErrorMessage(script+" not found");
+			return;
+		}
+		meta["script-content"] = nunjucks.render(vscode.Uri.joinPath(templatePath, script).fsPath, data);
+
+		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules").fsPath)) {
+			vscode.window.showErrorMessage("YANG modules not found");
+			return;
+		}
+		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules", "[intent_type].yang").fsPath)) {
+			vscode.window.showErrorMessage("Intent-type templates must have '[intent_type].yang' module!");
+			return;
+		}		
+		if (!meta.hasOwnProperty('module')) meta.module=[];
+		fs.readdirSync(vscode.Uri.joinPath(templatePath, "yang-modules").fsPath).forEach((filename: string) => {
+			const pathYANG = vscode.Uri.joinPath(templatePath, "yang-modules", filename).fsPath;
+			if (!fs.lstatSync(pathYANG).isFile())
+				this.pluginLogs.info("ignore "+filename+" (not a file)")
+			else if (filename.startsWith('.'))
+				this.pluginLogs.info("ignore hidden file "+filename)
+			else if (filename!="[intent_type].yang")
+				meta.module.push({name: filename, "yang-content": fs.readFileSync(pathYANG, {encoding: 'utf8', flag: 'r'})});
+			else
+				meta.module.push({name: data.intent_type+".yang", "yang-content": nunjucks.render(pathYANG, data)});
 		});
 
-		if (intentName) {		
-			this.pluginLogs.debug('newIntentType(', intentName, ')');
-
-			const uriList:vscode.Uri[] = this._getUriList(args);
-			for (const entry of uriList)
-				if (!entry.toString().endsWith(".yang"))
-					throw vscode.FileSystemError.Unavailable("File "+entry.toString()+" is not .yang");
-			
-			// Checking if the intent-type already exists
-			let url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+encodeURIComponent(intentName)+",1";
-
-			let response: any = await this._callNSP(url, {method: "GET"});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (response.ok)
-				throw vscode.FileSystemError.FileExists("Intent name already exist, cannot create");
+		if (!meta.hasOwnProperty('resource')) meta.resource=[];
+		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath))
+			fs.readdirSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath, {recursive: true}).forEach((filename: string) => {
+				const path = vscode.Uri.joinPath(templatePath, "intent-type-resources", filename).fsPath;
+				if (!fs.lstatSync(path).isFile())
+					this.pluginLogs.info("ignore "+filename+" (not a file)")
+				else if (filename.startsWith('.') || filename.includes('/.'))
+					this.pluginLogs.info("ignore hidden file/folder "+filename)
+				else
+					meta.resource.push({name: filename, value: nunjucks.render(path, data)});
+			});
+		else vscode.window.showWarningMessage("Intent-type template has no resources");
 	
-			// Creating a template for new intent-types (to be updated by the user)
-			let meta : {[key: string]: any} = {
-				"ibn-administration:intent-type": {
-					"date": "-",
-					"support-nested-type-in-es": false,
-					"author": "Nokia IM vsCode",
-					"target-component": [
-						{
-							"i18n-text": "Device Name",
-							"function-name": "suggestDeviceNames",
-							"pattern-error-message": "",
-							"name": "deviceName",
-							"value-type": "STRING",
-							"order": 1
-						}
-					],
-					"mapping-engine": "js-scripted",
-					"label": [
-						"vsCode Intent"
-					],
-					"priority": 50,
-					"version": 1,
-					"build": "-",
-					"lifecycle-state": "released",
-					"name": intentName,
-					"live-state-retrieval": false
-				}
-			};
-			meta["ibn-administration:intent-type"]["script-content"]="\nvar RuntimeException = Java.type('java.lang.RuntimeException');\n\nvar prefixToNsMap = {\n  \"ibn\" : \"http://www.nokia.com/management-solutions/ibn\",\n  \"nc\" : \"urn:ietf:params:xml:ns:netconf:base:1.0\",\n  \"device-manager\" : \"http://www.nokia.com/management-solutions/anv\",\n};\n\nvar nsToModule = {\n  \"http://www.nokia.com/management-solutions/anv-device-holders\" : \"anv-device-holders\"\n};\n\nfunction synchronize(input) {\n  var result = synchronizeResultFactory.createSynchronizeResult();\n  // Code to synchronize goes here\n  \n  result.setSuccess(true);\n  return result;\n}\n\nfunction audit(input) {\n  var report = auditFactory.createAuditReport(null, null);\n  // Code to audit goes here\n\n  return report\n}\n\nfunction validate(syncInput) {\n  var contextualErrorJsonObj = {};\n  var intentConfig = syncInput.getJsonIntentConfiguration();\n  \n  // Code to validation here. Add errors to contextualErrorJsonObj.\n  // contextualErrorJsonObj[\"attribute\"] = \"Attribute must be set\";\n  \n  if (Object.keys(contextualErrorJsonObj).length !== 0) {\n        utilityService.throwContextErrorException(contextualErrorJsonObj);\n  }\n}\n\n";
-			
-			meta["ibn-administration:intent-type"]["module"]=[];
-			if (uriList) {
-				for (const uri of uriList) {
-					const parts = uri.toString().split('/').map(decodeURIComponent);
-					const module = parts.pop();
-					const content = fs.readFileSync(uri.fsPath, {encoding:'utf8', flag:'r'});
-					meta["ibn-administration:intent-type"]["module"].push({"name": module, "yang-content": content});
-				}
-			} else meta["ibn-administration:intent-type"]["module"].push({"name":intentName+".yang","yang-content":"module "+intentName+" {\n  namespace \"http://www.nokia.com/management-solutions/"+intentName+"\";\n  prefix \""+intentName+"\";\n\n  organization        \"NOKIA Corp\";\n  contact \"\";\n  description \"\";\n  revision \"2023-03-07\" {\n    description\n      \"Initial revision.\";\n  }\n  grouping configuration-details {\n    container "+intentName+"{\n\n    }\n  }\n   \n  uses "+intentName+":configuration-details;\n}\n"})
-			meta["ibn-administration:intent-type"]["resource"]=[];
-			meta["ibn-administration:intent-type"]["resource"].push({"name":intentName+".js","value":""});
-			
-			//Consider adding composite
-			let del = ["intent-type","date","category","custom-field","instance-depends-on-category","resourceDirectory","support-nested-type-in-es","supports-network-state-suspend","default-version","author","skip-device-connectivity-check","return-config-as-json","build","composite","support-aggregated-request","notify-intent-instance-events","supported-hardware-types"];
-			for (const d of del) delete meta["ibn-administration:intent-type"][d];
-			let body = meta;
-			url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog";
+		// Intent-type "meta" may contain the parameter "intent-type"
+		// RESTCONF API required parameter "name" instead
 
-			response = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (!response.ok)
-				this._raiseRestconfError("Upload intent-type failed!", await response.json());
+		meta.name = data.intent_type;
+		meta.version = 1;
+		delete meta["intent-type"];
 
-			await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-			vscode.window.showInformationMessage("Succesfully created");
+		// IBN expects targetted-device to contain an index as key, which is not contained in exported intent-types (ZIP)
+		if (meta.hasOwnProperty("targetted-device")) {
+			let index=0;
+			for (const entry of meta["targetted-device"]) {
+				if (!entry.hasOwnProperty("index"))	entry.index = index;
+				index+=1;
+			}
 		}
+	
+		vscode.window.showInformationMessage("Creating new Intent-Type");
+		const body = {"ibn-administration:intent-type": meta};
+		const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog";
+		let response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		if (!response.ok)
+			this._raiseRestconfError("Create intent-type failed!", await response.json(), true);
+
+		vscode.window.showInformationMessage("Intent-Type "+data.intent_type+" successfully created!");
+		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");			
 	}
 
 	shareStatusBarItem(): vscode.StatusBarItem {

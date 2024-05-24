@@ -115,7 +115,7 @@
 {% for entry in report["misaligned-attribute"] %}                
                 <tr>
                     <td>{{ entry["device-name"]    }}</td>
-                    <td>{{ entry["attribute-name"] | safe }}</td>
+                    <td>{{ entry["name"] | safe }}</td>
                     <td>{{ entry["expected-value"] }}</td>
                     <td>{{ entry["actual-value"]   }}</td>
                 </tr>

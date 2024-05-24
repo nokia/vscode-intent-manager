@@ -1,0 +1,16 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix "{{ intent_type }}";
+
+  organization "{{ author }}";
+  contact "";
+  description "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+  }
+}

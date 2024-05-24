@@ -85,13 +85,13 @@
       {
         "command": "nokia-intent-manager.newIntent",
         "category": "IntentManager",
-        "title": "Create new intent",
+        "title": "Create intent",
         "icon": "$(play-circle)"
       },
       {
         "command": "nokia-intent-manager.newIntentType",
         "category": "IntentManager",
-        "title": "Create new intent-type"
+        "title": "Create intent-type"
       }
     ],
     "menus": {
@@ -99,42 +99,42 @@
         {
           "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
           "command": "nokia-intent-manager.uploadLocal",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resourceScheme == im && activeEditorIsDirty == true",
           "command": "workbench.files.action.compareWithSaved",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resourceScheme == im",
           "command": "nokia-intent-manager.openInBrowser",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\//",
           "command": "nokia-intent-manager.newIntent",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.logs",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.audit",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.sync",
-          "group": "nokia_im"
+          "group": "navigation"
         },
         {
           "when": "resource =~ /^im:\\/[a-zA-Z0-9\\-_]+_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.state",
-          "group": "nokia_im"
+          "group": "navigation"
         }
       ],
       "explorer/context": [
@@ -142,11 +142,6 @@
           "command": "nokia-intent-manager.uploadLocal",
           "group": "nokia_im",
           "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-zA-Z0-9\\-_]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.newIntentType",
-          "group": "nokia_im",
-          "when": "resourceScheme == file && resourceExtname == .yang"
         },
         {
           "command": "nokia-intent-manager.newIntentType",
@@ -192,6 +187,11 @@
           "command": "nokia-intent-manager.lastAuditReport",
           "group": "nokia_im",
           "when": "resource =~ /^im:\\/[a-z][a-zA-Z0-9\\-_]*_v\\d+\\/intents\\/[^/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.openInBrowser",
+          "group": "nokia_im",
+          "when": "resourceScheme == im"
         }
       ]
     },
