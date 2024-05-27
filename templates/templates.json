@@ -7,6 +7,10 @@
         {
             "label": "deviceSecuritySRX24",
             "description": "device security SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "latencySRX24",
+            "description": "latency measurement using TWAMP/light SReXperts 2024 | research/study, experimental"
         }
     ]
 }
