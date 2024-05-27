@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            html, body, iframe {
+                height: 100%;
+                width: 100%;
+                background: white;
+                border: none;
+                padding: 0;
+                margin: 0;
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- 
+            src="https://www.google.com/webhp?igu=1"
+            src="https://135.228.138.227"
+            src="https://135.228.138.227/web/intent-manager/intent-types/intents-list/create-intent?intentTypeId=twamp&version=1"
+        -->
+        <iframe
+        src="{{ url }}"
+        sandbox="allow-forms allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-modals">
+        </iframe>
+    </body>
+</html>

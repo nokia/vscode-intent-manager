@@ -1,0 +1,23 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix {{ intent_type }};
+
+  import webfwk-ui-metadata {
+    prefix ui;
+  }
+  
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {        
+  }
+}

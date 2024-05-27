@@ -20,7 +20,6 @@ const DECORATION_RESOURCES: vscode.FileDecoration =    new vscode.FileDecoration
 	'📚', 'Resources', new vscode.ThemeColor('list.warningForeground')
 );
 
-
 const DECORATION_ALIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
 	'✅', 'Intent: Aligned', new vscode.ThemeColor('list.warningForeground')
 );
@@ -65,8 +64,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	serverLogs: vscode.OutputChannel;
 	pluginLogs: vscode.LogOutputChannel;
-
-	matchIntentType: RegExp;
 
 	intentTypes: {
 		[key: string]: {
@@ -123,7 +120,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.authToken = undefined;
 
-		this.matchIntentType = /^([a-z][a-z_\-]+[_\-]v\d+)$/;
 		this.intentTypes = {};
 
 		this._eventEmiter = new vscode.EventEmitter();
@@ -444,7 +440,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				object["object-id"] = this._modelPathHTML(object["object-id"]);
 
 		const panel = vscode.window.createWebviewPanel('auditReport', 'Audit '+intent_type+'/'+target, vscode.ViewColumn.Active, {enableScripts: true});
-		panel.webview.html = nunjucks.render(templatePath.fsPath, {report: report});
+		panel.webview.html = nunjucks.render(templatePath.fsPath, {intent_type: intent_type, target: target, report: report});
 		this.pluginLogs.info(panel.webview.html);
 	}
 
@@ -758,7 +754,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (parts[2]==="intent-type-resources") {
 			for (const resource of this.intentTypes[parts[1]].data.resource)
 				if (resource.name === parts.slice(3).join("/"))
-					return Buffer.from(resource.value);
+					if (resource.name.endsWith('.viewConfig'))
+						return Buffer.from(JSON.stringify(JSON.parse(resource.value), null, '  '));
+					else 
+						return Buffer.from(resource.value);
 		}
 
 		if (parts[2]==="intents") {
@@ -1067,7 +1066,32 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+encodeURIComponent(intent_type)+","+intent_type_version+"/views="+encodeURIComponent(viewname);
 					this.pluginLogs.info("delete view", intent_type, viewname);
 				}
-			} else this.pluginLogs.info("delete intent-type", intent_type);
+			} else {
+				this.pluginLogs.info("delete intent-type", intent_type);
+
+				const targets = Object.keys(this.intentTypes[parts[1]].intents);
+
+				if (targets.length > 0) {
+					const selection = await vscode.window.showWarningMessage("Intent-type "+parts[1]+" is in-use! "+targets.length.toString()+" intents exist!", "Proceed","Cancel");
+					if (selection === 'Proceed') {
+						this.pluginLogs.info("delete all intents for", intent_type);
+
+						for (const target of targets) {
+							this.pluginLogs.info("delete intent", intent_type, target);
+							const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+encodeURIComponent(intent_type);
+
+							let response: any = await this._callNSP(url, {method: "DELETE"});
+							if (!response)
+								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+							if (response.ok) {
+								delete this.intentTypes[parts[1]].aligned[target];
+								delete this.intentTypes[parts[1]].desired[target];
+								delete this.intentTypes[parts[1]].intents[target];																
+							} else this._printRestconfError("Delete intent failed!", await response.json());
+						}
+					} else return;
+				}
+			}
 
 			let response: any = await this._callNSP(url, {method: "DELETE"});
 			if (!response)
@@ -1112,7 +1136,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	*/	
 
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
-		this.pluginLogs.debug("createDirectory(", oldUri, newUri, ")");
+		this.pluginLogs.debug("rename(", oldUri, newUri, ")");
 		throw vscode.FileSystemError.NoPermissions('Unsupported operation!');	
 	}
 
@@ -1124,7 +1148,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	async createDirectory(uri: vscode.Uri):  Promise<void> {
 		this.pluginLogs.debug("createDirectory(", uri, ")");
-		throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
+
+		const path = uri.toString();
+		const parts = path.split('/').map(decodeURIComponent);
+		const pattern = /^([a-z][a-z0-9\-]+)(_v\d+)?$/;
+
+		if (parts.length===2 && pattern.test(parts[1])) {
+			await this.newIntentTypeFromTemplate([uri]);
+		} else throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
 	}	
 
 	// --- SECTION: vscode.FileDecorationProvider implementation ------------
@@ -1303,7 +1334,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (matchImportedIntentType.test(intent_type_folder))
 			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, "_v"); 
 
-		if (this.matchIntentType.test(intent_type_folder))
+		if (matchIntentType.test(intent_type_folder))
 			this.pluginLogs.debug("uploadLocalIntentType("+path+")");
 		else
 			throw vscode.FileSystemError.FileNotFound("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
@@ -1841,13 +1872,22 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const nunjucks = require("nunjucks");		
 		const fs = require('fs');
 
+		const path = this._getUriList(args)[0].toString();
+		const parts = path.split('/').map(decodeURIComponent);
+		const pattern = /^([a-z][a-z0-9\-]+)(_v\d+)?$/;
+
+
+		let intent_type_name = "default";
+		if (parts.length===2 && pattern.test(parts[1]))
+			intent_type_name = parts[1].replace(/_v\d+$/, "");
+
 		let data:{
 			intent_type: string|undefined,
 			author:string|undefined,
 			template:string|undefined,
 			date:string|undefined
 		} = {
-			intent_type: "default",
+			intent_type: intent_type_name,
 			author: "NSP DevOps",
 			template: "none",
 			date: new Date().toISOString().slice(0,10)
@@ -1895,12 +1935,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			meta["mapping-engine"] = 'js-scripted';
 
 		let script: string|undefined;
-		switch (meta["mapping-engine"]) {
+		switch(meta["mapping-engine"]) {
 			case 'js-scripted':
 				script = 'script-content.js';
 				break;
 			case 'js-scripted-graal':
-				script = 'script-content.js';
+				script = 'script-content.mjs';
 				break;
 		}
 		if (!script) {

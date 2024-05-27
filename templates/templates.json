@@ -3,6 +3,10 @@
         {
             "label": "helloWorld",
             "description": "basic intent-type | mapping-engine js-scripted (Nashorn)"
+        },
+        {
+            "label": "deviceSecuritySRX24",
+            "description": "device security SReXperts 2024 | research/study, experimental"
         }
     ]
 }

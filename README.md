@@ -19,6 +19,8 @@ The vsCode extension for NSP Intent Manager allows the user to:
 * Code snippets to accelerate coding.
 * Retrieve logs from OpenSearch (filtered by intent-types and intents)
 * Cross navigate to NSP WebUI in context of intent-types and intents
+* Multi-target operations (sync, audit, set-state, logging)
+* Deletion of intent-types including intents (confirmation dialogue)
 
 This project is community-driven. This means that support is best-effort coming from the community
 (i.e. anyone with access to the code extension) and contributions from the community are welcome at any time.
@@ -43,11 +45,11 @@ To make the extension work, make sure you configure the following attributed in 
 * By changing the extension config, the data does not get updated. User needs to reload vsCode to get config updated.
 * OpenSearch logs retrieved filtering by target and limited to 1000 logs and 10min.
 * No local validation. NSP will validate changes during upload/save.
-* If running NSP releases prior 23.11, some of the functionality is not supported due to API restrictions
+* If running NSP releases 23.11 and prior, some of the functionality may not be supported due to API restrictions
 
 ## Feature candidates
 
-* Interactive intent creation w/ schema validation (or schema-form)
+* Interactive intent creation w/ schema validation / schema-form
 * Extend logging/tracing other NSP components
 * Front-end for NSP Resource Administrator
 * Intent-type generator (from model, from instance)
@@ -67,7 +69,7 @@ To make the extension work, make sure you configure the following attributed in 
 * Evolution of intent signing (candidate: 24.8). “New version” or “clone” of signed intent-types should be unsiged to allow for changes.
 * Improve flow to create intent and intent-types using multi-step forms and instant validation
 * Advanced boilerplase templates like IPL!nk, IBSF, … for intent-type creation
-* Delete intent-type including all intents (with warning dialogue)
+* Provide option to gracefully remove intents (cleanup network/resources)
 
 ## Release Notes
 

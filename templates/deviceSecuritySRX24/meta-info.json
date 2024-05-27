@@ -1,0 +1,38 @@
+{
+  "supports-network-state-suspend": true,
+  "geo-location": {
+    "has-geo-location": false,
+    "layer": "device"
+  },
+  "composite": false,
+  "live-state-retrieval": true,
+  "support-nested-type-in-es": false,
+  "author": "Nokia",
+  "target-component": [
+    {
+      "i18n-text": "Node",
+      "function-name": "getTargetNodes",
+      "name": "neId",
+      "value-type": "STRING",
+      "order": 1
+    }
+  ],
+  "mapping-engine": "js-scripted",
+  "label": [
+    "ApprovedMisalignments",
+    "SReXperts2024"
+  ],
+  "priority": 50,
+  "version": "1",
+  "targetted-device": [
+    {
+      "target-component": "neId",
+      "index": 0
+    }
+  ],
+  "return-config-as-json": true,
+  "build": "-",
+  "lifecycle-state": "released",
+  "notify-intent-instance-events": false,
+  "intent-type": "{{ intent_type }}"
+}
