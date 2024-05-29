@@ -1,0 +1,54 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix {{ intent_type }};
+  
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {   
+    container location {
+      leaf name {
+        type string;
+        mandatory true;
+      }
+    
+      leaf country {
+        type string;
+        mandatory true;
+      }
+
+      leaf ccode {
+        type string;
+        mandatory true;
+      }
+      
+      leaf gpsPosition {
+        type string;
+        mandatory true;
+      }
+
+      leaf latitude {
+        type string;
+        mandatory true;
+      }
+
+      leaf longitude {
+        type string;
+        mandatory true;
+      }
+    }
+    
+    leaf contact {
+      type string;
+    }
+  }
+}

@@ -1,0 +1,203 @@
+{
+    "{{ intent_type }}.adminState": {
+        "columnSpan": 1
+    },
+    "{{ intent_type }}.enableOAM": {
+        "title": "OAM"
+    },
+    "{{ intent_type }}.endpoint-a.vlan-id": {
+        "title": "VLAN"
+    },
+    "{{ intent_type }}.endpoint-b.vlan-id": {
+        "title": "VLAN"
+    },  
+    "{{ intent_type }}.endpoint-a.ne-id": {
+        "suggest": "getNodes",
+        "title": "NE ID",
+        "type": "leafref",
+        "displayKey": "ne-id",
+        "componentProps": {
+            "isObject": false,
+            "isPagination": true,
+            "paginationProps": {
+                "pageLabel": "Page"
+            }
+        },
+        "properties": [
+            {
+                "title": "NE ID",
+                "name": "ne-id",
+                "description": "Device ID",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "NE NAME",
+                "name": "ne-name",
+                "description": "Device Name",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "CHASSIS TYPE",
+                "name": "type",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "VERSION",
+                "name": "version",
+                "type": "string",
+                "floatingFilter": true
+            }
+        ]
+    },
+    "{{ intent_type }}.endpoint-a.port-id": {
+        "suggest": "getAccessPorts",
+        "title": "PORT",
+        "type": "leafref",
+        "displayKey": "name",
+        "componentProps": {
+            "isObject": false,
+            "isPagination": true,
+            "paginationProps": {
+                "pageLabel": "Page"
+            }
+        },
+        "properties": [
+            {
+                "title": "PORT ID",
+                "name": "name",
+                "description": "Port Identifier",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "DESCRIPTION",
+                "name": "description",
+                "description": "Port Description",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "MODE",
+                "name": "port-mode",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "ENCAP",
+                "name": "encap-type",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "RATE",
+                "name": "actual-rate",
+                "type": "number",
+                "floatingFilter": true
+            },
+            {
+                "title": "MTU",
+                "name": "mtu-value",
+                "type": "number",
+                "floatingFilter": true
+            }          
+        ]
+    },
+    "{{ intent_type }}.endpoint-b.ne-id": {
+        "suggest": "getNodes",
+        "title": "NE ID",
+        "type": "leafref",
+        "displayKey": "ne-id",
+        "componentProps": {
+            "isObject": false,
+            "isPagination": true,
+            "paginationProps": {
+                "pageLabel": "Page"
+            }
+        },
+        "properties": [
+            {
+                "title": "NE ID",
+                "name": "ne-id",
+                "description": "Device ID",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "NE NAME",
+                "name": "ne-name",
+                "description": "Device Name",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "CHASSIS TYPE",
+                "name": "type",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "VERSION",
+                "name": "version",
+                "type": "string",
+                "floatingFilter": true
+            }
+        ]
+    },
+    "{{ intent_type }}.endpoint-b.port-id": {
+        "suggest": "getAccessPorts",
+        "title": "PORT",
+        "type": "leafref",
+        "displayKey": "name",
+        "componentProps": {
+            "isObject": false,
+            "isPagination": true,
+            "paginationProps": {
+                "pageLabel": "Page"
+            }
+        },
+        "properties": [
+            {
+                "title": "PORT ID",
+                "name": "name",
+                "description": "Port Identifier",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "DESCRIPTION",
+                "name": "description",
+                "description": "Port Description",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "MODE",
+                "name": "port-mode",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "ENCAP",
+                "name": "encap-type",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "RATE",
+                "name": "actual-rate",
+                "type": "number",
+                "floatingFilter": true
+            },
+            {
+                "title": "MTU",
+                "name": "mtu-value",
+                "type": "number",
+                "floatingFilter": true
+            }
+          
+        ]
+    }
+}

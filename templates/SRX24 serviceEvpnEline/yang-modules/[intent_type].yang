@@ -1,0 +1,95 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix {{ intent_type }};
+
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+    leaf description {
+      type string;
+    }
+    
+    leaf adminState {
+      type enumeration {
+        enum enable;
+        enum disable;
+      }
+      default "enable";
+    }
+    
+    leaf enableOAM {
+      type boolean;
+      default false;
+    }
+    
+    container endpoint-a {
+      leaf ne-id {
+        type string;
+        mandatory true;
+      }
+      leaf port-id {
+        type string;
+        mandatory true;
+      }
+      leaf vlan-id {
+        default 0;
+        type int16 {
+          range "-1 .. 4095";
+        }
+      }
+    }
+    container endpoint-b {
+      leaf ne-id {
+        type string;
+        mandatory true;
+      }
+      leaf port-id {
+        type string;
+        mandatory true;
+      }
+      leaf vlan-id {
+        default 0;
+        type int16 {
+          range "-1 .. 4095";
+        }
+      }      
+    }
+  }
+  
+  container {{ intent_type }}-state {
+    config false;
+    leaf oper-state {
+      type string;
+    }
+    leaf evi {
+      type uint64;
+    }
+    leaf transport {
+      type string;
+    }
+    container performance {
+      leaf round-trip-delay {
+        type uint32;
+        units "microseconds";
+      }
+      leaf round-trip-jitter {
+        type uint32;
+        units "microseconds";
+      }
+      leaf frame-loss-ratio {
+        type uint32;
+        units "millipercent";
+      }
+    }
+  }
+}

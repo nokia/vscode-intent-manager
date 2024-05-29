@@ -5,12 +5,28 @@
             "description": "basic intent-type | mapping-engine js-scripted (Nashorn)"
         },
         {
-            "label": "deviceSecuritySRX24",
+            "label": "SRX24 deviceSecurity",
             "description": "device security SReXperts 2024 | research/study, experimental"
         },
         {
-            "label": "latencySRX24",
+            "label": "SRX24 iplink",
+            "description": "ipl!nk (abstraction and assurance) SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "SRX24 oamTwampLight",
             "description": "latency measurement using TWAMP/light SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "SRX24 serviceL3vpn",
+            "description": "abstract l3vpn service SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "SRX24 serviceEvpnEline",
+            "description": "abstract EVWS service SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "SRX24 goldenConfiguration",
+            "description": "day1 node config SReXperts 2024 | research/study, experimental"
         }
     ]
 }

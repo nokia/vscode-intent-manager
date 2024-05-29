@@ -1279,12 +1279,16 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const intent = parts[3];
 					const intent_type = parts[1].split('_v')[0];
 
-					const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(intent)+","+encodeURIComponent(intent_type);
-					let response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
-					if (!response)
-						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-					if (response.ok)
-						this.intentTypes[parts[1]].desired[intent] = state;
+					if (this.intentTypes[parts[1]].desired[intent] !== state) {
+						const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(intent)+","+encodeURIComponent(intent_type);
+						let response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
+						if (!response)
+							throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+						if (response.ok) {
+							this.intentTypes[parts[1]].desired[intent] = state;
+							vscode.window.showInformationMessage("Desired state for "+intent_type+"/"+intent+" updated to '"+selection.label+"'!");
+						}
+					}
 				}
 				this._eventEmiter.fire(uriList);
 				await vscode.commands.executeCommand("nokia-intent-manager.updateStatusBar");
@@ -1876,7 +1880,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const parts = path.split('/').map(decodeURIComponent);
 		const pattern = /^([a-z][a-z0-9\-]+)(_v\d+)?$/;
 
-
 		let intent_type_name = "default";
 		if (parts.length===2 && pattern.test(parts[1]))
 			intent_type_name = parts[1].replace(/_v\d+$/, "");
@@ -1974,6 +1977,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				meta.module.push({name: data.intent_type+".yang", "yang-content": nunjucks.render(pathYANG, data)});
 		});
 
+		let resourcefiles:string[] = [];
+
 		if (!meta.hasOwnProperty('resource')) meta.resource=[];
 		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath))
 			fs.readdirSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath, {recursive: true}).forEach((filename: string) => {
@@ -1984,8 +1989,25 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					this.pluginLogs.info("ignore hidden file/folder "+filename)
 				else
 					meta.resource.push({name: filename, value: nunjucks.render(path, data)});
+
+				resourcefiles.push(filename);
 			});
 		else vscode.window.showWarningMessage("Intent-type template has no resources");
+
+		// merge common resources
+		const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common-resources');
+		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources").fsPath))
+			fs.readdirSync(commonsPath.fsPath, {recursive: true}).forEach((filename: string) => {
+				const path = vscode.Uri.joinPath(commonsPath, filename).fsPath;
+				if (!fs.lstatSync(path).isFile())
+					this.pluginLogs.info("ignore "+filename+" (not a file)")
+				else if (filename.startsWith('.') || filename.includes('/.'))
+					this.pluginLogs.info("ignore hidden file/folder "+filename)
+				else if (resourcefiles.includes(filename))
+					this.pluginLogs.info(filename+" (common) skipped, overwritten in template")
+				else
+					meta.resource.push({name: filename, value: nunjucks.render(path, data)});
+			});
 	
 		// Intent-type "meta" may contain the parameter "intent-type"
 		// RESTCONF API required parameter "name" instead

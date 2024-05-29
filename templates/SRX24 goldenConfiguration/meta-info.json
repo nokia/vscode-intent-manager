@@ -1,0 +1,27 @@
+{
+  "intent-type": "{{ intent_type }}",
+  "version": "1",
+  "author": "{{ author }}",
+  "mapping-engine": "js-scripted",
+  "label": [
+    "ApprovedMisalignments",
+    "SReXperts2024"
+  ],
+  "target-component": [
+    {
+      "i18n-text": "Node",
+      "function-name": "getTargetNodes",
+      "name": "neId",
+      "value-type": "STRING",
+      "order": 1
+    }
+  ],
+  "supports-network-state-suspend": false,
+  "return-config-as-json": true,
+  "lifecycle-state": "released",
+  "priority": 50,
+  "build": "-",
+  "composite": false,
+  "notify-intent-instance-events": false,
+  "live-state-retrieval": false
+}

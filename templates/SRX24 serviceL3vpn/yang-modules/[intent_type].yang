@@ -1,0 +1,93 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix {{ intent_type }};
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+    leaf description {
+      type string;
+    }
+    
+    list site {
+      key "ne-id";
+      
+      leaf ne-id {
+        type string;
+        mandatory true;
+      }
+      
+      list interface  {
+        key "name";
+
+        leaf name {
+          type yang:yang-identifier;
+        }
+      
+        leaf address {
+          type inet:ipv4-address;
+        }
+        
+        leaf prefix-length {
+          default 30;
+          type int16 {
+            range "8 .. 32";
+          }
+        }
+        
+        leaf port-id {
+          type string;
+        }
+        
+        leaf vlan-id {
+          default 0;
+          type int16 {
+            range "-1 .. 4095";
+          }
+        }
+    
+        leaf rate {
+          type int16;
+          default 100;
+          units "mbps";
+        }
+    
+        leaf ebgp {
+          type boolean;
+          default false;
+        }
+      }
+    }
+  }
+  
+  container {{ intent_type }}-state {
+    config false;
+    leaf oper-state {
+      type string;
+    }
+    leaf rd-index {
+      type uint64;
+    }
+    leaf transport {
+      type string;
+    }
+  }
+}

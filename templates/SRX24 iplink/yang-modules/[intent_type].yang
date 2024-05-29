@@ -1,0 +1,84 @@
+module {{ intent_type }} {
+  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  prefix {{ intent_type }};
+
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+    leaf description {
+      type string;
+    }
+    
+    leaf adminState {
+      type enumeration {
+        enum enable;
+        enum disable;
+      }
+      default "enable";
+    }
+    
+    container endpoint-a {
+      leaf ne-id {
+        type string;
+        mandatory true;
+      }
+      leaf port-id {
+        type string;
+        mandatory true;
+      }
+    }
+    container endpoint-b {
+      leaf ne-id {
+        type string;
+        mandatory true;
+      }
+      leaf port-id {
+        type string;
+        mandatory true;
+      }
+    }
+  }
+  
+  container {{ intent_type }}-state {
+    config false;
+    leaf oper-state {
+      type string;
+    }
+    leaf subnet {
+      type string;
+    }
+    leaf speed {
+      type string;
+    }
+    container performance {
+      leaf round-trip-delay {
+        type uint32;
+        units "microseconds";
+      }
+      leaf round-trip-jitter {
+        type uint32;
+        units "microseconds";
+      }
+      leaf frame-loss-ratio {
+        type uint32;
+        units "millipercent";
+      }
+      leaf utilization {
+        type uint32 {
+            range "0..10000";
+        }
+        units "centipercent";
+      }
+    }    
+  }  
+}

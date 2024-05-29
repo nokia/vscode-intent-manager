@@ -1,0 +1,63 @@
+{
+    "{{ intent_type }}.location.name": {
+        "suggest": "getCities",
+        "title": "LOCATION NAME",
+        "type": "leafref",
+        "displayKey": "name",
+        "componentProps": {
+            "isObject": false,
+            "isPagination": true,
+            "paginationProps": {
+                "pageLabel": "Page"
+            }
+        },
+        "properties": [
+            {
+                "title": "NAME",
+                "name": "name",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "COUNTRY",
+                "name": "country",
+                "type": "string",
+                "floatingFilter": true
+            },
+            {
+                "title": "POPULATION",
+                "name": "population",
+                "type": "number",
+                "floatingFilter": true
+            }   
+        ],
+        "setFieldValues": [
+            {
+                "name": "location.country",
+                "value": "country"
+            },
+            {
+                "name": "location.ccode",
+                "value": "iso2"
+            },
+            {
+                "name": "location.gpsPosition",
+                "value": "coordinates"
+            },
+            {
+                "name": "location.latitude",
+                "value": "latitude"
+            },
+            {
+                "name": "location.longitude",
+                "value": "longitude"
+            }
+        ]
+    },
+    "{{ intent_type }}.location.gpsPosition": {
+        "title": "GPS Position"
+    },
+    "{{ intent_type }}.location.ccode": {
+        "title": "Country Code (2 letters)"
+    }
+}
