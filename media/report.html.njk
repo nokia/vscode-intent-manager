@@ -2,43 +2,55 @@
 <html>
     <head>
         <style>
-            body {font-family: Verdana, sans-serif;}
+            body {
+                font-family: Verdana, sans-serif;
+                border: none;
+                padding: 0px;
+                margin: 20px;
+                display: block;
+            }
 
-            /* Style for buttons to select tab */
+            .logo {
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                width: 40%;
+                fill: var(--vscode-foreground);
+            }
+
             .tab {
-                overflow: hidden;
-                border: 1px solid #cccccc;
-                background-color: #f0f0f0;
+                border: 1px solid;
             }
 
             .tab button {
-                background-color: inherit;
+                color: var(--vscode-button-foreground);
+                background-color: var(--vscode-button-background);
                 float: left;
                 border: none;
                 outline: none;
                 cursor: pointer;
-                padding: 2px 30px;
+                padding: 2px 10px;
                 transition: 0.5s;
                 font-size: 12px;
-                margin-left: auto;            
             }
 
             .tab button:hover {
-                background-color: #dddddd;
+                background-color: var(--vscode-button-hoverBackground);
             }
 
             .tab button.active {
-                background-color: #cccccc;
+                font-weight: bold;
+                background-color: var(--vscode-button-background);
             }
 
-            /* Tab must be selected to display */
             .tabcontent {
                 display: none;
-                border: 1px solid #cccccc;
+                border: 1px solid;
                 border-top: none;
             }
 
-            /* Table for audit result */
             table {
                 font-family: Tahoma, sans-serif;
                 font-size: 12px;
@@ -47,18 +59,17 @@
             }
             
             td, th {
-                border: 1px solid #dddddd;
+                border: 1px solid var(--vscode-tree-tableColumnsBorder);
                 text-align: left;
                 padding: 8px;
             }
             
-            tr:nth-child(even) {
-                background-color: #f0f0f0;
+            tr:nth-child(odd) {
+                background-color: var(--vscode-tree-tableOddRowsBackground);
             }
 
             em {
-                background-color: yellow;
-                color: black;
+                background-color: var(--vscode-editor-wordHighlightTextBackground);
                 font-style:normal;
                 font-weight: bold;
                 padding: 1px 4px;
@@ -86,8 +97,9 @@
         </script>        
     </head>
     <body onload="clickFirstTab()">
-        <div style="display: block; margin-left: auto; margin-right: auto; margin-top: 20px; margin-bottom: 20px; width: 40%;">
+        <div class="logo">
             <svg id="Art" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 129.8"><g id="Logo"><path id="Wordmark" d="m398.2,3.9v121.9s19.1,0,19.1,0V3.9h-19.1ZM194.2,1.9c-37.2,0-66,25.9-66,63s28.9,63,66,63c37.2,0,66.1-24.3,66-63,0-35.2-28.9-63-66-63Zm47,63c0,27.5-21,45.7-47,45.7s-47-18.2-47-45.7,21-45.7,47-45.7,47,18.7,47,45.7ZM0,0v125.8h19.5V42.7s101.2,87.1,101.2,87.1v-26.1L0,0Zm274.6,64.9l70.8,60.9h28.4s-71-60.9-71-60.9L373.9,3.9h-28.4l-70.8,60.9Zm301.4,60.9h-21l-15.4-27h-69.6l-15.4,27h-21l25.4-45h70.5l-35.1-62.5,10.4-18.3h0s0,0,0,0l71.1,125.8Z"/></g></svg>
+            
         </div>
 
         <h3>Audit Report</h3>

@@ -424,8 +424,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */	
 
 	private async _auditReport(intent_type: string, target: string, report: {[key: string]: any}): Promise<void>  {
-		const nunjucks = require("nunjucks");
-		const templatePath = vscode.Uri.joinPath(this.extensionUri, 'media', 'report.html.njk');
+		var nunjucks = require("nunjucks");
+		nunjucks.configure(vscode.Uri.joinPath(this.extensionUri, 'media').fsPath);
 
 		if (report.hasOwnProperty("misaligned-attribute"))
 				for (let object of report["misaligned-attribute"])
@@ -440,7 +440,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				object["object-id"] = this._modelPathHTML(object["object-id"]);
 
 		const panel = vscode.window.createWebviewPanel('auditReport', 'Audit '+intent_type+'/'+target, vscode.ViewColumn.Active, {enableScripts: true});
-		panel.webview.html = nunjucks.render(templatePath.fsPath, {intent_type: intent_type, target: target, report: report});
+		panel.webview.html = nunjucks.render('report.html.njk', {intent_type: intent_type, target: target, report: report});
 		this.pluginLogs.info(panel.webview.html);
 	}
 
@@ -1069,8 +1069,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			} else {
 				this.pluginLogs.info("delete intent-type", intent_type);
 
-				const targets = Object.keys(this.intentTypes[parts[1]].intents);
+				if (Object.keys(this.intentTypes[parts[1]].intents).length===0)
+					await this.readDirectory(vscode.Uri.joinPath(uri, "intents"));
 
+				const targets = Object.keys(this.intentTypes[parts[1]].intents);
 				if (targets.length > 0) {
 					const selection = await vscode.window.showWarningMessage("Intent-type "+parts[1]+" is in-use! "+targets.length.toString()+" intents exist!", "Proceed","Cancel");
 					if (selection === 'Proceed') {
@@ -1325,61 +1327,61 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const matchImportedIntentType = /^intent\-([a-z][a-z_\-]+\-v\d+)$/;
 
 		const uri:vscode.Uri = this._getUriList(args)[0];
-		const allparts = uri.fsPath.split('/');
+		const allparts = uri.toString().split('/');
 		let parts:string[] = []
 		for (const part of allparts) {
 			parts.push(part);
 			if (matchIntentType.test(part) || matchImportedIntentType.test(part))
 				break;
 		}
-		const path = parts.join("/")+"/";
+		const path = vscode.Uri.parse(parts.join("/"));
 		let intent_type_folder = parts.pop() ?? "";
 
 		if (matchImportedIntentType.test(intent_type_folder))
 			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, "_v"); 
 
 		if (matchIntentType.test(intent_type_folder))
-			this.pluginLogs.debug("uploadLocalIntentType("+path+")");
+			this.pluginLogs.debug("uploadLocalIntentType("+path.fsPath+")");
 		else
 			throw vscode.FileSystemError.FileNotFound("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
 
 		// load meta, script, resource-files, yang modules and views
 
 		let meta:{[key:string]: any};
-		if (fs.existsSync(path+"meta-info.json"))
-			meta = JSON.parse(fs.readFileSync(path+"meta-info.json", {encoding:'utf8', flag:'r'}));
+		if (fs.existsSync(vscode.Uri.joinPath(path, "meta-info.json").fsPath))
+			meta = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(path, "meta-info.json").fsPath, {encoding:'utf8', flag:'r'}));
 		else
 			throw vscode.FileSystemError.FileNotFound("meta-info.json not found");
 
-		if (fs.existsSync(path+"script-content.js"))
-			meta["script-content"] = fs.readFileSync(path+"script-content.js", {encoding:'utf8', flag:'r'});
+		if (fs.existsSync(vscode.Uri.joinPath(path, "script-content.js").fsPath))
+			meta["script-content"] = fs.readFileSync(vscode.Uri.joinPath(path, "script-content.js").fsPath, {encoding:'utf8', flag:'r'});
 		else if (fs.existsSync(path+"script-content.mjs"))
-			meta["script-content"] = fs.readFileSync(path+"script-content.mjs", {encoding:'utf8', flag:'r'});
+			meta["script-content"] = fs.readFileSync(vscode.Uri.joinPath(path, "script-content.mjs").fsPath, {encoding:'utf8', flag:'r'});
 		else
 			throw vscode.FileSystemError.FileNotFound("script-content not found");
 
 		let modules:string[] = [];
-		if (fs.existsSync(path+"yang-modules")) {
-			fs.readdirSync(path+"yang-modules").forEach((file: string) => {
-				if (fs.lstatSync(path+"yang-modules/"+file).isFile() && !file.startsWith('.')) modules.push(file);
+		if (fs.existsSync(vscode.Uri.joinPath(path, "yang-modules").fsPath)) {
+			fs.readdirSync(vscode.Uri.joinPath(path, "yang-modules").fsPath).forEach((filename: string) => {
+				if (fs.lstatSync(vscode.Uri.joinPath(path, "yang-modules", filename).fsPath).isFile() && !filename.startsWith('.')) modules.push(filename);
 			});
 			this.pluginLogs.info("modules: " + JSON.stringify(modules));
 		} else
 			throw vscode.FileSystemError.FileNotFound("YANG modules not found");
 
 		let resources:string[] = [];
-		if (fs.existsSync(path+"intent-type-resources")) {
-			fs.readdirSync(path+"intent-type-resources", {recursive: true}).forEach((file: string) => {
-				if (fs.lstatSync(path+"intent-type-resources"+'/'+file).isFile() && !file.startsWith('.') && !file.includes('/.'))
-					resources.push(file);
+		if (fs.existsSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath)) {
+			fs.readdirSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath, {recursive: true}).forEach((filename: string) => {
+				if (fs.lstatSync(vscode.Uri.joinPath(path, "intent-type-resources", filename).fsPath).isFile() && !filename.startsWith('.') && !filename.includes('/.'))
+					resources.push(filename);
 			});
 			this.pluginLogs.info("resources: " + JSON.stringify(resources));
 		} else
 			vscode.window.showWarningMessage("Intent-type has no resources");
 
 		let views:string[] = [];
-		if (fs.existsSync(path+"views")) {
-			fs.readdirSync(path+"views").forEach((file: string) => views.push(file));
+		if (fs.existsSync(vscode.Uri.joinPath(path, "views").fsPath)) {
+			fs.readdirSync(vscode.Uri.joinPath(path, "views").fsPath).forEach((filename: string) => views.push(filename));
 			this.pluginLogs.info("views: " + JSON.stringify(views));
 		} else
 			vscode.window.showWarningMessage("Views not found.");
@@ -1418,12 +1420,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		meta["module"]=[];
 		for (const module of modules) {
-			meta["module"].push({"name": module, "yang-content": fs.readFileSync(path+"yang-modules/"+module, {encoding: 'utf8', flag: 'r'})});
+			meta["module"].push({"name": module, "yang-content": fs.readFileSync(vscode.Uri.joinPath(path, "yang-modules", module).fsPath, {encoding: 'utf8', flag: 'r'})});
 		}
 
 		meta["resource"]=[];
 		for (const resource of resources) {
-			meta["resource"].push({"name": resource, "value": fs.readFileSync(path+"intent-type-resources/"+resource, {encoding: 'utf8', flag: 'r'})});
+			meta["resource"].push({"name": resource, "value": fs.readFileSync(vscode.Uri.joinPath(path, "intent-type-resources", resource).fsPath, {encoding: 'utf8', flag: 'r'})});
 		}
 
 		// Parameters "resourceDirectory" and "supported-hardware-types" are not supported in the
@@ -1459,7 +1461,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		}
 		vscode.window.showInformationMessage("Intent-Type "+intent_type_folder+" successfully uploaded");
 
-		this._eventEmiter.fire(vscode.Uri.parse("file:/"+path));
+		this._eventEmiter.fire(vscode.Uri.parse("file:/"+path.fsPath));
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");		
 
 		if (views) {
@@ -1467,7 +1469,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			for (const view of views) {
 				if (view.endsWith(".viewConfig")) {
 					let viewname = view.slice(0,-11);			
-					let viewcontent = fs.readFileSync(path+"views/"+view, {encoding:'utf8', flag:'r'});
+					let viewcontent = fs.readFileSync(vscode.Uri.joinPath(path, "views", view).fsPath, {encoding:'utf8', flag:'r'});
 
 					const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+encodeURIComponent(meta.name)+","+meta.version;
 					const body = {
@@ -1616,8 +1618,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */		
 
 	async audit(args:any[]): Promise<void> {
-		const nunjucks = require("nunjucks");
-
 		let uriList:vscode.Uri[] = this._getUriList(args);
 		for (const entry of uriList) {
 			this.pluginLogs.debug("audit(", entry.toString(), ")");
@@ -1662,8 +1662,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */		
 
 	async lastAuditReport(args:any[]): Promise<void> {
-		const nunjucks = require("nunjucks");
-
 		let uriList:vscode.Uri[] = this._getUriList(args);
 		for (const entry of uriList) {
 			this.pluginLogs.debug("lastAuditReport(", entry.toString(), ")");
@@ -1873,8 +1871,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	async newIntentTypeFromTemplate(args:any[]): Promise<void> {
-		const nunjucks = require("nunjucks");		
 		const fs = require('fs');
+		var nunjucks = require("nunjucks");		
 
 		const path = this._getUriList(args)[0].toString();
 		const parts = path.split('/').map(decodeURIComponent);
@@ -1932,7 +1930,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			return;
 		}
 		let meta:{[key:string]: any};
-		meta = JSON.parse(nunjucks.render(vscode.Uri.joinPath(templatePath, 'meta-info.json').fsPath, data));
+		nunjucks.configure(templatePath.fsPath);
+		meta = JSON.parse(nunjucks.render('meta-info.json', data));
 
 		if (!meta.hasOwnProperty("mapping-engine"))
 			meta["mapping-engine"] = 'js-scripted';
@@ -1954,7 +1953,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			vscode.window.showErrorMessage(script+" not found");
 			return;
 		}
-		meta["script-content"] = nunjucks.render(vscode.Uri.joinPath(templatePath, script).fsPath, data);
+		meta["script-content"] = nunjucks.render(script, data);
 
 		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules").fsPath)) {
 			vscode.window.showErrorMessage("YANG modules not found");
@@ -1963,51 +1962,61 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules", "[intent_type].yang").fsPath)) {
 			vscode.window.showErrorMessage("Intent-type templates must have '[intent_type].yang' module!");
 			return;
-		}		
+		}
+
+		const modulesPath = vscode.Uri.joinPath(templatePath, "yang-modules").fsPath;
+		nunjucks.configure(modulesPath);
+
 		if (!meta.hasOwnProperty('module')) meta.module=[];
-		fs.readdirSync(vscode.Uri.joinPath(templatePath, "yang-modules").fsPath).forEach((filename: string) => {
-			const pathYANG = vscode.Uri.joinPath(templatePath, "yang-modules", filename).fsPath;
-			if (!fs.lstatSync(pathYANG).isFile())
+		fs.readdirSync(modulesPath).forEach((filename: string) => {
+			const fullpath = vscode.Uri.joinPath(templatePath, "yang-modules", filename).fsPath;
+			if (!fs.lstatSync(fullpath).isFile())
 				this.pluginLogs.info("ignore "+filename+" (not a file)")
 			else if (filename.startsWith('.'))
 				this.pluginLogs.info("ignore hidden file "+filename)
 			else if (filename!="[intent_type].yang")
-				meta.module.push({name: filename, "yang-content": fs.readFileSync(pathYANG, {encoding: 'utf8', flag: 'r'})});
+				meta.module.push({name: filename, "yang-content": fs.readFileSync(fullpath, {encoding: 'utf8', flag: 'r'})});
 			else
-				meta.module.push({name: data.intent_type+".yang", "yang-content": nunjucks.render(pathYANG, data)});
+				meta.module.push({name: data.intent_type+".yang", "yang-content": nunjucks.render(filename, data)});
 		});
 
-		let resourcefiles:string[] = [];
+		const resourcesPath = vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath;
+		nunjucks.configure(resourcesPath);
 
+		let resourcefiles:string[] = [];
 		if (!meta.hasOwnProperty('resource')) meta.resource=[];
-		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath))
-			fs.readdirSync(vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath, {recursive: true}).forEach((filename: string) => {
-				const path = vscode.Uri.joinPath(templatePath, "intent-type-resources", filename).fsPath;
-				if (!fs.lstatSync(path).isFile())
+		if (fs.existsSync(resourcesPath))
+			fs.readdirSync(resourcesPath, {recursive: true}).forEach((filename: string) => {
+				const fullpath = vscode.Uri.joinPath(templatePath, "intent-type-resources", filename).fsPath;
+				if (!fs.lstatSync(fullpath).isFile())
 					this.pluginLogs.info("ignore "+filename+" (not a file)")
 				else if (filename.startsWith('.') || filename.includes('/.'))
 					this.pluginLogs.info("ignore hidden file/folder "+filename)
 				else
-					meta.resource.push({name: filename, value: nunjucks.render(path, data)});
+					meta.resource.push({name: filename, value: nunjucks.render(filename, data)});
 
 				resourcefiles.push(filename);
 			});
 		else vscode.window.showWarningMessage("Intent-type template has no resources");
 
 		// merge common resources
-		const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common-resources');
-		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources").fsPath))
+
+		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources").fsPath)) {
+			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common-resources');
+			nunjucks.configure(commonsPath.fsPath);
+
 			fs.readdirSync(commonsPath.fsPath, {recursive: true}).forEach((filename: string) => {
-				const path = vscode.Uri.joinPath(commonsPath, filename).fsPath;
-				if (!fs.lstatSync(path).isFile())
+				const fullpath = vscode.Uri.joinPath(commonsPath, filename).fsPath;
+				if (!fs.lstatSync(fullpath).isFile())
 					this.pluginLogs.info("ignore "+filename+" (not a file)")
 				else if (filename.startsWith('.') || filename.includes('/.'))
 					this.pluginLogs.info("ignore hidden file/folder "+filename)
 				else if (resourcefiles.includes(filename))
 					this.pluginLogs.info(filename+" (common) skipped, overwritten in template")
 				else
-					meta.resource.push({name: filename, value: nunjucks.render(path, data)});
+					meta.resource.push({name: filename, value: nunjucks.render(filename, data)});
 			});
+		}
 	
 		// Intent-type "meta" may contain the parameter "intent-type"
 		// RESTCONF API required parameter "name" instead

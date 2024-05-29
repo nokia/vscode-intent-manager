@@ -94,3 +94,4 @@ Updates:
 * More short-cuts added to explorer (including multi-select)
 * Creation of new intent-types using templates
 * Deletion of intent-types with intents (confirmation prompt)
+* Audit reports using colors from vsCode theme (dark vs light)
