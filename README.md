@@ -39,36 +39,13 @@ To make the extension work, make sure you configure the following attributed in 
 * `NSP user`: User name.
 * `NSP password`: User's Password (stored as vsCode secret)
 
-## Known Issues and Limitations
-
-* `process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"` disables SSL verification (not recommended).
-* By changing the extension config, the data does not get updated. User needs to reload vsCode to get config updated.
-* OpenSearch logs retrieved filtering by target and limited to 1000 logs and 10min.
-* No local validation. NSP will validate changes during upload/save.
-* If running NSP releases 23.11 and prior, some of the functionality may not be supported due to API restrictions
-
-## Feature candidates
-
-* Interactive intent creation w/ schema validation / schema-form
-* Extend logging/tracing to other NSP components
-* Front-end for NSP Resource Administrator
-* Intent-type generator (from model, from instance)
-* Extend code snippets collection (input from community appretiated)
-* Debugging (using next-gen intent-engine)
-* Validation of meta-info.json and *.viewConfig (using json-schema)
-* Better indication on the WebUI that a sync/audit/upload operation is currently running
-* Explore techniques for embedding unit-tests in intent-type code
-* Explore options to stream logging from opensearch in real-time
-* Explore options to modify server-site log-level
-* Add support for createDirectory() under intent-type-resource
-* Add support for rename() for intent-type resources
-* Add support for rename() for intents (delete and recreate intent under new target)
-* Show # of entries on tabs for audit reports (same as NSP WebUI)
-* Evolution of intent signing: “New version” or “clone” of signed intent-types should be unsiged to allow for changes.
-* Improve flow to create intent and intent-types using multi-step forms and instant validation
-* Provide option to gracefully remove intents (cleanup network/resources)
-* Add/Update boilerplase intent-type templates (next-gen JS engine, IBSF, ICM)
-* Extend async/parallel execution for: set-state, deletion
+> [!WARNING]
+> * Intent decorations are automatically updated by audit/sync methods to reduce server load. In some error scenarios the displayed alignment state does not reflect the server state. Consider to trigger a manual resync to reload alignment states from the backend server.
+> * `process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"` disables SSL verification (not recommended).
+> * By changing the extension config, the data does not get updated. User needs to reload vsCode to get config updated.
+> * OpenSearch logs retrieved filtering by target and limited to 1000 logs and 10min.
+> * No local validation. NSP will validate changes during upload/save.
+> * If running NSP releases 23.11 and prior, some of the functionality may not be supported due to API restrictions
 
 ## Release Notes
 
