@@ -1,4 +1,5 @@
 # NOKIA Intent Manager vsCode extension 
+![vsCode extension settings](https://raw.githubusercontent.com/nokia/vscode-intent-manager/main/media/NSP_Logo.png)
 
 This vsCode extension connects to Nokia NSP Intent Manager to facilitate Intent development and delivery.
 
