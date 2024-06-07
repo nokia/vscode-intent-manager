@@ -2,9 +2,10 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
+  "repository": "http://github.com/nokia/vscode-intent-manager",
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -33,7 +34,7 @@
       {
         "command": "nokia-intent-manager.lastAuditReport",
         "category": "IntentManager",
-        "title": "Last audit report",
+        "title": "Audit report",
         "icon": "$(search)"
       },
       {
@@ -45,13 +46,13 @@
       {
         "command": "nokia-intent-manager.logs",
         "category": "IntentManager",
-        "title": "NSP server-logs",
+        "title": "Server Logs",
         "icon": "$(debug)"
       },
       {
         "command": "nokia-intent-manager.state",
         "category": "IntentManager",
-        "title": "Set intent state",
+        "title": "Set intent(s) state",
         "icon": "$(symbol-property)"
       },
       {
@@ -112,27 +113,27 @@
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/[a-z0-9\\-]+_v\\d+\\//",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\//",
           "command": "nokia-intent-manager.newIntent",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/[a-z0-9\\-]+_v\\d+\\/intents\\/[^/]+$/",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.logs",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/[a-z0-9\\-]+_v\\d+\\/intents\\/[^/]+$/",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.audit",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/[a-z0-9\\-]+_v\\d+\\/intents\\/[^/]+$/",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.sync",
           "group": "navigation"
         },
         {
-          "when": "resource =~ /^im:\\/[a-z0-9\\-]+_v\\d+\\/intents\\/[^/]+$/",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
           "command": "nokia-intent-manager.state",
           "group": "navigation"
         }
@@ -141,7 +142,7 @@
         {
           "command": "nokia-intent-manager.uploadLocal",
           "group": "nokia_im",
-          "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-z0-9\\-]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-z0-9\\-]*_v\\d+/"
+          "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.newIntentType",
@@ -151,42 +152,42 @@
         {
           "command": "nokia-intent-manager.newIntent",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.newVersion",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.clone",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.logs",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
         },
         {
           "command": "nokia-intent-manager.audit",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+\\/intents\\/[^/]+$/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.sync",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+\\/intents\\/[^/]+$/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.state",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+\\/intents\\/[^/]+$/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.lastAuditReport",
           "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9\\-]*_v\\d+\\/intents\\/[^/]+$/"
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
         },
         {
           "command": "nokia-intent-manager.openInBrowser",
@@ -233,9 +234,9 @@
         },
         "intentManager.timeout": {
           "type": "number",
-          "default": 20000,
+          "default": 90000,
           "scope": "application",
-          "description": "Connection timeout in ms"
+          "description": "timeout for calls to NSP in ms"
         },
         "intentManager.ignoreLabels": {
           "type": "array",
@@ -244,7 +245,13 @@
             "type": "string"
           },
           "description": "Intent-types with these labels will be hidden."
-        }
+        },
+        "intentManager.parallelOperations.enable": {
+          "type": "boolean",
+          "scope": "application",
+          "default": false,
+          "description": "Enable parallel intent operations (EXPERIMENTAL)"
+        }        
       }
     }
   },

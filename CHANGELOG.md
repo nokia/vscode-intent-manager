@@ -95,3 +95,24 @@ Updates:
 * Creation of new intent-types using templates
 * Deletion of intent-types with intents (confirmation prompt)
 * Audit reports using colors from vsCode theme (dark vs light)
+
+## [2.1.0]
+
+Fixes:
+* Consistent usage of intent-type naming pattern (small caps, numbers, minus, underscore)
+* Raise exception to let vsCode know, that deletion of intent-types with existing intents was cancelled
+* Increased default timeout for REST calls from 20sec to 90sec for better robbustness
+
+Updates:
+* Filename for intents are now URI-encoded to support special-characters like `/`, like if target contains xpath
+* Extension `.json` has been added for intents to improve support for local editing
+* Update of extension settings without the need to reload vsCode
+* Upload intent-types including intents
+* Error messages improved
+
+Experimental:
+* Async execution allowing parallel intent operations (sync/audit)
+
+Known limitations:
+* Intent decoration is automatically updated by audit/sync methods to reduce server.
+  In some error scenarios the displayed alignment state does not reflect the server state.

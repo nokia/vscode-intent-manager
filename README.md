@@ -50,7 +50,7 @@ To make the extension work, make sure you configure the following attributed in 
 ## Feature candidates
 
 * Interactive intent creation w/ schema validation / schema-form
-* Extend logging/tracing other NSP components
+* Extend logging/tracing to other NSP components
 * Front-end for NSP Resource Administrator
 * Intent-type generator (from model, from instance)
 * Extend code snippets collection (input from community appretiated)
@@ -58,18 +58,17 @@ To make the extension work, make sure you configure the following attributed in 
 * Validation of meta-info.json and *.viewConfig (using json-schema)
 * Better indication on the WebUI that a sync/audit/upload operation is currently running
 * Explore techniques for embedding unit-tests in intent-type code
-* Explore options to stream logging in real-time (tail -f style)
+* Explore options to stream logging from opensearch in real-time
 * Explore options to modify server-site log-level
-* Improve performance for multi-target operations (audit, lastAudit and sync) by properly using async
-* Add support for createDirectory() to create new intent-types
 * Add support for createDirectory() under intent-type-resource
 * Add support for rename() for intent-type resources
 * Add support for rename() for intents (delete and recreate intent under new target)
 * Show # of entries on tabs for audit reports (same as NSP WebUI)
-* Evolution of intent signing (candidate: 24.8). “New version” or “clone” of signed intent-types should be unsiged to allow for changes.
+* Evolution of intent signing: “New version” or “clone” of signed intent-types should be unsiged to allow for changes.
 * Improve flow to create intent and intent-types using multi-step forms and instant validation
-* Advanced boilerplase templates like IPL!nk, IBSF, … for intent-type creation
 * Provide option to gracefully remove intents (cleanup network/resources)
+* Add/Update boilerplase intent-type templates (next-gen JS engine, IBSF, ICM)
+* Extend async/parallel execution for: set-state, deletion
 
 ## Release Notes
 
