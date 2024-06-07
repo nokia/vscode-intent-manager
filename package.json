@@ -16,7 +16,7 @@
     "onFileSystem:im",
     "onStartupFinished"
   ],
-  "main": "./out/extension.js",
+  "main": "./out/main.js",
   "contributes": {
     "snippets": [
       {
