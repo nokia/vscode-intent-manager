@@ -41,6 +41,55 @@ limited number of intent-types and instances, but it is not designed to work in 
 Extensive logging is available for all communication between this vsCode plugin and NSP IM.
 Check "OUTPUT" for more details.
 
+## Build VSIX
+
+Please make sure, you've got the following installed in your environment:
+
+```
+# npm install -g typescript
+# npm install -g @vscode/vsce
+```
+
+Installation can be validated like this:
+
+```
+% npm list -g             
+/usr/local/lib/node_modules/node/lib
+├── @vscode/vsce@2.27.0
+└── typescript@5.4.5
+```
+
+Before you compile and build the distribution, make sure all depended modules
+are installed:
+
+```
+% npm install .
+% npm list
+nokia-intent-manager@2.1.1 ~/dev/vscode-intent-manager
+├── @types/node@18.19.34
+├── @types/vscode@1.90.0
+├── @typescript-eslint/eslint-plugin@6.21.0
+├── @typescript-eslint/parser@6.21.0
+├── @vscode/codicons@0.0.36
+├── base-64@1.0.0
+├── esbuild@0.21.5
+├── eslint@8.57.0
+├── lodash@4.17.21
+├── node-fetch@2.7.0
+├── nunjucks@3.2.4
+├── typescript@5.4.5
+├── vscode-uri@3.0.8
+├── vse@0.5.1
+└── yaml@2.4.5
+```
+
+To see all dependencies, you can run `npm list --all`.
+In cases of any issues, visit the `npm doctor`.
+
+To compile and generate the VSIX for installation, run:
+
+    vsce package
+
 ## Extension Settings
 
 To make the extension work, make sure you configure the following attributes in the extension settings:
@@ -66,6 +115,7 @@ See release changes in Changelog.
 
 ## Important links
 
-* [Developer portal](https://network.developer.nokia.com/learn/23_4/network-programmability-automation-frameworks)
+### NOKIA | Network Developer Portal
+* [NSP Programmable Automation Frameworks](https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks)
 
 **Enjoy!**

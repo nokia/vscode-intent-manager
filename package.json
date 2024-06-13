@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -16,7 +16,7 @@
     "onFileSystem:im",
     "onStartupFinished"
   ],
-  "main": "./out/main.js",
+  "main": "./dist/main.js",
   "contributes": {
     "snippets": [
       {
@@ -62,9 +62,15 @@
         "icon": "$(home)"
       },
       {
-        "command": "nokia-intent-manager.uploadLocal",
+        "command": "nokia-intent-manager.uploadIntentType",
         "category": "IntentManager",
         "title": "Upload intent-type",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "nokia-intent-manager.uploadIntents",
+        "category": "IntentManager",
+        "title": "Upload intent(s)",
         "icon": "$(cloud-upload)"
       },
       {
@@ -99,7 +105,7 @@
       "editor/title": [
         {
           "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
-          "command": "nokia-intent-manager.uploadLocal",
+          "command": "nokia-intent-manager.uploadIntentType",
           "group": "navigation"
         },
         {
@@ -140,9 +146,14 @@
       ],
       "explorer/context": [
         {
-          "command": "nokia-intent-manager.uploadLocal",
+          "command": "nokia-intent-manager.uploadIntentType",
           "group": "nokia_im",
           "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+        },
+        {
+          "command": "nokia-intent-manager.uploadIntents",
+          "group": "nokia_im",
+          "when": "resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/.+\\.json/"
         },
         {
           "command": "nokia-intent-manager.newIntentType",
@@ -251,47 +262,39 @@
           "scope": "application",
           "default": false,
           "description": "Enable parallel intent operations (EXPERIMENTAL)"
-        }        
+        }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run esbuild-base -- --minify",
-    "build": "./node_modules/typescript/bin/tsc",
-    "compile": "./node_modules/typescript/bin/tsc -p ./",
-    "watch": "./node_modules/typescript/bin/tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --packages=external",
-    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "vscode:prepublish": "npm run esbuild -- --minify",
+    "compile": "tsc -p ./ --sourceMap",
+    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "rm -rf node_modules out",
+    "watch": "tsc -watch -p ./",
+    "build": "tsc",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --packages=external",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-    "test-compile": "./node_modules/typescript/bin/tsc -p ./"
+    "esbuild": "npm run esbuild-base -- --sourcemap"
   },
   "devDependencies": {
-    "@types/glob": "^8.0.0",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
+    "@types/node": "18.x",
     "@types/vscode": "^1.75.0",
-    "@typescript-eslint/eslint-plugin": "^5.45.0",
-    "@typescript-eslint/parser": "^5.45.0",
-    "@vscode/test-electron": "^2.2.0",
-    "eslint": "^8.28.0",
-    "glob": "^8.0.3",
-    "mocha": "^10.1.0",
-    "typescript": "^4.9.3"
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^8.26.0",
+    "typescript": "5.x"
   },
   "dependencies": {
-    "@vscode/codicons": "0.0.20",
-    "@vscode/vsce": "^2.25.0",
+    "@vscode/codicons": "^0.0.36",
     "base-64": "^1.0.0",
-    "esbuild": "^0.20.2",
-    "lodash": "^4.17.0",
-    "node-fetch": "2.6.6",
+    "lodash": "^4.17.21",
+    "node-fetch": "^2.7.0",
+    "npm": "^10.8.1",
     "nunjucks": "^3.2.0",
-    "vsce": "^2.15.0",
-    "vscode-uri": "^3.0.0",
+    "vscode-uri": "^3.0.8",
     "vse": "^0.5.1",
-    "yaml": "^2.2.0"
+    "yaml": "^2.4.5"
   }
 }

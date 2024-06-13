@@ -116,3 +116,16 @@ Experimental:
 Known limitations:
 * Intent decoration is automatically updated by audit/sync methods to reduce server.
   In some error scenarios the displayed alignment state does not reflect the server state.
+
+## [2.1.1]
+
+Fixes:
+* Upload intents and views from local machine (drag'n drop, copy/paste)
+* Sanitized code for lint conformance
+* Optimized build script
+
+Updates:
+* Allow updating `meta-info.json` for signed intent-types. Change was requested to remove label `ArtifactAdmin`
+  after an intent-type was cloned or a new version have been created.
+* New command to upload intents from local system.
+

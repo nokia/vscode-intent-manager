@@ -1,4 +1,7 @@
-.vscode
+.vscode/
 node_modules/
 out/
+dist/
 *.vsix
+package-lock.json
+.DS_Store/

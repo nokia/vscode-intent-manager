@@ -1,0 +1,8 @@
+.git/**
+.vscode/**
+src/**
+out/**
+tsconfig.json
+.gitignore
+.DS_Store
+.eslintrc.js
