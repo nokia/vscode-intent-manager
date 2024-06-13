@@ -739,7 +739,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const forCleanup = ["default-version", "supports-health",	"skip-device-connectivity-check", "support-aggregated-request",	"resource",	"name",	"date",	"module", "script-content"];
 					for (const parameter of forCleanup) delete meta[parameter];
 					
-					return Buffer.from(JSON.stringify(meta, null, "  "));
+					return Buffer.from(JSON.stringify(meta, null, '  '));
 				}
 
 				if (parts[2].startsWith('script-content'))
@@ -763,11 +763,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (parts[2]==="intents") {
 					const target = decodeURIComponent(parts[3].slice(0,-5));
 					if (this.intentTypes[intent_type_folder].intents.hasOwnProperty(target))
-						return Buffer.from(JSON.stringify(this.intentTypes[intent_type_folder].intents[target], null, "  "));
+						return Buffer.from(JSON.stringify(this.intentTypes[intent_type_folder].intents[target], null, '  '));
 				}
 
 				if (parts[2]==="views")
-					return Buffer.from(JSON.stringify(this.intentTypes[intent_type_folder].views[parts[3]], null, "  "));
+					return Buffer.from(JSON.stringify(this.intentTypes[intent_type_folder].views[parts[3]], null, '  '));
 			}
 		}
 
@@ -850,12 +850,17 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				else if (parts[2]==="intents") {
 					if (parts.length===3)
 						return {type: vscode.FileType.Directory, ctime: 0, mtime: Date.now(), size: 0, permissions: vscode.FilePermission.Readonly};
-					else
+					else if (this.intentTypes[intent_type_folder].intents.hasOwnProperty(decodeURIComponent(parts[3].slice(0,-5))))
 						return {type: vscode.FileType.File, ctime: 0, mtime: Date.now(), size: 0};
+					else
+						this.pluginLogs.warn('Unknown intent', uri.toString());
 				}
-		
-				if (parts[2]==="meta-info.json" || parts[2].startsWith('script-content.'))
+
+				if (parts[2].startsWith('script-content.'))
 					return {type: vscode.FileType.File, ctime: 0, mtime: timestamp, size: 0, permissions: access};
+
+				if (parts[2]==="meta-info.json")
+					return {type: vscode.FileType.File, ctime: 0, mtime: timestamp, size: 0};
 
 				this.pluginLogs.warn('Unknown folder/file', uri.toString());
 			} else {
@@ -884,6 +889,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const intent_type_folder = parts[1];
 			const intent_type_version = intent_type_folder.split('_v')[1];
 			const intent_type = intent_type_folder.split('_v')[0];
+
+			var name_changed = false;
 	
 			this.pluginLogs.debug("writeFile("+path+")");
 			if (!this.intentTypes.hasOwnProperty(intent_type_folder)) {
@@ -891,11 +898,17 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				await this.readDirectory(vscode.Uri.parse('im:/'));
 			}
 
+			// Note: We can only write files if the intent-type exists and is loaded.
 			if (this.intentTypes.hasOwnProperty(intent_type_folder)) {
-				// Note: We can only write files if the intent-type exists and is loaded.
+				
 				if (parts[2]==="intents") {
 					if (parts[3].endsWith('.json')) {
-						const target = decodeURIComponent(parts[3].slice(0,-5));
+						let target = decodeURIComponent(parts[3].slice(0,-5));
+
+						if (target.endsWith(" copy") && this.intentTypes[intent_type_folder].intents.hasOwnProperty(target.slice(0,-5))) {
+							name_changed = true;
+							target = target.slice(0,-5);
+						}
 
 						if (this.intentTypes[intent_type_folder].intents.hasOwnProperty(target)) {
 							this.pluginLogs.info("update intent", intent_type, target);
@@ -906,13 +919,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 							if (response.ok) {
 								vscode.window.showInformationMessage("Intent succesfully updated");
-								this.intentTypes[intent_type_folder].intents[target] = content.toString();
+								this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content.toString());
 								this.intentTypes[intent_type_folder].aligned[target] = false;
 								this._eventEmiter.fire(uri);
 							} else
 								this._raiseRestconfError("Update intent failed!", await response.json());
 						} else {
-							this.pluginLogs.info("create new intent", intent_type, target);
+							this.pluginLogs.info("Create new intent", intent_type, target);
 
 							let intent : string | undefined = content.toString();
 							if (!intent) {
@@ -942,51 +955,47 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 							if (response.ok) {
 								vscode.window.showInformationMessage("Intent succesfully created");
-								this.intentTypes[intent_type_folder].intents[target] = content.toString();
+								this.intentTypes[intent_type_folder].intents[target] = JSON.parse(intent);
 								this.intentTypes[intent_type_folder].desired[target] = "active";
 								this.intentTypes[intent_type_folder].aligned[target] = false;
 							} else
 								this._raiseRestconfError("Intent creation failed!", await response.json());
 						}
-					} else throw vscode.FileSystemError.NoPermissions("Save intent failed! Only .json files are supported");
+					} else throw vscode.FileSystemError.NoPermissions("Upload intent failed! Only .json files are supported");
 				}
 
 				else if (parts[2]==="views") {
-					let viewname = parts[3];
-					let viewjson = content.toString();
+					if (parts[3].endsWith('.viewConfig')) {
+						const viewname = parts[3].slice(0,-11);
+						let viewjson = content.toString();
 
-					if (viewname.endsWith(".schemaForm")) {
-						throw vscode.FileSystemError.Unavailable('You can only upload viewConfig file! SchemaForm is auto-generated.');
-					}
+						if (!viewjson) {
+							// vsCode user has execute "New File..."
+							// initialize with empty JSON to pass NSP validation
+							viewjson = "{}";
+						}
 
-					// viewname is filename without file-ext ".viewConfig"
-					// file-extension will automatically be added as required
-
-					if (viewname.endsWith(".viewConfig"))
-						viewname = viewname.slice(0,-11);
-
-					if (!viewjson) {
-						// vsCode user has execute "New File..."
-						// initialize with empty JSON to pass NSP validation
-						viewjson = "{}";
-					}
-
-					const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version;
-					const body = {
-						"nsp-intent-type-config-store:intent-type-configs":[{
-							"views": [{
-								"name": viewname,
-								"viewconfig": viewjson
+						const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version;
+						const body = {
+							"nsp-intent-type-config-store:intent-type-configs":[{
+								"views": [{
+									"name": viewname,
+									"viewconfig": viewjson
+								}]
 							}]
-						}]
-					};
-					let response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
-					if (!response)
-						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-					if (response.ok)
-						vscode.window.showInformationMessage("View "+intent_type_folder+"/"+viewname+"succesfully saved");
+						};
+						let response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
+						if (!response)
+							throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+						if (response.ok) {
+							vscode.window.showInformationMessage("View "+intent_type_folder+"/"+viewname+"succesfully saved");
+							this.intentTypes[intent_type_folder].views[viewname+".viewConfig"] = JSON.parse(viewjson);
+						} else this._raiseRestconfError("Save viewConfig failed!", await response.json());
+					}
+					else if (parts[3].endsWith('.schemaForm'))
+						throw vscode.FileSystemError.NoPermissions('You can only upload .viewConfig file! SchemaForm is auto-generated.');
 					else
-						this._raiseRestconfError("Save viewConfig failed!", await response.json());
+						throw vscode.FileSystemError.NoPermissions("Upload view failed! Only .viewConfig files are supported");
 				}
 				
 				else {
@@ -1053,10 +1062,31 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						this.intentTypes[intent_type_folder].signed = data.label.includes('ArtifactAdmin');
 						this.intentTypes[intent_type_folder].data = data;
 
-						this._eventEmiter.fire(uri);
+						if (parts[2]==="meta-info.json") {
+							// update decorations, just in case we've toggled between signed vs unsigned
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder));
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/meta-info.json"));
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.js"));
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.mjs"));
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/intent-type-resources"));
+							this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/yang-modules"));
+						}
 					} else
 						this._raiseRestconfError("Save intent-type failed!", await response.json());
 				}
+
+				if (name_changed) {
+					this.pluginLogs.warn("Filename adjusted to match Intent Manager conventions!");
+					vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+					throw vscode.FileSystemError.Unavailable("Operation was successful! Filename adjusted to match Intent Manager conventions! ");
+				}
+
+				// if .viewConfig file was successfully written,
+				// refresh explorer to ensure .schemaForm is displayed correctly:
+
+				if (parts[2]==="views")
+					vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+
 			} else throw vscode.FileSystemError.Unavailable("Save file failed! Unknown intent-type "+intent_type_folder+"!"); 
 		} else throw vscode.FileSystemError.Unavailable("Save file failed! Unsupported folder/file!");
 	}
@@ -1093,18 +1123,18 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 				if (parts.length>3) {
 					if (parts[2]==="intents") {
-						const target = decodeURIComponent(parts[3].slice(0,-5));
+						const target = decodeURIComponent(parts[3].slice(0,-5)); // remove .json extension and decode
 						url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 						this.pluginLogs.info("delete intent", intent_type, target);
 					} else if (parts[2]==="intent-type-resources") {
 						const resourcename = parts.slice(3).join("/");
 						url = url+"/resource="+encodeURIComponent(resourcename);
 						this.pluginLogs.info("delete resource", intent_type, resourcename);
-					} else if (parts[2].includes("yang-modules")) {
+					} else if (parts[2]==="yang-modules") {
 						const modulename = parts[3];
 						url = url+"/module="+modulename;
 						this.pluginLogs.info("delete module", intent_type, modulename);
-					} else if (parts[2].includes("views")) {
+					} else if (parts[2]==="views") {
 						const viewname = parts[3].slice(0,-11); // remove .viewConfig extension
 						url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version+"/views="+viewname;
 						this.pluginLogs.info("delete view", intent_type, viewname);
@@ -1159,6 +1189,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						this.intentTypes[intent_type_folder].data.module = this.intentTypes[intent_type_folder].data.module.filter((module:{name:string, value:string}) => module.name!=modulename);
 					} else if (parts[2].includes("views")) {
 						delete this.intentTypes[intent_type_folder].views[parts[3]];
+						delete this.intentTypes[intent_type_folder].views[parts[3].slice(0,-11)+".schemaForm"];
+						vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer"); // needed to remove schemaForm
 					}
 				} else {
 					delete this.intentTypes[intent_type_folder];
@@ -1249,15 +1281,17 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					} else return DECORATION_INTENTS;
 				}
 
-				if (!this.intentTypes[intent_type_folder].signed) {
-					if (parts.length===3) {
-						if (parts[2]==="intent-type-resources") return DECORATION_RESOURCES;
-						if (parts[2]==="yang-modules") 			return DECORATION_MODULES;
-					}
-				} else return DECORATION_SIGNED;
+				if (parts.length===3) {
+					if (this.intentTypes[intent_type_folder].signed)
+						return DECORATION_SIGNED;
+					if (parts[2]==="intent-type-resources")
+						return DECORATION_RESOURCES;
+					if (parts[2]==="yang-modules")
+						return DECORATION_MODULES;
+				}
 			}
 		}
-	}	
+	}
 
 	// --- SECTION: IntentManagerProvider specific public methods implementation ---
 
@@ -1405,7 +1439,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * 
 	 */	
 
-	public async uploadLocal(args:any[]): Promise<void> {
+	public async uploadIntentType(args:any[]): Promise<void> {
 		var fs = require('fs');
 
 		const matchIntentType = /^([a-z][a-z0-9_\-]+_v\d+)$/;
@@ -1426,7 +1460,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, "_v"); 
 
 		if (matchIntentType.test(intent_type_folder))
-			this.pluginLogs.debug("uploadLocalIntentType("+path.fsPath+")");
+			this.pluginLogs.debug("uploadIntentType("+path.fsPath+")");
 		else {
 			vscode.window.showErrorMessage("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
 			throw vscode.FileSystemError.FileNotFound("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
@@ -1572,7 +1606,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 		}
 		vscode.window.showInformationMessage("Intent-Type "+intent_type_folder+" successfully uploaded");
-		this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder));
+
+		// update decorations, just in case we've toggled between signed vs unsigned
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder));
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/meta-info.json"));
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.js"));
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.mjs"));
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/intent-type-resources"));
+		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/yang-modules"));
 
 		// Upload views
 
@@ -1595,7 +1636,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			if (response.ok) {
 				vscode.window.showInformationMessage("View "+intent_type_folder+"/"+viewname+" successfully uploaded");
-				this.intentTypes[intent_type_folder].views[viewname] = JSON.parse(content);
+				this.intentTypes[intent_type_folder].views[view] = JSON.parse(content);
 			} else this._printRestconfError("Upload view(s) failed!", await response.json());
 		}
 
@@ -1616,7 +1657,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully updated");
 					this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
 					this.intentTypes[intent_type_folder].aligned[target] = false;
-					this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+encodeURIComponent(encodeURIComponent(target))+".json"));
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+filename));
 				} else this._printRestconfError("Update intent failed!", await response.json());
 			} else {
 				const url = "/restconf/data/ibn:ibn";
@@ -1638,13 +1679,80 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
 					this.intentTypes[intent_type_folder].aligned[target] = false;
 					this.intentTypes[intent_type_folder].desired[target] = "active";
-
-					this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+encodeURIComponent(encodeURIComponent(target))+".json"));
 				} else this._printRestconfError("Create intent failed!", await response.json());
 			}
 		}
 
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");		
+	}
+
+	/**
+	 * Upload an intents from a local workspace folder to NSP Intent Manager.
+	 * 
+	 * @param {any[]} args context used to issue command
+	 * 
+	 */	
+
+	public async uploadIntents(args:any[]): Promise<void> {
+		var fs = require('fs');
+
+		const matchIntentType = /^([a-z][a-z0-9_\-]+_v\d+)$/;
+
+		let uriList:vscode.Uri[] = this._getUriList(args);
+		for (const entry of uriList) {
+			let parts = entry.toString().split('/');
+			const filename           = parts.pop();
+			const intent_folder      = parts.pop();
+			const intent_type_folder = parts.pop();
+
+			if (intent_type_folder && matchIntentType.test(intent_type_folder) && intent_folder &&  intent_folder==="intents" && filename && filename.endsWith(".json")) {
+				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type_version = intent_type_folder.split('_v')[1];
+				const target = decodeURIComponent(decodeURIComponent(filename.slice(0,-5)));
+				const content = fs.readFileSync(entry.fsPath, {encoding:'utf8', flag:'r'});
+		
+				if (this.intentTypes[intent_type_folder].intents.hasOwnProperty(target)) {
+					const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/intent-specific-data";
+					const body = {"ibn:intent-specific-data": JSON.parse(content)};
+					this.pluginLogs.info("update intent", intent_type, target);
+					let response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
+					if (!response)
+						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+					if (response.ok) {
+						vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully updated");
+						this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
+						this.intentTypes[intent_type_folder].aligned[target] = false;
+						this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+filename));
+					} else this._printRestconfError("Update intent failed!", await response.json());
+				} else {
+					const url = "/restconf/data/ibn:ibn";
+					const body = {
+						"ibn:intent": {
+							"target": target,
+							"intent-type": intent_type,
+							"intent-type-version": intent_type_version,
+							"ibn:intent-specific-data": JSON.parse(content),
+							"required-network-state": "active"
+						}
+					};
+					this.pluginLogs.info("create intent", intent_type, target);
+					let response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
+					if (!response)
+						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+					if (response.ok) {
+						vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully uploaded");
+						this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
+						this.intentTypes[intent_type_folder].aligned[target] = false;
+						this.intentTypes[intent_type_folder].desired[target] = "active";
+					} else this._printRestconfError("Create intent failed!", await response.json());
+				}
+			} else {
+				this.pluginLogs.warn("uploadIntent(", filename, ") failed! URI does not match expected folder structure!");
+				vscode.window.showErrorMessage("Failed to upload "+entry.toString()+"! Intents must be stored in directory {intent_type}_v{version}/intents/{target}.json"); 
+			}
+		}
+		
+		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 	}
 
 	/**
@@ -1897,6 +2005,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const intent_type_folder = parts[1];
 				const intent_type = intent_type_folder.split('_v')[0];
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/synchronize";
+
+				throw(Error("blabla blabla"));
 
 				if (this.parallelOps && uriList.length>1) {
 					this.pluginLogs.warn("parallel sync(", entry.toString(), "), EXPERIMENTAL!");
