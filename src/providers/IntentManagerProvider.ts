@@ -1770,11 +1770,30 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	public async logs(args:any[]): Promise<void> {
 		this.pluginLogs.debug("logs()");
 		
-		const query : {[key: string]: any} = {"bool": {"must": [
-			{"range": {"@datetime": {"gte": "now-10m"}}},
-			{"match_phrase": {"log": "\"category\":\"com.nokia.fnms.controller.ibn.impl.ScriptedEngine\""}},
-			{"bool": {"should": []}}
-		]}};
+		const query : {[key: string]: any} = {
+			"bool": {
+				"must": [{
+					"range": {
+						"@datetime": {
+							"gte": "now-10m"
+						}
+					}
+				}, {
+					"bool": {
+						"should": []
+					}
+
+				// Removed filter by category below (not needed)!
+				// Value changed for next-gen script engine:
+				//   com.nokia.fnms.controller.ibn.impl.graal.GraalJSScriptedEngine
+	
+				// }, {
+				// 	"match_phrase": {
+				// 		"log": "\"category\":\"com.nokia.fnms.controller.ibn.impl.ScriptedEngine\""
+				// 	}
+				}]
+			}
+		};
 
 		const uriList:vscode.Uri[] = this._getUriList(args);
 		for (const entry of uriList) {
@@ -1794,7 +1813,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (parts.length===4 && parts[2]==="intents")
 					qentry.bool.must.push({"match_phrase": {"log": "\"target\":\""+decodeURIComponent(parts[3].slice(0,-5))+"\""}});
 
-				query.bool.must.at(2).bool.should.push(qentry);
+				query.bool.must.at(1).bool.should.push(qentry);
 			}
 		}
 
