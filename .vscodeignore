@@ -1,7 +1,8 @@
 .git/**
 .vscode/**
-src/**
+node_modules/**
 out/**
+src/**
 tsconfig.json
 .gitignore
 .DS_Store

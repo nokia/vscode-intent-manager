@@ -273,7 +273,7 @@
     "clean": "rm -rf node_modules out",
     "watch": "tsc -watch -p ./",
     "build": "tsc",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --packages=external",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --loader:.node=file",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
     "esbuild": "npm run esbuild-base -- --sourcemap"
   },
