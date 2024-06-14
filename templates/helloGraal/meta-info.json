@@ -8,7 +8,7 @@
   "priority": 50,
   "return-config-as-json": true,
   "support-nested-type-in-es": false,
-  "supports-network-state-suspend": true,
+  "supports-network-state-suspend": false,
   "target-component": [
     {
       "i18n-text": "Target Device",

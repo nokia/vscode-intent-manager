@@ -129,3 +129,10 @@ Updates:
   after an intent-type was cloned or a new version have been created.
 * New command to upload intents from local system.
 
+## [2.2.0]
+
+Updates:
+* Server logs now include stacktrace for JavaScript errors
+* Server logs timespan and limit are not configurable
+* Limit for intent-type/intent retrieval is now configurable
+* New template for next-gen javascript engine has been added

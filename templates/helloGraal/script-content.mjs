@@ -6,8 +6,8 @@ let HashMap = classResolver.resolveClass("java.util.HashMap");
 let Arrays = Java.type("java.util.Arrays");
 
 export class IntentTypeHandler {
-  INTENT_TYPE_NAME = "hellograal";
-  INTENT_ROOT = "hellograal:hellograal";
+  INTENT_TYPE_NAME = "{{ intent_type }}";
+  INTENT_ROOT = "{{ intent_type }}:{{ intent_type }}";
 
   constructor() {
     logger.info("Creating IntentTypeHandler for "+this.INTENT_TYPE_NAME);
