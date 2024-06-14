@@ -5,6 +5,10 @@
             "description": "basic intent-type | mapping-engine js-scripted (Nashorn)"
         },
         {
+            "label": "helloGraal",
+            "description": "basic intent-type | next-gen javascript engine (GraalJS)"
+        },
+        {
             "label": "SRX24 deviceSecurity",
             "description": "device security SReXperts 2024 | research/study, experimental"
         },
