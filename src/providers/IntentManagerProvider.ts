@@ -67,6 +67,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	fileIgnore: Array<string>;
 	parallelOps: boolean;
 
+	serverLogsOffset: string;
+	serverLogsFullStack: boolean;
+	logLimit: number;
+	queryLimit: number;
+
 	nspVersion: number[] | undefined;
 	secretStorage: vscode.SecretStorage;
 
@@ -97,13 +102,21 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	
 	constructor (context: vscode.ExtensionContext) {
 		const config = vscode.workspace.getConfiguration('intentManager');
-		this.nspAddr = config.get("NSPIP") ?? "";
-		this.username = config.get("user") ?? "admin";
 		this.secretStorage = context.secrets;
-		this.port = config.get("port") ?? "443";
-		this.timeout = config.get("timeout") ?? 90000;
+
+		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
+
+		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";
+		this.serverLogsFullStack = config.get("serverLogsFullStack") ?? false;
+		this.logLimit = config.get("logLimit") ?? 5000;
+		this.queryLimit = config.get("queryLimit") ?? 1000;
+
+		this.nspAddr = config.get("NSPIP") ?? "";
+		this.username = config.get("user") ?? "admin";
+		this.port = config.get("port") ?? "443";
+
 		this.extensionPath = context.extensionPath;
 		this.extensionUri = context.extensionUri;
 
@@ -232,7 +245,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<void> {
 		const timeout = new AbortController();
-        setTimeout(() => timeout.abort(), this.timeout);
+        setTimeout(() => timeout.abort(), this.timeout*1000);
 		options.signal = timeout.signal;
 
 		if (!('headers' in options)) {
@@ -357,7 +370,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		
 		const json = await response.json();
 
-		const version = json["response"]["data"]["nspOSVersion"];		
+		const version = json["response"]["data"]["nspOSVersion"];
 		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(parseInt);
 		vscode.window.showInformationMessage("NSP version: "+version);
 	}
@@ -504,7 +517,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			// while labels to ignore are applied as blacklist.
 
 			const url = "/restconf/operations/ibn-administration:search-intent-types";
-			const body = {"ibn-administration:input": {"page-number": 0, "page-size": 1000}};
+			const body = {"ibn-administration:input": {"page-number": 0, "page-size": this.queryLimit}};
 			const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
 
 			if (!response)
@@ -513,8 +526,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				this._raiseRestconfError("Getting list of intent-types failed!", await response.json());
 
 			const json = await response.json();
-			if (json["ibn-administration:output"]["total-count"]>1000) {
-				vscode.window.showWarningMessage("NSP has more than 1000 intent-types. Only showing the first 1000.");
+			if (json["ibn-administration:output"]["total-count"]>this.queryLimit) {
+				vscode.window.showWarningMessage("NSP has more than "+this.queryLimit+" intent-types. Loading the first "+this.queryLimit+" intent-types only.");
 			}
 
 			let intentTypes = json["ibn-administration:output"]["intent-type"];
@@ -599,7 +612,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							]
 						},							
 						"page-number": 0,
-						"page-size": 1000
+						"page-size": this.queryLimit
 					}
 				};
 
@@ -612,8 +625,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const json = await response.json();
 				const output = json["ibn:output"];
 
-				if (output["total-count"]>1000)
-					vscode.window.showWarningMessage("More than 1000 intents found. Only showing the first 1000.");
+				if (output["total-count"]>this.queryLimit)
+					vscode.window.showWarningMessage("Intent-type "+intent_type+" has more than "+this.queryLimit+" intents. Loading the first "+this.queryLimit+" intents only.");
 
 				if ('intent' in output.intents) {
 					this.intentTypes[intent_type_folder].intents = output.intents.intent.reduce((intents: any, item: { [key: string]: any; target: string; }) => {
@@ -1295,20 +1308,26 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * 
 	 */	
 
-	public updateSettings() {
+	async updateSettings() {
 		this.pluginLogs.info("Updating IntentManagerProvider after configuration change");
 
 		const config = vscode.workspace.getConfiguration('intentManager');
 
-		this.timeout = config.get("timeout") ?? 90000; // default: 3min
+		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
 
+		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";
+		this.serverLogsFullStack = config.get("serverLogsFullStack") ?? false;
+		this.logLimit = config.get("logLimit") ?? 5000;
+		this.queryLimit = config.get("queryLimit") ?? 1000;
+
 		const nsp:string = config.get("NSPIP") ?? "";
 		const user:string = config.get("user") ?? "admin";
-		const port:string =  config.get("port") ?? "443";
+		const port:string = config.get("port") ?? "443";
+		const pass = await this.secretStorage.get("nsp_im_password");
 
-		if (nsp !== this.nspAddr || user !== this.username || port !== this.port) {
+		if (nsp !== this.nspAddr || user !== this.username || port !== this.port || pass !== this.password) {
 			this.pluginLogs.warn("Disconnecting from NSP", this.nspAddr);
 			this._revokeAuthToken();
 			this.nspAddr = nsp;
@@ -1749,9 +1768,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	/**
 	 * Get server logs for the intent script execution from OpenSearch. Filtering is applied
-	 * based on intent-type(s) or intent instances being selected.
+	 * based on intent-type(s) and/or intent instances being selected.
 	 * 
-	 * Collection will be limited to cover the last 10min only respectively 1000 log entries.
+	 * By default, log collection will be limited to cover the last 10min respectively
+	 * 5000 log entries. Values can be overwritten using the extension settings. 
 	 * 
 	 * Whenever there is a pause between two adjacent log entries for 30sec or more, an empty
 	 * line will be added. This is to provide better separation between disjoint intent
@@ -1760,9 +1780,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * Logs are reordered (sorted) by the timestamp generated by the IBN engine. In some cases
 	 * adjacent log entries contain the same timestamp, while displaying logs in the correct
 	 * order can not be granted.
-	 * 
-	 * If no intent-type/intent URI is provided, all execution logs from last 10 minutes
-	 * are queried.
 	 * 
 	 * @param {any[]} args context used to issue command
 	 */	
@@ -1775,22 +1792,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				"must": [{
 					"range": {
 						"@datetime": {
-							"gte": "now-10m"
+							"gte": "now-"+this.serverLogsOffset
 						}
 					}
 				}, {
 					"bool": {
 						"should": []
 					}
-
-				// Removed filter by category below (not needed)!
-				// Value changed for next-gen script engine:
-				//   com.nokia.fnms.controller.ibn.impl.graal.GraalJSScriptedEngine
-	
-				// }, {
-				// 	"match_phrase": {
-				// 		"log": "\"category\":\"com.nokia.fnms.controller.ibn.impl.ScriptedEngine\""
-				// 	}
 				}]
 			}
 		};
@@ -1825,8 +1833,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		}
 
 		const url = "/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
-		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": 1000};
-		
+		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": this.logLimit};
+
 		let osdver = "2.6.0";
 		if (this._fromRelease(23,11)) osdver="2.10.0";
 
@@ -1849,7 +1857,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		const data : {[key: string]: any}[] = json["hits"]["hits"];
 		if (data.length === 0 ) {
-			vscode.window.showWarningMessage("No intent operation logs for the last 10 minutes");
+			vscode.window.showWarningMessage("No intent operation logs for the last "+this.serverLogsOffset);
 		} else {
 			const logs : Array<any> = [];
 			for (const entry of data) {
@@ -1862,23 +1870,34 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 			let pdate = logs[0]['date'];
 			for (const logentry of logs) {
-				const timestamp = new Date(logentry['date']);
-				const level = logentry['level'];
-				const target = logentry['target'];
-				const intent_type = logentry['intent_type'];
-				const intent_type_version = logentry['intent_type_version'];
+				const timestamp = new Date(logentry.date);
+				const level = logentry.level;
+				const target = logentry.target;
+				const intent_type = logentry.intent_type;
+				const intent_type_version = logentry.intent_type_version;
 				const intent_type_folder = intent_type+"_v"+intent_type_version;
 
-				let message = logentry['message'].slice(logentry['message'].indexOf("]")+1).trim();
-				
-				// insert empty line, if more than 30sec between two log entries
-				if (logentry['date'] > pdate+30000)
-					this.serverLogs.appendLine("");
-
 				// avoid duplication of logging intent-type/version/target (from sf-logger.js)
+				let message = logentry.message.slice(logentry.message.indexOf("]")+1);
 				message = message.replace("["+intent_type+"]", "").replace("["+intent_type_version+"]", "").replace("["+target+"]", "").trim();
 
-				this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type_folder + ' ' + target + "] " + message);
+				// insert empty line, if more than 30sec between two log entries
+				if (logentry.date > pdate+30000)
+					this.serverLogs.appendLine("");
+
+				if (target)
+					this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type_folder + ' ' + target + "] " + message);
+				else
+					this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type_folder + "] " + message);
+
+				// append error-details, if available
+				if ('throwable' in logentry && logentry.throwable)
+					if (this.serverLogsFullStack)
+						this.serverLogs.appendLine(logentry.throwable.trim());
+					else
+						// remove stacktrace lines that refer to java-code (backend), only keep references to *.mjs and *.js files
+						this.serverLogs.appendLine(logentry.throwable.trim().split(/[\n\r]+/).filter((line:string) => (line.match(/\s+at.+\.m?js:\d+/) || !line.match(/\s+at.+/))).join('\n'));
+
 				pdate = logentry['date'];
 			}
 		}

@@ -215,11 +215,11 @@
           "default": "localhost",
           "scope": "application",
           "format": "ipv4",
-          "description": "NSP IP address."
+          "description": "Intent Manager hostname or IP address"
         },
         "intentManager.port": {
           "type": "string",
-          "default": "8545",
+          "default": "443",
           "scope": "application",
           "enum": [
             "443",
@@ -229,25 +229,25 @@
             "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
             "8545 used in older NSP releases, to be deprecated."
           ],
-          "description": "NSP IM port."
+          "description": "Intent Manager port number (default: 443)"
         },
         "intentManager.user": {
           "type": "string",
-          "default": "user",
+          "default": "admin",
           "scope": "application",
-          "description": "NSP user."
+          "description": "Intent Manager username (default: admin)"
         },
         "intentManager.password": {
           "type": "null",
           "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
           "scope": "application",
-          "description": "NSP user password."
+          "description": "Intent Manager password"
         },
         "intentManager.timeout": {
           "type": "number",
-          "default": 90000,
+          "default": 90,
           "scope": "application",
-          "description": "timeout for calls to NSP in ms"
+          "description": "Timeout for API calls to Intent Manager in seconds (default: 90)"
         },
         "intentManager.ignoreLabels": {
           "type": "array",
@@ -262,6 +262,30 @@
           "scope": "application",
           "default": false,
           "description": "Enable parallel intent operations (EXPERIMENTAL)"
+        },
+        "intentManager.serverLogsOffset": {
+          "type": "string",
+          "scope": "application",
+          "default": "10m",
+          "description": "Time window for receiving server logs. Examples: 1h, 5m (default: 10m)"
+        },
+        "intentManager.serverLogsFullStack": {
+          "type": "boolean",
+          "scope": "application",
+          "default": false,
+          "description": "Verbose Mode: include full stacktrace in logs from throwable (with java)"
+        },
+        "intentManager.logLimit": {
+          "type": "number",
+          "scope": "application",
+          "default": 5000,
+          "description": "Maximum number of logs to be received from server (default: 5000)"
+        },
+        "intentManager.queryLimit": {
+          "type": "number",
+          "scope": "application",
+          "default": 1000,
+          "description": "Maximum number of intent-types and intents to be received from server (default: 1000)"
         }
       }
     }
