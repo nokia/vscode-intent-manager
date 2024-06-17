@@ -71,9 +71,6 @@ export class IntentTypeHandler {
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.INTENT_ROOT];
     var topology = input.getCurrentTopology();
     var report   = new AuditReport();
-
-    // misaligned object (is-configured=false)
-    let misAlignedObject;
     
     // missing objects (is-undesired=false)
     report.addMisAlignedObject(new MisAlignedObject("/root/missing=1", false, target)); // (is-configured=false)
