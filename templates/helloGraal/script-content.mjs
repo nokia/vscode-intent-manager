@@ -1,4 +1,5 @@
 let ValidateResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.ValidateResult");
+let SynchronizeResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.SynchronizeResult");
 let AuditReport = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.AuditReport");
 let MisAlignedObject = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedObject");
 let MisAlignedAttribute = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedAttribute");
@@ -35,7 +36,7 @@ export class IntentTypeHandler {
 
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.INTENT_ROOT];
     var topology = input.getCurrentTopology();
-    var result   = synchronizeResultFactory.createSynchronizeResult();
+    var result   = new SynchronizeResult();
 
     logger.debug("logging example (level:debug)");
     logger.info ("logging example (level:info)");
