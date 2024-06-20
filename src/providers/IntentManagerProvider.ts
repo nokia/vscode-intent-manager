@@ -1409,7 +1409,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					body = {"ibn:intent": {"required-network-state": "custom", "custom-required-network-state": state}};
 
 				for (const entry of uriList) {
-					this.pluginLogs.debug("setState(", entry.toString(), ")");
 
 					const parts = entry.toString().split('/').map(decodeURIComponent);
 					const target = decodeURIComponent(parts[3].slice(0,-5));
@@ -1418,13 +1417,33 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					if (this.intentTypes[intent_type_folder].desired[target] !== state) {
 						const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
-						const response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
-						if (!response)
-							throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-						if (response.ok) {
-							this.intentTypes[intent_type_folder].desired[target] = state;
-							vscode.window.showInformationMessage("Desired state for "+intent_type+"/"+target+" updated to '"+selection.label+"'!");
+
+						if (this.parallelOps) {
+							this.pluginLogs.warn("parallel setState(", entry.toString(), "), EXPERIMENTAL");
+							this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)})
+							.then((response:any) => {
+								if (response.ok) {
+									this.intentTypes[intent_type_folder].desired[target] = state;
+									vscode.window.showInformationMessage("Desired state for "+intent_type+"/"+target+" updated to '"+selection.label+"'!");									
+								} else {
+									response.json().then((response:any) => this._printRestconfError("Update desired state for "+intent_type+"/"+target+" failed!", response));
+								}
+							})
+							.catch((error:any) => {
+								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+							});
+						} else {
+							this.pluginLogs.debug("setState(", entry.toString(), ")");
+							const response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
+							if (!response)
+								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+							if (response.ok) {
+								this.intentTypes[intent_type_folder].desired[target] = state;
+								vscode.window.showInformationMessage("Desired state for "+intent_type+"/"+target+" updated to '"+selection.label+"'!");
+							}
 						}
+					} else {
+						this.pluginLogs.info("setState(", entry.toString(), ") skipped");
 					}
 				}
 				await vscode.commands.executeCommand("nokia-intent-manager.updateStatusBar");
@@ -1942,10 +1961,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 									this.intentTypes[intent_type_folder].aligned[target]=true;
 									vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" is aligned!");
 								}
-								this._eventEmiter.fire(entry);
 							});
-						else
+						else {
+							this.intentTypes[intent_type_folder].aligned[target]=false;
 							response.json().then((json:any) => this._printRestconfError("Audit intent failed!", json));
+						}
+						this._eventEmiter.fire(entry);
 					})
 					.catch((error:any) => {
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -2042,9 +2063,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						if (response.ok) {
 							vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" synchronized!");
 							this.intentTypes[intent_type_folder].aligned[target]=true;
-							this._eventEmiter.fire(entry);
-						} else
+						} else {
 							response.json().then((response:any) => this._printRestconfError("Synchronize intent "+intent_type+"/"+target+" failed!", response));
+							this.intentTypes[intent_type_folder].aligned[target]=false;
+						}
+						this._eventEmiter.fire(entry);
 					})
 					.catch((error:any) => {
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -2058,11 +2081,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					if (response.ok) {
 						vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" synchronized!");
 						this.intentTypes[intent_type_folder].aligned[target]=true;
-						this._eventEmiter.fire(entry);
 					} else {
 						this._printRestconfError("Synchronize intent failed!", await response.json());
 						this.intentTypes[intent_type_folder].aligned[target]=false;
 					}
+					this._eventEmiter.fire(entry);
 				}
 			}
 		}

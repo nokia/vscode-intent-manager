@@ -136,3 +136,9 @@ Updates:
 * Server logs timespan and limit are not configurable
 * Limit for intent-type/intent retrieval is now configurable
 * New template for next-gen javascript engine has been added
+
+## [2.2.1]
+
+Fixes:
+* Parallel exeuction for desired state updates
+* Alignement state updates for sync/audit errors
