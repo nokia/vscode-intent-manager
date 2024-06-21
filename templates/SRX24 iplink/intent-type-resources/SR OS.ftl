@@ -1,5 +1,5 @@
 <#setting number_format="computer">
-<#assign ifname="${site['ne-name']}_to_${site.peer['ne-name']}">
+<#assign ifname="${target}_${site['ne-name']}_to_${site.peer['ne-name']}">
 {
     "[${site.ne\-name}] PORT  ${site.port\-id}": {
         "config": {

@@ -1,12 +1,8 @@
-load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
+/* global load, resourceProvider, utils, resourceAdmin */
+/* eslint no-undef: "error" */
+
 load({script: resourceProvider.getResource('utils_callouts.js'),    name: 'callouts'});
-
-fwkUtils = load({script: resourceProvider.getResource('utils.js'),  name: 'fwkUtils'});
-fwkResources = load({script: resourceProvider.getResource('utils_resources.js'),  name: 'fwkResources'});
-
-var utils = new fwkUtils();
-var resourceAdmin = new fwkResources();
-var StringUtils = Java.type('org.apache.commons.lang3.StringUtils');
+load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
 
 const intentTypeName  = "{{ intent_type }}";
 const intentContainer = "{{ intent_type }}:{{ intent_type }}";
@@ -28,12 +24,12 @@ function getSites(target, config)
 {  
   var sites = config.site;
   
-  for (i = 0; i < sites.length; i++) {
+  for (let i = 0; i < sites.length; i++) {
     sites[i]['ne-name'] = utils.getDeviceDetails(sites[i]['ne-id'])['ne-name'];
     
-    for (k = 0; k < sites[i].interface.length; k++) {
+    for (let k = 0; k < sites[i].interface.length; k++) {
       if (sites[i].interface[k].ebgp) {
-         helper = sites[i].interface[k].address.split('.');
+         let helper = sites[i].interface[k].address.split('.');
          helper[3] = (parseInt(helper[3])+1).toString();
         
          if (!("ebgp" in sites[i]))
@@ -42,7 +38,7 @@ function getSites(target, config)
          sites[i]["ebgp"].push({
            "local": sites[i].interface[k].address,
            "peer": helper.join('.')
-         })
+         });
       }
     }
   }
@@ -118,15 +114,15 @@ function getTemplateName(neId, familyTypeRelease)
   var neType = familyTypeRelease.split(':')[0];
  
   if (neType=="7220 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7250 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7730 SXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7750 SR")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else if (neType=="7450 ESS")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else
-    return 'OpenConfig.ftl'
+    return "OpenConfig.ftl";
 }

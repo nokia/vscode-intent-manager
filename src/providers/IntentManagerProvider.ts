@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 
+import yaml = require('yaml');
+
 // @ts-expect-error module node-fetch does not have a declaration file
 import fetch = require('node-fetch');
 // @ts-expect-error module node-fetch does not have a declaration file
@@ -1418,8 +1420,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					if (this.intentTypes[intent_type_folder].desired[target] !== state) {
 						const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 
+						this.pluginLogs.info("setState(", entry.toString(), ")");
 						if (this.parallelOps) {
-							this.pluginLogs.warn("parallel setState(", entry.toString(), "), EXPERIMENTAL");
 							this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)})
 							.then((response:any) => {
 								if (response.ok) {
@@ -1433,7 +1435,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 							});
 						} else {
-							this.pluginLogs.debug("setState(", entry.toString(), ")");
 							const response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
 							if (!response)
 								throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -1941,9 +1942,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const intent_type = intent_type_folder.split('_v')[0];
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/audit";
 
+				this.pluginLogs.info("audit(", entry.toString(), ")");
 				if (this.parallelOps && uriList.length>1) {
-					this.pluginLogs.warn("parallel audit(", entry.toString(), "), EXPERIMENTAL!");
-
 					this._callNSP(url, {method: "POST", body: ""})
 					.then((response:any) => {
 						if (response.ok)
@@ -1972,8 +1972,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 					});	
 				} else {
-					this.pluginLogs.debug("audit(", entry.toString(), ")");
-
 					const response: any = await this._callNSP(url, {method: "POST", body: ""});
 					if (!response)
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -2037,7 +2035,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		}
 	}
 
-
 	/**
 	 * Execute a synchronize of the selected intent instance(s).
 	 * 
@@ -2055,9 +2052,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const intent_type = intent_type_folder.split('_v')[0];
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/synchronize";
 
+				this.pluginLogs.info("sync(", entry.toString(), ")");
 				if (this.parallelOps && uriList.length>1) {
-					this.pluginLogs.warn("parallel sync(", entry.toString(), "), EXPERIMENTAL!");
-
 					this._callNSP(url, {method: "POST", body: ""})
 					.then((response:any) => {
 						if (response.ok) {
@@ -2073,8 +2069,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 					});
 				} else {
-					this.pluginLogs.debug("sync(", entry.toString(), ")");			
-
 					const response: any = await this._callNSP(url, {method: "POST", body: ""});
 					if (!response)
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -2087,6 +2081,47 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					}
 					this._eventEmiter.fire(entry);
 				}
+			}
+		}
+	}
+
+	/**
+	 * Retrieve state data for the select intent instance(s).
+	 * 
+	 * @param {any[]} args context used to issue command
+	 */
+
+	public async retrieveState(args:any[]): Promise<void> {
+		const uriList:vscode.Uri[] = this._getUriList(args);
+		for (const entry of uriList) {
+			const parts = entry.toString().split('/').map(decodeURIComponent);
+
+			if (parts.length===4 && parts[2]==="intents") {
+				const target = decodeURIComponent(parts[3].slice(0,-5));
+				const intent_type_folder = parts[1];
+				const intent_type = intent_type_folder.split('_v')[0];
+				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
+
+				this._callNSP(url, {method: "GET"})
+				.then((response:any) => {
+					if (response.ok)
+						response.json().then((json:any) => {
+							const data = json["ibn:intent"]["intent-specific-data"];
+							for (const container of Object.keys(data))
+								if (container.endsWith('-state')) {
+									const date = new Date();
+									let text = "# INTENT OPERATIONAL STATE\n"
+									text += "# intent-type: " + intent_type + ", target: " + target+ "\n";
+									text += "# received at " + date.toUTCString() +"\n\n";
+									text += yaml.stringify(data[container]);
+
+									vscode.workspace.openTextDocument({content: text, language: 'yaml'})
+									.then((textDocument) => {
+										vscode.window.showTextDocument(textDocument);
+									});
+								}
+						});	
+				});
 			}
 		}
 	}

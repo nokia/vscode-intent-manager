@@ -1,3 +1,6 @@
+/* global classResolver, Java, logger, mds, utilityService */
+/* eslint no-undef: "error" */
+
 let ValidateResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.ValidateResult");
 let SynchronizeResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.SynchronizeResult");
 let AuditReport = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.AuditReport");
@@ -35,14 +38,14 @@ export class IntentTypeHandler {
     // CODE FOR SYNCHRONIZE | BEGIN >>>
 
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.INTENT_ROOT];
-    var topology = input.getCurrentTopology();
-    var result   = new SynchronizeResult();
+    logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
     logger.debug("logging example (level:debug)");
     logger.info ("logging example (level:info)");
     logger.warn ("logging example (level:warn)");
     logger.error("logging example (level:error)");
 
+    var result = new SynchronizeResult();
     result.setSuccess(true);
 
     // <<< END | CODE FOR SYNCHRONIZE
@@ -69,8 +72,9 @@ export class IntentTypeHandler {
     // CODE FOR AUDIT | BEGIN >>>
 
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.INTENT_ROOT];
-    var topology = input.getCurrentTopology();
-    var report   = new AuditReport();
+    logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
+
+    var report = new AuditReport();
     
     // missing objects (is-undesired=false)
     report.addMisAlignedObject(new MisAlignedObject("/root/missing=1", false, target)); // (is-configured=false)
@@ -111,15 +115,15 @@ export class IntentTypeHandler {
 
     // CODE FOR VALIDATION | BEGIN >>>
 
-    let validateResult = new ValidateResult();
-
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.INTENT_ROOT];
     logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
-    var contextualErrorJsonObj = {};  
+    let validateResult = new ValidateResult();
+    let contextualErrorJsonObj = {};
+
     const neInfo = mds.getAllInfoFromDevices(target);
     if (neInfo === null || neInfo.size() === 0) {
-      logger.error("Node "+target+" not found!")
+      logger.error("Node "+target+" not found!");
       contextualErrorJsonObj["NODE "+target] = "Node not found";
     }
     // <<< END | CODE FOR VALIDATION

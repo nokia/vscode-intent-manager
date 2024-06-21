@@ -10,10 +10,21 @@
  *
  ********************************************************************************/
 
-fwkUtils = load({script: resourceProvider.getResource('utils.js'), name: 'fwkUtils'});
-utils = new fwkUtils();
+/* global load, resourceProvider, Java, logger, mds, utilityService  */
+/* global synchronizeResultFactory, topologyFactory, auditFactory */
+/* global intentTypeName, intentContainer */
+/* global getSites, getGlobal, freeResources, getState, getTemplateName */
+/* eslint no-undef: "error" */
 
-var RuntimeException = Java.type('java.lang.RuntimeException');
+const fwkUtils = load({script: resourceProvider.getResource('utils.js'),  name: 'fwkUtils'});
+const utils = new fwkUtils();
+
+const fwkResources = load({script: resourceProvider.getResource('utils_resources.js'),  name: 'fwkResources'});
+const resourceAdmin = new fwkResources();
+
+const StringUtils = Java.type('org.apache.commons.lang3.StringUtils');
+
+const RuntimeException = Java.type('java.lang.RuntimeException');
 
 /**
   * Validation of intent config/target that is automatically called for intent 
@@ -23,40 +34,43 @@ var RuntimeException = Java.type('java.lang.RuntimeException');
   * Execution happens before synchronize() to ensure intent is valid.
   *
   * @param {} input input provided by intent-engine
+  * 
+  * @throws {throwContextErrorException} Validation failed
+  * 
   **/
 
-function validate(input) {
-  var startTS = Date.now();
+function validate(input) {  
+  const startTS = Date.now();
 
-  var target     = input.getTarget();
-  var config     = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const target  = input.getTarget();
+  const config  = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
   
   logger.info(intentTypeName+":validate(" + target + ")");
   
-  var contextualErrorJsonObj = {};
+  let contextualErrorJsonObj = {};
   getSites(target, config).forEach(function(site) {
-    var neInfo = mds.getAllInfoFromDevices(site['ne-id']);
+    const neInfo = mds.getAllInfoFromDevices(site['ne-id']);
     
     if (neInfo === null || neInfo.size() === 0) {
       contextualErrorJsonObj["NODE "+site['ne-id']] = "Node not found";
     } else {
-      var neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+      const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
       if (neFamilyTypeRelease === null) {
         contextualErrorJsonObj["NODE "+site['ne-id']] = "Family/Type/Release unkown";
       } else {
-        var neType = neFamilyTypeRelease.split(':')[0];
-        var neVersion = neFamilyTypeRelease.split(':')[1];
+        const neType = neFamilyTypeRelease.split(':')[0];
+        const neVersion = neFamilyTypeRelease.split(':')[1];
+        const templateName = getTemplateName(site['ne-id'], neType);
         try {
-          var templateName = getTemplateName(site['ne-id'], neType);
-          var siteTemplate = resourceProvider.getResource(templateName);
+          resourceProvider.getResource(templateName);
         } catch (e) {
           contextualErrorJsonObj["NODE "+site['ne-id']] = "Device type unsupported! Template '"+templateName+"' not found!";
         }
       }
     }
-  })
+  });
 
-  var duration = Date.now()-startTS;
+  const duration = Date.now()-startTS;
   logger.info(intentTypeName+":validate(" + target + ") finished within "+duration+" ms");
 
   if (Object.keys(contextualErrorJsonObj).length !== 0) {
@@ -81,22 +95,22 @@ function validate(input) {
   * @param {} input input provided by intent-engine
   **/
 
-function synchronize(input) {
-  var startTS = Date.now();
-
-  var target     = input.getTarget();
-  var config     = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var state      = input.getNetworkState().name();
-  var topology   = input.getCurrentTopology();
-  var syncResult = synchronizeResultFactory.createSynchronizeResult();
-  
+function synchronize(input) {  
+  const startTS = Date.now();
+  const target  = input.getTarget();
+  const config  = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const state   = input.getNetworkState().name();
+ 
   logger.info(intentTypeName+":synchronize(" + target + ") in state " + state);
-    
-  var sites = [];
-  var sitesConfigs = {};
-  var sitesCleanups = {};
-  var deploymentErrors = [];
-  var yangPatchTemplate = resourceProvider.getResource("patch.ftl");
+ 
+  let topology   = input.getCurrentTopology();
+  let syncResult = synchronizeResultFactory.createSynchronizeResult();
+  
+  let sitesConfigs = {};
+  let sitesCleanups = {};
+  let deploymentErrors = [];
+
+  const yangPatchTemplate = resourceProvider.getResource("patch.ftl");
 
   // Recall nodal configuration elements from previous synchronize (for cleanup/housekeeping)
   if (topology && topology.getXtraInfo()!==null && !topology.getXtraInfo().isEmpty()) {
@@ -106,47 +120,45 @@ function synchronize(input) {
         sitesConfigs  = JSON.parse(item.getValue()); // deep-clone of sitesCleanups
         logger.info("sitesCleanups restored: "+item.getValue());
       }
-    })
+    });
   }
-    
+
+  // Iterate sites to populate/update sitesConfigs per target device
   if (state == "active")
-    sites = getSites(target, config)
+    getSites(target, config).forEach(function(site) {
+      const neId = site['ne-id'];
+      const neInfo = mds.getAllInfoFromDevices(neId);
+      const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+      const neType = neFamilyTypeRelease.split(':')[0];
+      const neVersion = neFamilyTypeRelease.split(':')[1];
 
-  // Iterate sites to populate siteConfigs per target device 
-  sites.forEach(function(site) {
-    var neId = site['ne-id'];
-    var neInfo = mds.getAllInfoFromDevices(neId);
-    var neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
-    var neType = neFamilyTypeRelease.split(':')[0];
-    var neVersion = neFamilyTypeRelease.split(':')[1];
-    
-    var global = getGlobal(target, config)
-    var siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
-    var objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'sync'}));
-
-    if (!(neId in sitesConfigs))
-      sitesConfigs[neId] = {};
-    
-    for (var objectName in objects) {
-      if ("config" in objects[objectName]) {
-        sitesConfigs[neId][objectName] = objects[objectName]['config'];
-            
-        // Convert 'value' object to JSON string as required as input for PATCH.ftl
-        if (objects[objectName]['config']['value']) {
-          let value = _resolveSynchronize(target, neId, '/'+objects[objectName]['config']['target'], objects[objectName]['config']['value']);
-          sitesConfigs[neId][objectName]['value'] = JSON.stringify(value);
+      if (!(neId in sitesConfigs))
+        sitesConfigs[neId] = {};
+      
+      const global = getGlobal(target, config);
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'sync'}));
+        
+      for (const objectName in objects) {
+        if ("config" in objects[objectName]) {
+          sitesConfigs[neId][objectName] = objects[objectName]['config'];
+              
+          // Convert 'value' object to JSON string as required as input for PATCH.ftl
+          if (objects[objectName]['config']['value']) {
+            let value = _resolveSynchronize(target, neId, '/'+objects[objectName]['config']['target'], objects[objectName]['config']['value']);
+            sitesConfigs[neId][objectName]['value'] = JSON.stringify(value);
+          }
         }
       }
-    }
-  })
+    });
   
   // Deploy changes to target devices and update topology objects and xtra-data
-  if ((state == "active") || (state == 'delete')) {
-    var topologyObjects = [];
-    for (neId in sitesConfigs) {
-      var body = utilityService.processTemplate(yangPatchTemplate, {'patchId': target, 'patchItems': sitesConfigs[neId]});
+  if ((state === "active") || (state === 'delete')) {
+    let topologyObjects = [];
+    for (const neId in sitesConfigs) {
+      const body = utilityService.processTemplate(yangPatchTemplate, {'patchId': target, 'patchItems': sitesConfigs[neId]});
       
-      result = utils.restconfPatchDevice(neId, body);
+      let result = utils.restconfPatchDevice(neId, body);
       
       if (result.success) {
         // RESTCONF YANG PATCH was successful
@@ -154,7 +166,7 @@ function synchronize(input) {
         //  - objects that have been added/updated are added to siteCleanups (extraData) to enable housekeeping
         
         sitesCleanups[neId] = {};
-        for (objectName in sitesConfigs[neId]) {
+        for (const objectName in sitesConfigs[neId]) {
           if (sitesConfigs[neId][objectName]["operation"]==="replace") {
             // For operation "replace" remember how to clean-up the object created (house-keeping).
             // For cleanup we are using operation "remove", to avoid the operation from failing,
@@ -181,7 +193,7 @@ function synchronize(input) {
         //  - Generate topology from siteCleanup (same content as it was before)
         
         if (neId in sitesCleanups) {
-          for (objectName in sitesCleanups[neId]) {
+          for (const objectName in sitesCleanups[neId]) {
             topologyObjects.push(topologyFactory.createTopologyObjectFrom(objectName, sitesCleanups[neId][objectName]['target'], "INFRASTRUCTURE", neId));
           }
         }
@@ -190,7 +202,7 @@ function synchronize(input) {
       if (topology === null)
         topology = topologyFactory.createServiceTopology();
 
-      var xtrainfo = topologyFactory.createTopologyXtraInfoFrom("sitesCleanups", JSON.stringify(sitesCleanups));
+      let xtrainfo = topologyFactory.createTopologyXtraInfoFrom("sitesCleanups", JSON.stringify(sitesCleanups));
 
       topology.setXtraInfo([xtrainfo]);
       topology.setTopologyObjects(topologyObjects);
@@ -209,20 +221,23 @@ function synchronize(input) {
       freeResources(target, config);
   }
   
-  var duration = Date.now()-startTS;
+  const duration = Date.now()-startTS;
   logger.info(intentTypeName+":synchronize(" + target + ") finished within "+duration+" ms");
 
   return syncResult;      
 }
 
 /**
-  * Internal wrapper for mediator operation /resolve-synchronize for nsp23.11
-  * implementation of approved misalignments.
+  * Wrapper for /resolve-synchronize implemented in mediator (nsp23.11/nsp24.4)
+  * Merging sync payload with device config to keep approved misalignments untouched
   *
   * @param {string} target     Intent target
   * @param {string} neId       Device identifier
   * @param {string} rootXPath  Root XPATH of configuration
   * @param {Object} config     Desired configuration
+  * 
+  * @throws {RuntimeException} /resolve-synchronize failed
+  * 
   **/
 
 function _resolveSynchronize(target, neId, rootXPath, config) {
@@ -239,19 +254,21 @@ function _resolveSynchronize(target, neId, rootXPath, config) {
     // Call the mediator to resolve config
     const resolveResponse = utils.fwkAction("/resolve-synchronize", unresolvedConfig);
   
-    if (resolveResponse.success) {
-        logger.info("resolved config report: " + JSON.stringify(resolveResponse.response));
-        return resolveResponse.response;
-    } else {
+    if (!resolveResponse.success)
       throw new RuntimeException("Resolve Synchronize failed with "+resolveResponse.errmsg);      
-    }
+
+    logger.info("resolved config report: " + JSON.stringify(resolveResponse.response));
+    return resolveResponse.response;
 }
 
 /**
-  * Internal helper for nsp23.11 implementation of approved misalignments
-  * Removes approved attributes/objects from audit-report.
+  * Wrapper for /resolve-audit implemented in mediator (nsp23.11/nsp24.4)
+  * Removes approved attributes/objects from audit-report
   *
   * @param {auditFactor.AuditReport} unresolvedAuditReport Audit report before applying approvals
+  * 
+  * @throws {RuntimeException} /resolve-audit failed
+  * 
   **/
 
 function _resolveAudit(unresolvedAuditReport) {
@@ -290,7 +307,7 @@ function _resolveAudit(unresolvedAuditReport) {
             unresolvedAuditReportJson["misaligned-object"].push(misAlignedObjectJson);
         });
     }
-  
+
     logger.info("unresolved audit report: {}", JSON.stringify(unresolvedAuditReportJson));
 
     // Create a new audit report to send back
@@ -298,7 +315,7 @@ function _resolveAudit(unresolvedAuditReport) {
 
     // Call the mediator to resolve audit report
     let resolveResponse = utils.fwkAction("/resolve-audit", unresolvedAuditReportJson);
-  
+
     if (resolveResponse.success) {
         logger.info("resolved audit report: " + JSON.stringify(resolveResponse.response));
         const resolvedAuditReportJson = resolveResponse.response;
@@ -320,7 +337,7 @@ function _resolveAudit(unresolvedAuditReport) {
     }
 
     return resolvedAuditReport;
-};
+}
 
 /**
   * Function to audit intents. Renders the desired configuration (same
@@ -328,51 +345,53 @@ function _resolveAudit(unresolvedAuditReport) {
   * Compares actual against desired configuration to produce the AuditReport.
   * 
   * @param {} input input provided by intent-engine
+  * 
+  * @throws {RuntimeException} config/state retrieval failed
+  * 
   **/
 
 function audit(input) {  
-  var startTS = Date.now();
+  const startTS = Date.now();
   
-  var target     = input.getTarget();
-  var config     = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var state      = input.getNetworkState().name();
-  var topology   = input.getCurrentTopology();
-  var auditReport = auditFactory.createAuditReport(intentTypeName, target);
+  const target    = input.getTarget();
+  const config    = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const state     = input.getNetworkState().name();
+  let auditReport = auditFactory.createAuditReport(intentTypeName, target);
 
   logger.info(intentTypeName+":audit(" + target + ") in state " + state);
   
   if (state=='active') {
-    var sites = getSites(target, config);
-      
-    // iterate sites to populate config
-    sites.forEach(function(site) {
-      var neId = site['ne-id'];
-      var neInfo = mds.getAllInfoFromDevices(neId);
-      var neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
-      var neType = neFamilyTypeRelease.split(':')[0];
-      var neVersion = neFamilyTypeRelease.split(':')[1];
+    // iterate sites to populate config:
+    getSites(target, config).forEach(function(site) {
+      const neId = site['ne-id'];
+      const neInfo = mds.getAllInfoFromDevices(neId);
+      const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+      const neType = neFamilyTypeRelease.split(':')[0];
+      const neVersion = neFamilyTypeRelease.split(':')[1];
 
-      var global = getGlobal(target, config)
-      var siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
-      var objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'audit'}));
+      const global = getGlobal(target, config);
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'audit'}));
 
-      for (var objectName in objects) {
+      for (const objectName in objects) {
         if ("config" in objects[objectName]) {
-          result = utils.restconfGetDevice(neId, objects[objectName]['config']['target']+"?content=config");
+          const result = utils.restconfGetDevice(neId, objects[objectName]['config']['target']+"?content=config");
           if (result.success) {
-            var aCfg = result.response;
-            var iCfg = objects[objectName]['config']['value'];
-            for (key in iCfg) {
+            let iCfg = objects[objectName]['config']['value'];
+            for (const key in iCfg) {
               iCfg = iCfg[key];
               break;
             }
             
-            for (key in aCfg) {
+            let aCfg = result.response;
+            for (const key in aCfg) {
               aCfg = aCfg[key];
-              if (Array.isArray(aCfg) && (aCfg.length > 0))
-                aCfg = aCfg[0];
               break;
             }
+
+            if (Array.isArray(aCfg) && (aCfg.length > 0))
+              aCfg = aCfg[0];
+
             if (Array.isArray(aCfg))
               auditReport.addMisAlignedObject(auditFactory.createMisAlignedObject(objects[objectName]['config']['target'], false, neId));              
             else
@@ -384,7 +403,7 @@ function audit(input) {
               logger.error("RESTCONF GET failed with error:\n" + result.errmsg);
               throw new RuntimeException("RESTCONF GET failed with " + result.errmsg);
             } else {
-              rcError = result.response['ietf-restconf:errors']['error'][0];
+              const rcError = result.response['ietf-restconf:errors']['error'][0];
               if (rcError['error-tag'] === "invalid-value") {
                 // get failed, because path is not configured
                 auditReport.addMisAlignedObject(auditFactory.createMisAlignedObject(objects[objectName]['config']['target'], false, neId));          
@@ -396,17 +415,18 @@ function audit(input) {
         }
         
         if ("health" in objects[objectName]) {
-          for (var path in objects[objectName]['health']) {
-            iState = objects[objectName]['health'][path];
-            result = utils.restconfGetDevice(neId, path);
+          for (const path in objects[objectName]['health']) {
+            const iState = objects[objectName]['health'][path];
+            const result = utils.restconfGetDevice(neId, path);
             if (result.success) {
-              aState = result.response;
-              for (key in aState) {
+              let aState = result.response;
+              for (const key in aState) {
                 aState = aState[key];
-                if (Array.isArray(aState))
-                  aState = aState[0]
                 break;
               }
+              if (Array.isArray(aState))
+                aState = aState[0];
+
               utils.audit_state(neId, aState, iState, auditReport, '/'+path);
               // utils.audit_state(neId, aState, iState, auditReport, objectName);
             } else {
@@ -414,7 +434,7 @@ function audit(input) {
                 logger.error("RESTCONF GET failed with error:\n" + result.errmsg);
                 throw new RuntimeException("RESTCONF GET failed with " + result.errmsg);
               } else {
-                rcError = result.response['ietf-restconf:errors']['error'][0];
+                const rcError = result.response['ietf-restconf:errors']['error'][0];
                 
                 if (rcError['error-tag'] === "invalid-value") {
                   // get failed, because path is not available
@@ -430,14 +450,16 @@ function audit(input) {
           }
         }
       }
-    })
+    });
   }
 
-  var duration = Date.now()-startTS;
+  const resolvedAuditReport =  _resolveAudit(auditReport);
+
+  const duration = Date.now()-startTS;
   logger.info(intentTypeName+":audit(" + target + ") finished within "+duration+" ms");
     
-  return _resolveAudit(auditReport);
-};
+  return resolvedAuditReport;
+}
 
 /**
   * Function to compute/retrieve read-only state-attributes.
@@ -446,73 +468,69 @@ function audit(input) {
   **/
 
 function getStateAttributes(input) {
-  /**
-    * Entrypoint to update state attributes
-    *
-    **/    
-  var startTS = Date.now();
+  const startTS = Date.now();
 
-  var target     = input.getTarget();
-  var config     = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var state      = input.getNetworkState().name();
-  var topology   = input.getCurrentTopology();
+  const target   = input.getTarget();
+  const config   = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const state    = input.getNetworkState().name();
+  let topology   = input.getCurrentTopology();
+  let rvalue     = "";
 
   logger.info(intentTypeName+":getStateAttributes(" + target + ") in state " + state);
   
-  if (state == "active")
-    sites = getSites(target, config)  
+  if (state == "active") {
+    let indicators = {};
 
-  // Iterate sites to get indiciators
-  var indicators = {};  
-  sites.forEach(function(site) {
-    var neId = site['ne-id'];
-    var neInfo = mds.getAllInfoFromDevices(neId);
-    var neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
-    var neType = neFamilyTypeRelease.split(':')[0];
-    var neVersion = neFamilyTypeRelease.split(':')[1];
-  
-    var global = getGlobal(target, config)
-    var siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
-    var objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'state'}));
+    // Iterate sites to get indiciators
+    getSites(target, config).forEach(function(site) {
+      const neId = site['ne-id'];
+      const neInfo = mds.getAllInfoFromDevices(neId);
+      const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+      const neType = neFamilyTypeRelease.split(':')[0];
+      const neVersion = neFamilyTypeRelease.split(':')[1];
     
-    for (var objectName in objects) {
-      if ("indicators" in objects[objectName]) {
-        for (var uri in objects[objectName]['indicators']) {
-          iState = objects[objectName]['indicators'][uri];
-          result = utils.restconfGetDevice(neId, uri);
-          
-          if (result.success) {
-            var response = result.response;
-            for (key in response) {
-              response = response[key];
-              if (Array.isArray(response))
-                response = response[0]
-              break;
-            }
+      const global = getGlobal(target, config);
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'state'}));
+      
+      for (const objectName in objects) {
+        if ("indicators" in objects[objectName]) {
+          for (const uri in objects[objectName]['indicators']) {
+            const result = utils.restconfGetDevice(neId, uri);
             
-            for (var indicator in objects[objectName]['indicators'][uri]) {
-              var value = utils.jsonPath(response, objects[objectName]['indicators'][uri][indicator]['path']);
-              if (value && (value.length > 0)) {
-                if (!(indicator in indicators))
-                  indicators[indicator] = {}
-                indicators[indicator][neId] = value[0];
+            if (result.success) {
+              let response = result.response;
+              for (const key in response) {
+                response = response[key];
+                break;
+              }
+              if (Array.isArray(response))
+                response = response[0];
+
+              for (const indicator in objects[objectName]['indicators'][uri]) {
+                const value = utils.jsonPath(response, objects[objectName]['indicators'][uri][indicator]['path']);
+                if (value && (value.length > 0)) {
+                  if (!(indicator in indicators))
+                    indicators[indicator] = {};
+                  indicators[indicator][neId] = value[0];
+                }
               }
             }
           }
         }
       }
-    }
-  })
-  
-  if (indicators)
-    logger.info('collected indicators: '+JSON.stringify(indicators));
+    });
+
+    if (indicators)
+      logger.info('collected indicators: '+JSON.stringify(indicators));
     
-  var state = getState(target, config, topology);
-  var template = resourceProvider.getResource("state.ftl");
-  var rvalue = utilityService.processTemplate(template, {'state': state, 'indicators': indicators});
+    const state = getState(target, config, topology);
+    const template = resourceProvider.getResource("state.ftl");
+    rvalue = utilityService.processTemplate(template, {'state': state, 'indicators': indicators});
+  }
   
-  var duration = Date.now()-startTS;
+  const duration = Date.now()-startTS;
   logger.info(intentTypeName+":getStateAttributes(" + target + ") finished within "+duration+" ms\n"+rvalue);
 
   return rvalue;
-};
+}

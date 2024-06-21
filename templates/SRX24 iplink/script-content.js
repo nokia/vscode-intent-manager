@@ -1,12 +1,8 @@
-load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
+/* global load, resourceProvider, utils, resourceAdmin */
+/* eslint no-undef: "error" */
+
 load({script: resourceProvider.getResource('utils_callouts.js'),    name: 'callouts'});
-
-fwkUtils = load({script: resourceProvider.getResource('utils.js'),  name: 'fwkUtils'});
-fwkResources = load({script: resourceProvider.getResource('utils_resources.js'),  name: 'fwkResources'});
-
-var utils = new fwkUtils();
-var resourceAdmin = new fwkResources();
-var StringUtils = Java.type('org.apache.commons.lang3.StringUtils');
+load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
 
 const intentTypeName  = "{{ intent_type }}";
 const intentContainer = "{{ intent_type }}:{{ intent_type }}";
@@ -36,13 +32,13 @@ function getSites(target, config)
   sites[1]['ne-name'] = utils.getDeviceDetails(sites[1]['ne-id'])['ne-name'];
 
   // Obtain an /31 subnet
-  var subnet = resourceAdmin.obtainSubnet("ip-pool", "global", 'network-link', 31, intentTypeName, target);
+  const subnet = resourceAdmin.obtainSubnet("ip-pool", "global", 'network-link', 31, intentTypeName, target);
 
   // Assign first address of /31 subnet to endpoint-a
   sites[0]["addr"] = subnet.split('/')[0];
 
   // Assign second address of /31 subnet to endpoint-b
-  helper = subnet.split('/')[0].split('.');
+  const helper = subnet.split('/')[0].split('.');
   helper[3] = (parseInt(helper[3])+1).toString();
   sites[1]["addr"] = helper.join('.');
 
@@ -123,15 +119,15 @@ function getTemplateName(neId, familyTypeRelease)
   var neType = familyTypeRelease.split(':')[0];
  
   if (neType=="7220 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7250 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7730 SXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7750 SR")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else if (neType=="7450 ESS")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else
-    return 'OpenConfig.ftl'
+    return "OpenConfig.ftl";
 }

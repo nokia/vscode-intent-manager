@@ -1,12 +1,8 @@
-load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
+/* global load, resourceProvider, utils, resourceAdmin, StringUtils */
+/* eslint no-undef: "error" */
+
 load({script: resourceProvider.getResource('utils_callouts.js'),    name: 'callouts'});
-
-fwkUtils = load({script: resourceProvider.getResource('utils.js'),  name: 'fwkUtils'});
-fwkResources = load({script: resourceProvider.getResource('utils_resources.js'),  name: 'fwkResources'});
-
-var utils = new fwkUtils();
-var resourceAdmin = new fwkResources();
-var StringUtils = Java.type('org.apache.commons.lang3.StringUtils');
+load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
 
 const intentTypeName  = "{{ intent_type }}";
 const intentContainer = "{{ intent_type }}:{{ intent_type }}";
@@ -26,15 +22,17 @@ const intentContainer = "{{ intent_type }}:{{ intent_type }}";
 
 function getSites(target, config)
 {
-  config['ne-id'] = target;
-  config['ne-name'] = utils.getDeviceDetails(target)['ne-name'];  
-  config['routerId'] = target;
-  config['systemIp'] = target;
-  config['isisArea'] = '49.cafe.cafe.cafe';
-  config['systemId'] = '0000.'+StringUtils.leftPad(target.split('.')[2], 4, '0')+'.'+StringUtils.leftPad(target.split('.')[3], 4, '0');
-  config['nodeSID'] = target.split('.')[3];
+  let sites = [config];
+
+  sites[0]['ne-id'] = target;
+  sites[0]['ne-name'] = utils.getDeviceDetails(target)['ne-name'];  
+  sites[0]['routerId'] = target;
+  sites[0]['systemIp'] = target;
+  sites[0]['isisArea'] = '49.cafe.cafe.cafe';
+  sites[0]['systemId'] = '0000.'+StringUtils.leftPad(target.split('.')[2], 4, '0')+'.'+StringUtils.leftPad(target.split('.')[3], 4, '0');
+  sites[0]['nodeSID'] = target.split('.')[3];
   
-  return [config];
+  return sites;
 }
 
 /**
@@ -105,17 +103,17 @@ function getTemplateName(neId, familyTypeRelease)
   var neType = familyTypeRelease.split(':')[0];
  
   if (neType=="7220 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7250 IXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7730 SXR SRLinux")
-    return "SRLinux.ftl"
+    return "SRLinux.ftl";
   else if (neType=="7750 SR")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else if (neType=="7450 ESS")
-    return "SR OS.ftl"
+    return "SR OS.ftl";
   else
-    return 'OpenConfig.ftl'
+    return "OpenConfig.ftl";
 }
 
 /**
@@ -124,6 +122,5 @@ function getTemplateName(neId, familyTypeRelease)
 
 function getCities(context)
 {
-  cities = JSON.parse( resourceProvider.getResource("cities.json") );
-  return( {"data": JSON.stringify(cities)} );
+  return( {"data": resourceProvider.getResource("cities.json")} );
 }

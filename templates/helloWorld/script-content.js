@@ -1,4 +1,5 @@
-var RuntimeException = Java.type('java.lang.RuntimeException');
+/* global logger, mds, utilityService, synchronizeResultFactory, auditFactory */
+/* eslint no-undef: "error" */
 
 const intentTypeName  = "{{ intent_type }}";
 const intentContainer = "{{ intent_type }}:{{ intent_type }}";
@@ -23,8 +24,9 @@ function synchronize(input) {
   // CODE FOR SYNCHRONIZE | BEGIN >>>
 
   const config = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var topology = input.getCurrentTopology();
   var result   = synchronizeResultFactory.createSynchronizeResult();
+
+  logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
   logger.debug("logging example (level:debug)");
   logger.info ("logging example (level:info)");
@@ -58,7 +60,8 @@ function audit(input) {
   // CODE FOR AUDIT | BEGIN >>>
 
   const config = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var topology = input.getCurrentTopology();
+  logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
+
   var report   = auditFactory.createAuditReport(null, null);
 
   // misaligned object (is-configured=false)
@@ -110,7 +113,7 @@ function validate(input) {
   var contextualErrorJsonObj = {};  
   const neInfo = mds.getAllInfoFromDevices(target);
   if (neInfo === null || neInfo.size() === 0) {
-    logger.error(target+" not found!")
+    logger.error(target+" not found!");
     contextualErrorJsonObj["NODE "+target] = "Node not found";
   }
   // <<< END | CODE FOR VALIDATION
@@ -131,7 +134,7 @@ function validate(input) {
 
 function getNodes() {
   var devices = mds.getAllManagedDevicesFrom(['MDC','NFM-P']);
-  var rvalue = {}
+  var rvalue = {};
   devices.forEach(function(device) {
     rvalue[device.getName()] = device.getName();
   });

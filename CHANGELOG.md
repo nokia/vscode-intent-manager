@@ -140,5 +140,12 @@ Updates:
 ## [2.2.1]
 
 Fixes:
-* Parallel exeuction for desired state updates
+* Parallel execution for desired state updates
 * Alignement state updates for sync/audit errors
+
+## [2.3.0]
+
+Updates:
+* Update intent-type templates avoiding scope global variables
+* Update intent-type templates to pass eslint validation
+* Retrieval of operational state from intents

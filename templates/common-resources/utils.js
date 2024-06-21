@@ -10,34 +10,31 @@
  * 
  ********************************************************************************/
 
-(function fwkUtils() {
-  this.restconfNspAction = function(resource, input)
-  {
-    /**
-      * Executes NSP RESTCONF action
-      *
-      * input:
-      *   resource - model-path string of the parent resource to execute the action
-      *   input    - dictionary of input variables (action specific)
-      *
-      * return values if successful:
-      *   success(true)
-      *   response  - dictionary of output variables (action specific)
-      *
-      * return values if failed:
-      *   success(false)
-      *   errmsg    - string containing error details
-      *
-      **/
-    
-    var t1 = Date.now();
+/* global mds, restClient, logger, auditFactory */
+/* global RuntimeException */
+/* eslint no-undef: "error" */
+
+(function fwkUtils()
+{
+  /**
+    * Executes NSP RESTCONF action
+    * 
+    * @param {} resource model-path string of the parent resource to execute the action
+    * @param {} input dictionary of input variables (action specific)
+    * @returns success {boolean} and errmsg {string}
+    * 
+    **/
+
+  this.restconfNspAction = function(resource, input) {
+    const startTS = Date.now();
     logger.info("restconfNspAction("+resource+")");
-    
-    var result = {};
-    var managerInfo = mds.getManagerByName('NSP');
+
+    const baseURL = "https://restconf-gateway/restconf/data/";
+    const body = JSON.stringify({"input": input});
+
+    let result = {};
+    const managerInfo = mds.getManagerByName('NSP');
     if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
-      var baseURL = "https://restconf-gateway/restconf/data/";
-      var body = JSON.stringify({"input": input});      
       restClient.setIp(managerInfo.getIp());
       restClient.setPort(managerInfo.getPort());
       restClient.setProtocol(managerInfo.getProtocol());
@@ -52,20 +49,28 @@
     } else
       result = { success: false, errmsg: "NSP mediator is disconnected." };
     
-    logger.info("restconfNspAction() finished within "+(Date.now()-t1)+"ms");
+    const duration = Date.now()-startTS;
+    logger.info("restconfNspAction() finished within "+duration+ "ms");
+
     return result;
-  }
-  
-  
+  };
+
+  /**
+    * Executes framework action, implemented by the mediator
+    * 
+    * @param {} action mediator framework action to be called
+    * @param {} input dictionary of input variables (action specific)
+    * @returns success {boolean} and errmsg {string}
+    * 
+    **/
   
   this.fwkAction = function(action, input)
   {
-    
-    var t1 = Date.now();
+    const startTS = Date.now();
     logger.info("fwkAction("+action+")");
     
-    var result = {};
-    var managerInfo = mds.getManagerByName('NSP');
+    let result = {};
+    const managerInfo = mds.getManagerByName('NSP');
     if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
       restClient.setIp(managerInfo.getIp());
       restClient.setPort(managerInfo.getPort());
@@ -80,40 +85,33 @@
       });
     } else
       result = { success: false, errmsg: "NSP mediator is disconnected." };
-    
-    logger.info("fwkAction() finished within "+(Date.now()-t1)+"ms");
+
+    const duration = Date.now()-startTS;
+    logger.info("fwkAction() finished within "+duration+ "ms");
+
     return result;
-  }  
+  };
   
-  
-  
+  /**
+    * Executes NSP RESTCONF RPC
+    * 
+    * @param {} operation RPC operation to be executed
+    * @param {} input dictionary of input variables (RPC specific)
+    * @returns success {boolean} and errmsg {string}
+    * 
+    **/  
+
   this.restconfNspRpc = function(operation, input)
   {
-    /**
-      * Executes NSP RESTCONF RPC
-      *
-      * input:
-      *   operation - RPC action to be executed
-      *   input     - dictionary of input variables (action specific)
-      *
-      * return values if successful:
-      *   success(true)
-      *   response   - dictionary of output variables (action specific)
-      *
-      * return values if failed:
-      *   success(false)
-      *   errmsg     - string containing error details
-      *
-      **/
-    
-    var t1 = Date.now();
+    const startTS = Date.now();
     logger.info("restconfNspRpc("+operation+")");
-    
-    var result = {};
-    var managerInfo = mds.getManagerByName('NSP');
+
+    const baseURL = "https://restconf-gateway/restconf/operations/";
+    const body = JSON.stringify({"input": input});
+
+    let result = {};
+    const managerInfo = mds.getManagerByName('NSP');
     if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
-      var baseURL = "https://restconf-gateway/restconf/operations/";
-      var body = JSON.stringify({"input": input});
       restClient.setIp(managerInfo.getIp());
       restClient.setPort(managerInfo.getPort());
       restClient.setProtocol(managerInfo.getProtocol());
@@ -127,163 +125,150 @@
       });
     } else
       result = { success: false, errmsg: "NSP mediator is disconnected." };
-    
-    logger.info("restconfNspRpc() finished within "+(Date.now()-t1)+"ms");
+
+    const duration = Date.now()-startTS;
+    logger.info("restconfNspRpc() finished within "+duration+ "ms");
+
     return result;
-  }
+  };
   
-  
+  /**
+    * Executes NSP RESTCONF GET against MDC-managed nodes
+    * 
+    * @param {} neId target device
+    * @param {} path requested subtree/attribute
+    * @returns success {boolean} and errmsg {string}
+    * 
+    **/
   
   this.restconfGetDevice = function(neId, path) {
-    /**
-      * Executes NSP RESTCONF GET against MDC-managed nodes
-      *
-      * input:
-      *   neId - targetted device
-      *   path - requested subtree/attribute
-      *
-      * return values if successful:
-      *   success(true)
-      *   response - get response
-      *
-      * return values if failed:
-      *   success(false)
-      *   errmsg   - string containing error details
-      *
-      **/
-    
-    var t1 = Date.now();
+    const startTS = Date.now();
     logger.info("restconfGetDevice(\"" + neId + "\", \"" + path + "\")");
-    
-    var result = {};
-    var baseURL = "/restconf/data/network-device-mgr:network-devices/network-device="+neId+"/root/";
-    
-    var managerInfo = mds.getAllManagersWithDevice(neId).get(0);
-    restClient.setIp(managerInfo.getIp());
-    restClient.setPort(managerInfo.getPort());
-    restClient.setProtocol(managerInfo.getProtocol());
-    restClient.get(baseURL+path, "application/json", function(exception, httpStatus, response) {
-      if (exception)
-        result = { success: false, errmsg: "Couldn't connect to mediator. Exception "+exception+" occured." };
-      else if (httpStatus == 200 || httpStatus == 201)
-        result = { success: true, response: JSON.parse(response) };
-      else
-        result = { success: false, response: JSON.parse(response) };
-    });
-    
-    logger.info("restconfGetDevice() finished within "+(Date.now()-t1)+"ms");
-    return result;
-  }
-  
-  
-  
-  this.restconfPatchDevice = function(neId, body) {
-    /**
-      * Executes NSP RESTCONF PATCH against MDC-managed nodes
-      *
-      * input:
-      *   neId - targetted device
-      *   body - JSON string (rfc8072 YANG PATCH compliant)
-      *
-      * return values if successful:
-      *   success(true)
-      *   response - not used
-      *
-      * return values if failed:
-      *   success(false)
-      *   errmsg   - string containing error details
-      *
-      **/
-    
-    var t1 = Date.now();
-    logger.info("restconfPatchDevice(\"" + neId + "\", \"" + body + "\")");
-    
-    var result = {};
-    var baseURL = "/restconf/data/network-device-mgr:network-devices/network-device="+neId+"/root/";
-    
-    var managerInfo = mds.getAllManagersWithDevice(neId).get(0);
-    restClient.setIp(managerInfo.getIp());
-    restClient.setPort(managerInfo.getPort());
-    restClient.setProtocol(managerInfo.getProtocol());
-    restClient.patch(baseURL, "application/yang-patch+json", body, "application/json", function(exception, httpStatus, response) {
-      if (exception)
-        result = { success: false, errmsg: "Couldn't connect to mediator. Exception "+exception+" occured." };
-      else if (httpStatus == 200 || httpStatus == 201)
-        result = { success: true };
-      else {
-        logger.error("RESTCONF PATCH failed with httpStatus(" + httpStatus + ") and respone:\n" + response);
-        
-        var errmsg = "";
-        var patchStatus = JSON.parse(response)['ietf-yang-patch:yang-patch-status'];
-        
-        if ('edit-status' in patchStatus) {
-          var rcError = patchStatus['edit-status']['edit'];
-        
-          rcError.forEach( function(rcEditError) {
-            errmsg += "\n"+rcEditError['edit-id']+":\n";
-            rcEditError['ietf-restconf:errors']['error'].forEach( function(errorDetails) {
-              errmsg += "\t" + errorDetails['error-tag'] + " path(" + errorDetails['error-path'] + ") details(" + errorDetails['error-message'] + ")\n";
-            });    
-          });
-        } else {
-          errmsg += "\n[site:"+neId+"] rfc8072 global-errors occurred:\n";
-          patchStatus['ietf-restconf:errors']['error'].forEach( function(errorDetails) {
-              errmsg += "\t" + errorDetails['error-message'] + "\n";
-          });
-        }
-                        
-        result = { success: false, response: response, errmsg: errmsg };
-      }
-    });
-    
-    logger.info("restconfPatchDevice() finished within "+(Date.now()-t1)+"ms");
-    return result;
-  }
 
-  
+    const baseURL = "/restconf/data/network-device-mgr:network-devices/network-device="+neId+"/root/";
+
+    let result = {};
+    const managerInfo = mds.getAllManagersWithDevice(neId).get(0);
+    if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
+      restClient.setIp(managerInfo.getIp());
+      restClient.setPort(managerInfo.getPort());
+      restClient.setProtocol(managerInfo.getProtocol());
+      restClient.get(baseURL+path, "application/json", function(exception, httpStatus, response) {
+        if (exception)
+          result = { success: false, errmsg: "Couldn't connect to mediator. Exception "+exception+" occured." };
+        else if (httpStatus == 200 || httpStatus == 201)
+          result = { success: true, response: JSON.parse(response) };
+        else
+          result = { success: false, response: JSON.parse(response) };
+      });
+    } else
+      result = { success: false, errmsg: "Mediator for "+neId+" is disconnected." };
+
+    const duration = Date.now()-startTS;
+    logger.info("restconfGetDevice() finished within "+duration+ "ms");
+
+    return result;
+  };
+
+  /**
+    * Executes NSP RESTCONF PATCH against MDC-managed nodes
+    * 
+    * @param {} neId target device
+    * @param {} body SON string (rfc8072 YANG PATCH compliant)
+    * @returns success {boolean} and errmsg {string}
+    * 
+    **/
+
+  this.restconfPatchDevice = function(neId, body) {
+    const startTS = Date.now();
+    logger.info("restconfPatchDevice(\"" + neId + "\", \"" + body + "\")");
+
+    const baseURL = "/restconf/data/network-device-mgr:network-devices/network-device="+neId+"/root/";
+    
+    let result = {};
+    const managerInfo = mds.getAllManagersWithDevice(neId).get(0);
+    if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
+      restClient.setIp(managerInfo.getIp());
+      restClient.setPort(managerInfo.getPort());
+      restClient.setProtocol(managerInfo.getProtocol());
+      restClient.patch(baseURL, "application/yang-patch+json", body, "application/json", function(exception, httpStatus, response) {
+        if (exception)
+          result = { success: false, errmsg: "Couldn't connect to mediator. Exception "+exception+" occured." };
+        else if (httpStatus == 200 || httpStatus == 201)
+          result = { success: true };
+        else {
+          logger.error("RESTCONF PATCH failed with httpStatus(" + httpStatus + ") and respone:\n" + response);
+          
+          let errmsg = "";
+          const patchStatus = JSON.parse(response)['ietf-yang-patch:yang-patch-status'];
+          
+          if ('edit-status' in patchStatus) {
+            const rcError = patchStatus['edit-status']['edit'];
+          
+            rcError.forEach( function(rcEditError) {
+              errmsg += "\n"+rcEditError['edit-id']+":\n";
+              rcEditError['ietf-restconf:errors']['error'].forEach( function(errorDetails) {
+                errmsg += "\t" + errorDetails['error-tag'] + " path(" + errorDetails['error-path'] + ") details(" + errorDetails['error-message'] + ")\n";
+              });    
+            });
+          } else {
+            errmsg += "\n[site:"+neId+"] rfc8072 global-errors occurred:\n";
+            patchStatus['ietf-restconf:errors']['error'].forEach( function(errorDetails) {
+                errmsg += "\t" + errorDetails['error-message'] + "\n";
+            });
+          }
+                          
+          result = { success: false, response: response, errmsg: errmsg };
+        }
+      });
+    } else
+    result = { success: false, errmsg: "Mediator for "+neId+" is disconnected." };
+
+    const duration = Date.now()-startTS;
+    logger.info("restconfPatchDevice() finished within "+duration+ "ms");
+
+    return result;
+  };
+
+  /**
+   * Retrieve device details from NSP model
+   *
+   * @param {} neId device
+   * 
+   **/
   
   this.getDeviceDetails = function(neId) {
-    /**
-     * Retrieve device details from NSP model
-     *
-     **/  
-
-    var input = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']"};
-    var result = this.restconfNspRpc("nsp-inventory:find", input);
+    const input = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']"};
+    const result = this.restconfNspRpc("nsp-inventory:find", input);
     
     if (!result.success)
-      return {}
+      return {};
 
     if (result.response["nsp-inventory:output"]["data"].length === 0)
-      return {}
+      return {};
         
     return this.serialize(result.response["nsp-inventory:output"]["data"][0]);
   };
 
-  
+  /**
+    * Get list-keys from YANG model for MDC-managed nodes
+    *
+    * @param {} neId device
+    * @param {} listPath  path of list to get the keys
+    * @returns listKeys[]
+    *
+    **/
   
   this.restconfGetListKeys = function(neId, listPath) {
-    /**
-      * Get list-keys from YANG model for MDC-managed nodes
-      *
-      * input:
-      *   neId     - targetted device
-      *   listPath - path of list to get the keys
-      *
-      * returns:
-      *   listKeys[]
-      *
-      **/
-    
-    var t1 = Date.now();
+    const startTS = Date.now();
     logger.info("restconfGetListKeys(\"" + neId + "\", \"" + listPath + "\")");
-    
-    var result = {};
-    var managerInfo = mds.getManagerByName('NSP');
-    if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
-      var baseURL = "https://restconf-gateway/restconf/meta/api/v1/model/schema/"+neId+"/"
-      var url = baseURL + listPath.replace(/=[^=\/]+\//g, "/");
 
+    const baseURL = "https://restconf-gateway/restconf/meta/api/v1/model/schema/"+neId+"/";
+    const url = baseURL + listPath.replace(/=[^=/]+\//g, "/");
+  
+    let result = {};
+    const managerInfo = mds.getManagerByName('NSP');
+    if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
       restClient.setIp(managerInfo.getIp());
       restClient.setPort(managerInfo.getPort());
       restClient.setProtocol(managerInfo.getProtocol());
@@ -296,43 +281,40 @@
           result = { success: false, errmsg: "Returned httpStatus(201): No response" };
         else
           result = { success: false, errmsg: response };
-      })
-    } else {
+      });
+    } else
       result = { success: false, errmsg: "NSP mediator is disconnected." };
-    }
     
-    var listKeys = [];
+    let listKeys = [];
     if (result["success"]) {
-      attr = result["response"]["attributes"];
-      for(var i = 0; i < attr.length; i++) {
+      const attr = result["response"]["attributes"];
+      for(let i = 0; i < attr.length; i++) {
         if(attr[i]["isKey"] !== undefined) {
           listKeys.push(attr[i]["name"]);
         }
       }
-    } else {
+    } else
       logger.error("restconfGetListKeys() failed with error:\n" + result["errmsg"]);
-    }
     
-    logger.info("restconfGetListKeys() finished within "+(Date.now()-t1)+"ms");
-    return listKeys;
-  }
+    const duration = Date.now()-startTS;
+    logger.info("restconfGetListKeys() finished within "+duration+ "ms");
 
+    return listKeys;
+  };
+
+  /**
+    * Flattens an inventory response and removes @ annotations
+    *
+    * @param {} obj object to be converted
+    * @returns flattened object
+    *
+    **/
   
-  
-  this.serialize = function(obj) {
-    /**
-      * Flattens an inventory response and removes @ annotations
-      *
-      * input:
-      *   obj   - object to be converted
-      *
-      * returns flattened object
-      *
-      **/
-    
-    var result = {};
+  this.serialize = function(obj) {    
+    let result = {};
+
     function flatten(obj) {
-      for (key in obj) {
+      for (const key in obj) {
         if (key !== '@') {
           if (typeof obj[key]==='object')
             flatten(obj[key]);
@@ -341,28 +323,29 @@
         }
       }
     }
+
     flatten(obj, "");
     return result;
-  }
+  };
   
-  
-  
+  /**
+    * JSONPath 0.8.4 - XPath for JSON
+    * available from https://code.google.com/archive/p/jsonpath/
+    *
+    * Copyright (c) 2007 Stefan Goessner (goessner.net)
+    * Licensed under the MIT (MIT-LICENSE.txt) licence.
+    * 
+    * @throws SyntaxError
+    *
+    **/
+
   this.jsonPath = function(obj, expr, arg) {
-    /**
-      * JSONPath 0.8.4 - XPath for JSON
-      * available from https://code.google.com/archive/p/jsonpath/
-      *
-      * Copyright (c) 2007 Stefan Goessner (goessner.net)
-      * Licensed under the MIT (MIT-LICENSE.txt) licence.
-      *
-      **/
-  
     var P = {
       resultType: arg && arg.resultType || "VALUE",
       result: [],
       normalize: function(expr) {
          var subx = [];
-         return expr.replace(/[\['](\??\(.*?\))[\]']|\['(.*?)'\]/g, function($0,$1,$2){return "[#"+(subx.push($1||$2)-1)+"]";})  /* http://code.google.com/p/jsonpath/issues/detail?id=4 */
+         return expr.replace(/[['](\??\(.*?\))[\]']|\['(.*?)'\]/g, function($0,$1,$2){return "[#"+(subx.push($1||$2)-1)+"]";})  /* http://code.google.com/p/jsonpath/issues/detail?id=4 */
                     .replace(/'?\.'?|\['?/g, ";")
                     .replace(/;;;|;;/g, ";..;")
                     .replace(/;$|'?\]|'$/g, "")
@@ -382,7 +365,7 @@
          if (expr !== "") {
             var x = expr.split(";"), loc = x.shift();
             x = x.join(";");
-            if (val && val.hasOwnProperty(loc))
+            if (val && Object.prototype.hasOwnProperty.call(val, loc))
                P.trace(x, val[loc], path + ";" + loc);
             else if (loc === "*")
                P.walk(loc, x, val, path, function(m,l,x,v,p) { P.trace(m+";"+x,v,p); });
@@ -412,7 +395,7 @@
          }
          else if (typeof val === "object") {
             for (var m in val)
-               if (val.hasOwnProperty(m))
+              if (Object.prototype.hasOwnProperty.call(val, m))
                   f(m,loc,expr,val,path);
          }
       },
@@ -437,50 +420,48 @@
        P.trace(P.normalize(expr).replace(/^\$;?/,""), obj, "$");  // issue 6 resolved
        return P.result.length ? P.result : false;
     }
-  } 
+  };
   
-  
-  
+  /**
+    * Helper to convert list of dict to dict
+    * Note: Needed for key-aware array compare
+    *
+    * @param {} list array of dicts
+    * @param {} keys keys for the underlying YANG list
+    *
+    **/
+
   this.groupBy = function(list, keys) {
-    /**
-      * Helper to convert list of dict to dict
-      * Note: Needed for key-aware array compare
-      *
-      * input:
-      *   list - array of dicts
-      *   keys - keys for the underlying YANG list
-      *
-      **/
-    
     return list.reduce(
       function(rdict, entry) {
-        var value = keys.map(function(key) {return encodeURIComponent(entry[key])}).join(",");
+        let value = keys.map(function(key) {return encodeURIComponent(entry[key]);}).join(",");
         rdict[value] = entry;
         return rdict; 
       }, {}
     );
-  }
-  
-  
+  };
+
+  /**
+    * Helper to run audits to compare intented vs actual config
+    *
+    * @param {} list ne-id, required for fetching model info
+    * @param {} basePath target root path of the object under audit
+    * @param {} aCfg actual config (object)
+    * @param {} iCfg intended config (object)
+    * @param {} mode operation: create, replace, merge, delete
+    * @param {} ignore list of children subtree to ignore
+    * @param {} auditReport used to report differences
+    * @param {} obj object reference used for report
+    * @param {} path used to build up relative path (recursive)
+    *
+    **/
   
   this.audit = function(neId, basePath, aCfg, iCfg, mode, ignore, auditReport, obj, path) {
-    /**
-      * Helper to run audits to compare intented vs actual config
-      *
-      * input:
-      *   neId        - ne-id, required for fetching model info
-      *   basePath    - target root path of the object under audit
-      *   aCfg        - actual config (object)
-      *   iCfg        - intended config (object)
-      *   mode        - operation: create, replace, merge, delete
-      *   ignore      - list of children subtree to ignore
-      *   auditReport - used to report differences
-      *   obj         - object reference used for report
-      *   path        - used to build up relative path (recursive)
-      *
-      **/
+    logger.debug("iCfg: "+JSON.stringify(iCfg));
+    logger.debug("aCfg: "+JSON.stringify(aCfg));
+
     
-    for (var key in iCfg) {
+    for (const key in iCfg) {
       if (key in aCfg) {
         if (typeof iCfg[key] !== typeof aCfg[key]) {
           // mismatch: type is different
@@ -494,14 +475,13 @@
           }
         } else if (Array.isArray(iCfg[key])) {
           if ((iCfg[key].length > 0) && (iCfg[key][0] instanceof Object) || (aCfg[key].length > 0) && (aCfg[key][0] instanceof Object)) {
-            keys = this.restconfGetListKeys(neId, basePath+'/'+path+key);
-
-            var iCfgConverted = this.groupBy(iCfg[key], keys);
-            var aCfgConverted = this.groupBy(aCfg[key], keys);
+            const keys = this.restconfGetListKeys(neId, basePath+'/'+path+key);
+            const iCfgConverted = this.groupBy(iCfg[key], keys);
+            const aCfgConverted = this.groupBy(aCfg[key], keys);
             this.audit(neId, basePath, aCfgConverted, iCfgConverted, mode, ignore, auditReport, obj, path+key+'=');
           } else {
-            iVal = JSON.stringify(iCfg[key]);
-            aVal = JSON.stringify(aCfg[key]);
+            const iVal = JSON.stringify(iCfg[key]);
+            const aVal = JSON.stringify(aCfg[key]);
             if (iVal !== aVal) {
               auditReport.addMisAlignedAttribute(auditFactory.createMisAlignedAttribute('/'+basePath+'/'+path+key, iVal, aVal, obj));
             }
@@ -514,7 +494,7 @@
         if (iCfg[key] instanceof Object) {
           // mismatch: list/container is unconfigured
               
-          iVal = JSON.stringify(iCfg[key]);
+          const iVal = JSON.stringify(iCfg[key]);
           if ((iVal === '{}') || (iVal === '[]') || (iVal === '[null]')) 
             auditReport.addMisAlignedAttribute(auditFactory.createMisAlignedAttribute('/'+basePath+'/'+path+key, 'SET', 'UNSET', obj));
           else
@@ -531,16 +511,16 @@
 
     // undesired nodal attributes (only in mode create/replace)
     if (mode != 'merge') {
-      for (key in aCfg) {
+      for (const key in aCfg) {
         if (!(key in iCfg)) {
           // Possibility to ignore undesired children that match the list provided. Restrictions:
           //  (1) Can only ignore what is not part of the object created
           //  (2) Object created must contain the parent of the ignored
           //  (3) The ignore option is currently supported for audit only (not for deployment)
           
-          var found = "";
-          var aKey = path+key;
-          for (idx in ignore) {
+          let found = "";
+          const aKey = path+key;
+          for (const idx in ignore) {
             if (aKey.startsWith(ignore[idx])) {
               found = ignore[idx];
               break;
@@ -551,7 +531,7 @@
             if (aCfg[key] instanceof Object) {
               // mismatch: undesired list/container
               
-              aVal = JSON.stringify(aCfg[key]);
+              const aVal = JSON.stringify(aCfg[key]);
               if ((aVal === '{}') || (aVal === '[]') || (aVal === '[null]')) 
                 auditReport.addMisAlignedAttribute(auditFactory.createMisAlignedAttribute(aKey, 'UNSET', 'SET', obj));
               else
@@ -567,35 +547,36 @@
         }
       }
     }
-  }
+  };
   
-  
-  
+  /**
+    * Helper to run audits to compare intented vs actual state
+    *
+    * @param {} neId ne-id, required for fetching model info
+    * @param {} aState actual state (object)
+    * @param {} iState intended state (object)
+    * @param {} auditReport used to report differences
+    * @param {} obj object reference used for report
+    * 
+    * @throws RuntimeException
+    * 
+    **/
+    
   this.audit_state = function(neId, aState, iState, auditReport, qPath) {
-    /**
-      * Helper to run audits to compare intented vs actual state
-      *
-      * input:
-      *   neId        - ne-id, required for fetching model info
-      *   aState      - actual state (object)
-      *   iState      - intended state (object)
-      *   auditReport - used to report differences
-      *   obj         - object reference used for report
-      *
-      **/
-    
-    var siteName = neId;
-    
-    for (var key in iState) {
+    logger.debug("iState: "+JSON.stringify(iState));
+    logger.debug("aState: "+JSON.stringify(iState));
+
+    const siteName = neId;    
+    for (const key in iState) {
       if (iState[key] instanceof Object) {
-        var path = iState[key]['path'];
-        var aValue = this.jsonPath(aState, path);
+        const path = iState[key]['path'];
+        const aValue = this.jsonPath(aState, path);
         
-        for (var check in iState[key]) {
+        for (const check in iState[key]) {
           if (check !== 'path') {
-            var iValue = iState[key][check];
+            const iValue = iState[key][check];
             if (aValue && aValue.length > 0) {
-              var match = true;
+              let match = true;
               switch (check) {
                 case 'equals':
                 case 'matches':
@@ -631,5 +612,5 @@
         auditReport.addMisAlignedAttribute(auditFactory.createMisAlignedAttribute(key, iState[key], null, siteName));
       }
     }
-  }
-})
+  };
+});

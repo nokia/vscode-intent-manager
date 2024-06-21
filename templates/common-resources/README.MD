@@ -41,7 +41,6 @@ business logic to drive audit and sync operations. The input-form can be customi
 ## RESTRICTIONS
 * Performance constraints apply for audits
 * Limited error-handling (FTL, ...)
-* Implementation is not thread-safe (parallel sync/audits)
 * Requires MDC mediation (devices with NETCONF or gRPC support)
 
 ## EXPERIMENTAL FEATURES

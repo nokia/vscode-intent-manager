@@ -26,7 +26,24 @@
       },
       "ignoreChildren": []
     },
-    "health": {}
+    "health": {
+      "srl_nokia-interfaces:/interface=${site.port\-id?url('ISO-8859-1')}": {
+            "oper-state": "up"
+      }
+    },
+    "indicators": {
+      "srl_nokia-interfaces:/interface=${site.port\-id?url('ISO-8859-1')}": {
+        "speed": {
+          "path": "$.ethernet.port-speed"
+        },
+        "utilization": {
+          "path": "$.traffic-rate.out-bps"
+        },
+        "state": {
+          "path": "$.oper-state"
+        }            
+      }
+    }
   },
     
   "[${site.ne\-name}] LLDP INTERFACE ${site.port\-id}": {
@@ -41,7 +58,18 @@
       },
       "ignoreChildren": []
     },
-    "health": {}
+    "health": {
+      "srl_nokia-system:/system/srl_nokia-lldp:lldp/interface=${site.port\-id?url('ISO-8859-1')}": {
+            "neighbor/nodename": {
+              "path": "$.srl_nokia-lldp:neighbor[*].system-name",
+              "equals": "${site.peer.ne\-name}"
+            },
+            "neighbor/port-id": {
+              "path": "$.srl_nokia-lldp:neighbor[*].port-id",
+              "equals": "${site.peer.port\-id}"
+            }              
+      }
+    }      
   },
     
   "[${site.ne\-name}] IP INTERFACE BINDING ${site.port\-id}.1": {
@@ -56,7 +84,20 @@
       },
       "ignoreChildren": []
     },
-    "health": {}
+    "health": {
+      "srl_nokia-interfaces:/interface=${site.port\-id?url('ISO-8859-1')}/subinterface=1": {
+            "subinterface/oper-state": {
+              "path": "oper-state",
+              "equals": "up"
+            }
+      },
+      "srl_nokia-network-instance:/network-instance=default/interface=${site.port\-id?url('ISO-8859-1')}.1": {
+            "binding/oper-state": {
+              "path": "oper-state",
+              "equals": "up"
+            }
+      }
+    }
   },
     
   "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}.1": {
