@@ -19,6 +19,7 @@
       "order": 1
     }
   ],
+  "supports-health": "never",
   "lifecycle-state": "released",
   "live-state-retrieval": true
 }

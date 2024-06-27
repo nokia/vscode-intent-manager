@@ -149,3 +149,10 @@ Updates:
 * Update intent-type templates avoiding scope global variables
 * Update intent-type templates to pass eslint validation
 * Retrieval of operational state from intents
+
+## [2.3.1]
+
+Fixes:
+* Get logviewer osd-version from api/status to be future-proof
+* Updated all templates with supports-health=never
+* Update helloWorld template to be created as released (was draft before)

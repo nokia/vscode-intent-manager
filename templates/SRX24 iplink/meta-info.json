@@ -21,6 +21,7 @@
   "priority": 50,
   "build": "-",
   "composite": false,
+  "supports-health": "never",
   "notify-intent-instance-events": false,
   "live-state-retrieval": true
 }

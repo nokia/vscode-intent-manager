@@ -371,7 +371,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this._raiseRestconfError("Getting NSP release failed!", await response.json());
 		
 		const json = await response.json();
-
+		
 		const version = json["response"]["data"]["nspOSVersion"];
 		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(parseInt);
 		vscode.window.showInformationMessage("NSP version: "+version);
@@ -746,7 +746,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					meta["intent-type"] = intent_type;
 					meta["version"] = intent_type_version;
-					const forCleanup = ["default-version", "supports-health",	"skip-device-connectivity-check", "support-aggregated-request",	"resource",	"name",	"date",	"module", "script-content"];
+					const forCleanup = ["default-version", "skip-device-connectivity-check", "support-aggregated-request",	"resource",	"name",	"date",	"module", "script-content"];
 					for (const parameter of forCleanup) delete meta[parameter];
 					
 					return Buffer.from(JSON.stringify(meta, null, '  '));
@@ -1852,13 +1852,36 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
 
+		let osdver: string;
+		let response: any = await this._callNSP("/logviewer/api/status", {
+			method: "GET",
+			headers: {
+				"Content-Type":  "application/json",
+				"Cache-Control": "no-cache",
+				"Authorization": "Bearer " + token
+			}
+		});
+
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP logviewer (opensearch)");
+
+		let json: any = await response.json();
+		if (!response.ok) {
+			this.pluginLogs.error('GET /logviewer/api/status failed', json);
+			osdver = "2.6.0";
+			if (this._fromRelease(23,11))
+				osdver = "2.10.0";
+			else
+				osdver = "2.6.0";
+		} else {
+			osdver = json.version.number;
+			this.pluginLogs.info('GET /logviewer/api/status ok, osd-version =', osdver);
+		}
+
 		const url = "/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
 		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": this.logLimit};
 
-		let osdver = "2.6.0";
-		if (this._fromRelease(23,11)) osdver="2.10.0";
-
-		const response: any = await this._callNSP(url, {
+		response = await this._callNSP(url, {
 			method: "POST",
 			headers: {
 				"Content-Type":  "application/json",
@@ -1871,9 +1894,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+
+		json = await response.json();
 		if (!response.ok)
-			this._raiseRestconfError("Getting logs failed!", await response.json(), true);
-		const json: any = await response.json();
+			this._raiseRestconfError("Getting logs failed!", json, true);
 
 		const data : {[key: string]: any}[] = json["hits"]["hits"];
 		if (data.length === 0 ) {
@@ -2110,7 +2134,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							for (const container of Object.keys(data))
 								if (container.endsWith('-state')) {
 									const date = new Date();
-									let text = "# INTENT OPERATIONAL STATE\n"
+									let text = "# INTENT OPERATIONAL STATE\n";
 									text += "# intent-type: " + intent_type + ", target: " + target+ "\n";
 									text += "# received at " + date.toUTCString() +"\n\n";
 									text += yaml.stringify(data[container]);
