@@ -350,7 +350,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	private _fromRelease(major: number, minor:number): boolean {
 		if (this.nspVersion) {
 			const version : any = this.nspVersion;
-			const parts = version.match(/\d+\.\d+\.\d+/)[0].split('.').map((v:string) => parseInt(v));
+			const parts = version.split('.').map((v:string) => parseInt(v));
 	
 			if (parts[0] > major) return true;
 			if (parts[0]===major && parts[1]>=minor) return true;	
@@ -374,7 +374,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (!response.ok)
 			this._raiseRestconfError("Getting NSP release failed!", await response.json());
 		let json : any = await response.json();		
-		this.nspVersion = json.response.data.nspOSVersion;
+		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+\.\d+/)[0];
 
 		this.pluginLogs.info("Requesting OSD version");
 		response = await this._callNSP("/logviewer/api/status", {method: "GET"});
@@ -387,7 +387,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		json = await response.json();
 		this.osdVersion = json.version.number;
 
-		vscode.window.showInformationMessage("NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
+		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
 	}
 
 	/**
