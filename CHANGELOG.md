@@ -156,3 +156,11 @@ Fixes:
 * Get logviewer osd-version from api/status to be future-proof
 * Updated all templates with supports-health=never
 * Update helloWorld template to be created as released (was draft before)
+
+## [2.3.2]
+
+Fixes:
+* Retrieval of NSP version and OSD version together when connecting to the server
+* Corrected NSP release check
+* Audit report now contains the timestamp of the last audit
+* Audit report now contains the neName and neId

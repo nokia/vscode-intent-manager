@@ -74,7 +74,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	logLimit: number;
 	queryLimit: number;
 
-	nspVersion: number[] | undefined;
+	nspVersion: string | undefined;
+	osdVersion: string | undefined;
 	secretStorage: vscode.SecretStorage;
 
 	serverLogs: vscode.OutputChannel;
@@ -125,6 +126,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		console.debug("IntentManagerProvider("+this.nspAddr+")");
 
 		this.nspVersion = undefined;
+		this.osdVersion = undefined;
 
 		this.serverLogs = vscode.window.createOutputChannel('nsp-server-logs/intents', 'log');
 		this.pluginLogs = vscode.window.createOutputChannel('nsp-intent-manager-plugin', {log: true});
@@ -347,8 +349,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	private _fromRelease(major: number, minor:number): boolean {
 		if (this.nspVersion) {
-			if (this.nspVersion[0] > major) return true;
-			if (this.nspVersion[0]===major && this.nspVersion[1]>=minor) return true;
+			const version : any = this.nspVersion;
+			const parts = version.match(/\d+\.\d+\.\d+/)[0].split('.').map((v:string) => parseInt(v));
+	
+			if (parts[0] > major) return true;
+			if (parts[0]===major && parts[1]>=minor) return true;	
 		}
 		return false;
 	}
@@ -363,18 +368,26 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	private async _getNSPversion(): Promise<void> {
 		this.pluginLogs.info("Requesting NSP version");
 		const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
-
-		const response: any = await this._callNSP(url, {method: "GET"});
+		let response: any = await this._callNSP(url, {method: "GET"});
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		if (!response.ok)
 			this._raiseRestconfError("Getting NSP release failed!", await response.json());
-		
-		const json = await response.json();
-		
-		const version = json["response"]["data"]["nspOSVersion"];
-		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(parseInt);
-		vscode.window.showInformationMessage("NSP version: "+version);
+		let json : any = await response.json();		
+		this.nspVersion = json.response.data.nspOSVersion;
+
+		this.pluginLogs.info("Requesting OSD version");
+		response = await this._callNSP("/logviewer/api/status", {method: "GET"});
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP logviewer (opensearch)");
+		if (!response.ok) {
+			const text: string = await response.text();
+			throw vscode.FileSystemError.Unavailable(text);
+		}
+		json = await response.json();
+		this.osdVersion = json.version.number;
+
+		vscode.window.showInformationMessage("NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
 	}
 
 	/**
@@ -430,25 +443,51 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * @param {string} intent_type Intent-type name
 	 * @param {string} target Intent target
 	 * @param {{[key: string]: any}} report Audit report returned from Intent Manager
+	 * @oaram {Date} timestamp last audit execution date/time
 	 */	
 
-	private async _auditReport(intent_type: string, target: string, report: {[key: string]: any}): Promise<void>  {
-		const j2media = nunjucks.configure(vscode.Uri.joinPath(this.extensionUri, 'media').fsPath);
+	private async _auditReport(intent_type: string, target: string, report: {[key: string]: any}, timestamp: Date): Promise<void>  {
+		const url = "/restconf/operations/nsp-inventory:find";
+		const body = {"input": {
+			'xpath-filter': '/nsp-equipment:network/network-element',
+			'depth': 3,
+			'fields': 'ne-id;ne-name'
+		}};
+		
+		const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
+
+		const nodeNames : {[key: string]: string} = {};
+		if (response && response.ok) {
+			const json = await response.json();
+			json["nsp-inventory:output"].data.forEach((entry: {"ne-id": string, "ne-name": string}) => {
+				nodeNames[entry["ne-id"]]=entry["ne-name"];
+			});
+		}
 
 		if ('misaligned-attribute' in report)
-				for (const object of report["misaligned-attribute"])
+				for (const object of report["misaligned-attribute"]) {
+					if (object["device-name"] in nodeNames)
+						object["device-name"] = nodeNames[object["device-name"]]+" ("+object["device-name"]+")";
 					object["name"] = this._modelPathHTML(object["name"]);
+				}
 
 		if ('misaligned-object' in report)
-			for (const object of report["misaligned-object"])
+			for (const object of report["misaligned-object"]) {
+				if (object["device-name"] in nodeNames)
+					object["device-name"] = nodeNames[object["device-name"]]+" ("+object["device-name"]+")";
 				object["object-id"] = this._modelPathHTML(object["object-id"]);
+			}
 
 		if ('undesired-object' in report)
-			for (const object of report["undesired-object"])
+			for (const object of report["undesired-object"]) {
+				if (object["device-name"] in nodeNames)
+					object["device-name"] = nodeNames[object["device-name"]]+" ("+object["device-name"]+")";
 				object["object-id"] = this._modelPathHTML(object["object-id"]);
+			}
 
+		const j2media = nunjucks.configure(vscode.Uri.joinPath(this.extensionUri, 'media').fsPath);
 		const panel = vscode.window.createWebviewPanel('auditReport', 'Audit '+intent_type+'/'+target, vscode.ViewColumn.Active, {enableScripts: true});
-		panel.webview.html = j2media.render('report.html.njk', {intent_type: intent_type, target: target, report: report});
+		panel.webview.html = j2media.render('report.html.njk', {intent_type: intent_type, target: target, report: report, timestamp: timestamp.toUTCString()});
 		this.pluginLogs.info(panel.webview.html);
 	}
 
@@ -1336,6 +1375,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this.username = user;
 			this.port = port;
 			this.nspVersion = undefined;
+			this.osdVersion = undefined;
 		}
 
 		this.intentTypes = {};
@@ -1845,48 +1885,20 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 		}
 
-		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
-		if (!token) {
+		if (!token)
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-
-		let osdver: string;
-		let response: any = await this._callNSP("/logviewer/api/status", {
-			method: "GET",
-			headers: {
-				"Content-Type":  "application/json",
-				"Cache-Control": "no-cache",
-				"Authorization": "Bearer " + token
-			}
-		});
-
-		if (!response)
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP logviewer (opensearch)");
-
-		let json: any = await response.json();
-		if (!response.ok) {
-			this.pluginLogs.error('GET /logviewer/api/status failed', json);
-			osdver = "2.6.0";
-			if (this._fromRelease(23,11))
-				osdver = "2.10.0";
-			else
-				osdver = "2.6.0";
-		} else {
-			osdver = json.version.number;
-			this.pluginLogs.info('GET /logviewer/api/status ok, osd-version =', osdver);
-		}
 
 		const url = "/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
 		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": this.logLimit};
 
-		response = await this._callNSP(url, {
+		const response : any = await this._callNSP(url, {
 			method: "POST",
 			headers: {
 				"Content-Type":  "application/json",
 				"Cache-Control": "no-cache",
-				"Osd-Version":   osdver,
+				"Osd-Version":   this.osdVersion,
 				"Authorization": "Bearer " + token
 			},
 			body: JSON.stringify(body)
@@ -1895,7 +1907,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 
-		json = await response.json();
+		const json = await response.json();
 		if (!response.ok)
 			this._raiseRestconfError("Getting logs failed!", json, true);
 
@@ -1977,7 +1989,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 									this.intentTypes[intent_type_folder].aligned[target]=false;
 									if (uriList.length===1)
 										vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!","Details","Cancel").then (
-											async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report);}
+											async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report, new Date());}
 										);
 									else
 										vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!");
@@ -2008,7 +2020,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 							if (uriList.length===1)
 								vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!","Details","Cancel").then(
-									async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report);}
+									async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report, new Date());}
 								);
 							else
 								vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!");
@@ -2049,9 +2061,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 				const json : any = await response.json();
 				const report = json["ibn:intent"]["last-audit-report"];
+				const tstamp = new Date(json["ibn:intent"]["audit-timestamp"]);
 
 				if (Object.keys(report).includes("misaligned-attribute") || Object.keys(report).includes("misaligned-object") || Object.keys(report).includes("undesired-object")) {
-					this._auditReport(intent_type, target, report);
+					this._auditReport(intent_type, target, report, tstamp);
 				} else {
 					vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" is aligned!");
 				}
