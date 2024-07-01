@@ -164,3 +164,16 @@ Fixes:
 * Corrected NSP release check
 * Audit report now contains the timestamp of the last audit
 * Audit report now contains the neName and neId
+
+## [2.4.0]
+
+Fixes:
+* In case of authentication errors reset `authToken`. Next time an auth-token is requested, vscode
+  extension will try to authenticate again.
+
+Updates:
+* Audit report format: Align table layout for missing/undesired objects with IM WebUI (2 columns)
+* Audit report format: For misaligned object entries with isConfigured equals false use different color
+* Command `setPassword` can now be triggered from other extensions while passing the new password.
+* Updated badges/tooltips/colors in FileSystemProvider (Explorer View)
+* Explorer view now shows if vsCode is connected to Intent Manager. Tooltips provide extra information.

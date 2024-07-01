@@ -10,41 +10,25 @@ import base64 = require('base-64');
 // @ts-expect-error module nunjucks does not have a declaration file
 import nunjucks = require('nunjucks');
 
-const DECORATION_WORKSPACE: vscode.FileDecoration = new vscode.FileDecoration(
-	'', 'Intent Manager Plugin', new vscode.ThemeColor('list.focusForeground')
-);
+const COLOR_OK            = new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'); // appears green
+const COLOR_READONLY      = new vscode.ThemeColor('list.deemphasizedForeground');
+const COLOR_CUSTOMIZATION = new vscode.ThemeColor('list.highlightForeground'); // appears blue
+const COLOR_WARNING       = new vscode.ThemeColor('list.warningForeground');
+const COLOR_ERROR         = new vscode.ThemeColor('list.errorForeground');
 
-const DECORATION_SIGNED: vscode.FileDecoration = new vscode.FileDecoration(
-	'🔒', 'IntentType: Signed', new vscode.ThemeColor('list.deemphasizedForeground')
-);
+const DECORATION_INITIAL   = { badge: '❗', tooltip: 'Disconnected', color: COLOR_ERROR };  // should become codicon $(warning)
+const DECORATION_CONNECTED = { badge: '✔',  tooltip: 'Connected...', color: COLOR_OK };     // should become codicon $(vm-active)
+const DECORATION_SIGNED    = { badge: '🔒', tooltip: 'IntentType: Signed', color: COLOR_READONLY};
 
-const DECORATION_UNSIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
-	'',	'IntentType: Unsigned',	new vscode.ThemeColor('list.warningForeground')
-);
+const DECORATION_VIEWS     = { tooltip: 'UI Form Customization', color: COLOR_CUSTOMIZATION };
+const DECORATION_INTENTS   = { tooltip: 'Intents', color: COLOR_CUSTOMIZATION };
 
-const DECORATION_MODULES: vscode.FileDecoration =    new vscode.FileDecoration(
-	'☯', 'YANG Modules', new vscode.ThemeColor('list.warningForeground')
-);
+const DECORATION_UNSIGNED  = { tooltip: 'IntentType: Unsigned' }; // default colors
+const DECORATION_MODULES   = { tooltip: 'YANG Modules' }; // default colors
+const DECORATION_RESOURCES = { tooltip: 'Resources' }; // default colors
 
-const DECORATION_RESOURCES: vscode.FileDecoration =    new vscode.FileDecoration(
-	'📚', 'Resources', new vscode.ThemeColor('list.warningForeground')
-);
-
-const DECORATION_ALIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
-	'✅', 'Intent: Aligned', new vscode.ThemeColor('list.warningForeground')
-);
-
-const DECORATION_MISALIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
-	'💔', 'Intent: Misaligned', new vscode.ThemeColor('list.errorForeground')
-);
-
-const DECORATION_INTENTS: vscode.FileDecoration =    new vscode.FileDecoration(
-	'', 'Instances', new vscode.ThemeColor('list.highlightForeground')
-);
-
-const DECORATION_VIEWS: vscode.FileDecoration =    new vscode.FileDecoration(
-	'', 'UI Customization', new vscode.ThemeColor('list.highlightForeground')
-);
+const DECORATION_ALIGNED    = { badge: '✅', tooltip: 'Intent: Aligned',    color: COLOR_OK };
+const DECORATION_MISALIGNED = { badge: '💔', tooltip: 'Intent: Misaligned', color: COLOR_ERROR };
 
 const myStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 myStatusBarItem.command = 'nokia-intent-manager.intentStatus';
@@ -163,9 +147,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	private async _getAuthToken(): Promise<void> {
         if (this.authToken) {
-            if (!(await this.authToken)) {
-                this.authToken = undefined;
-            }
+			const token = await this.authToken;
+            if (!token) {
+                this.authToken = undefined; // Reset authToken, if it is undefined
+            } else {
+				return; // If we have a valid token, no need to proceed further
+			}
         }
 
 		this.password = await this.secretStorage.get("nsp_im_password");
@@ -180,6 +167,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
                 setTimeout(() => timeout.abort(), 10000);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
+				const startTS = Date.now();
+
                 fetch(url, {
                     method: "POST",
                     headers: {
@@ -189,25 +178,30 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
                     },
                     body: '{"grant_type": "client_credentials"}',
                     signal: timeout.signal
-                }).then((response:any) => {
-                    this.pluginLogs.info("POST", url, response.status);
-                    if (!response.ok) {
+                }).then(async (response:any) => {
+					const duration = Date.now()-startTS;
+                    this.pluginLogs.info("POST", url, "finished within", duration, "ms");
+
+					const json = await response.json();
+                    if (response.ok) {
+						this.pluginLogs.info("NSP response:", response.status);
+						resolve(json.access_token);
+						this.pluginLogs.info("new authToken:", json.access_token);
+						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
+                    } else {
+						this.pluginLogs.warn("NSP response:", response.status, json.error);
 						vscode.window.showErrorMessage("NSP Authentication Error");
+						this.authToken = undefined; // Reset authToken on error
                         reject("Authentication Error!");
-                        throw new Error("NSP Authentication Error!");
-                    }
-                    return response.json();
-                }).then((json:any) => {
-                    this.pluginLogs.info("new authToken:", json.access_token);
-                    resolve(json.access_token);
-                    // automatically revoke token after 10min
-                    setTimeout(() => this._revokeAuthToken(), 600000);
+					}
                 }).catch((error:any) => {
 					if (error.message.includes('user aborted'))
 						this.pluginLogs.error("No response for getting authToken within 10sec");
 					else
 						this.pluginLogs.error("Getting authToken failed with", error.message);
-					vscode.window.showWarningMessage("NSP is not reachable");
+
+					vscode.window.showErrorMessage("NSP is not reachable");
+					this.authToken = undefined; // Reset authToken on error					
                     resolve(undefined);
                 });
             });
@@ -388,6 +382,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.osdVersion = json.version.number;
 
 		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
+		this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 	}
 
 	/**
@@ -1298,7 +1293,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (path==="im:/") {
 			this.pluginLogs.debug("provideFileDecoration(im:/)");
-			return DECORATION_WORKSPACE;
+			if (this.nspVersion) {
+				DECORATION_CONNECTED.tooltip = "Connected to "+this.username+"@"+this.nspAddr+" (Release: "+this.nspVersion+")";
+				return DECORATION_CONNECTED;
+			} else return DECORATION_INITIAL;
 		}
 
 		if (parts[0]==="im:" && pattern.test(parts[1])) {
@@ -1376,7 +1374,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this.port = port;
 			this.nspVersion = undefined;
 			this.osdVersion = undefined;
-		}
+			this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+		}	
 
 		this.intentTypes = {};
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
@@ -1987,12 +1986,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 								const report = json["ibn:output"]["audit-report"];
 								if (Object.keys(report).includes("misaligned-attribute") || Object.keys(report).includes("misaligned-object") || Object.keys(report).includes("undesired-object")) {
 									this.intentTypes[intent_type_folder].aligned[target]=false;
-									if (uriList.length===1)
-										vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!","Details","Cancel").then (
-											async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report, new Date());}
-										);
-									else
-										vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!");
+									vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!");
 								} else {
 									this.intentTypes[intent_type_folder].aligned[target]=true;
 									vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" is aligned!");
@@ -2019,9 +2013,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							this.intentTypes[intent_type_folder].aligned[target]=false;
 
 							if (uriList.length===1)
-								vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!","Details","Cancel").then(
-									async (selectedItem) => {if ('Details' === selectedItem) this._auditReport(intent_type, target, report, new Date());}
-								);
+								this._auditReport(intent_type, target, report, new Date());
 							else
 								vscode.window.showWarningMessage("Intent "+intent_type+"/"+target+" is misaligned!");
 						} else {
@@ -2496,7 +2488,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const topOfDocument = new vscode.Range(0, 0, 0, 0);
 
 		const command = {
-			title: 'Intent Manager at '+this.nspAddr+' by NOKIA',
+			title: 'Intent Manager at '+this.nspAddr+' (Release: '+this.nspVersion+') by NOKIA',
 			command: 'nokia-intent-manager.openInBrowser'
 		};
 	

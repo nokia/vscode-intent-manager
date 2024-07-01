@@ -30,10 +30,11 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newVersion',       async (...args) => imProvider.newVersion(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newIntentType',    async (...args) => imProvider.newIntentTypeFromTemplate(args)));
 	
-	vscode.commands.registerCommand('nokia-intent-manager.setPassword', async () => {
-		const passwordInput: string = await vscode.window.showInputBox({password: true, title: "Password"}) ?? '';
-		if(passwordInput !== '')
-			secretStorage.store("nsp_im_password", passwordInput);
+	vscode.commands.registerCommand('nokia-intent-manager.setPassword', async (password: string|undefined) => {
+		if (password === undefined)
+			password = await vscode.window.showInputBox({password: true, title: "Password"});
+		if (password !== undefined)
+			secretStorage.store("nsp_im_password", password);
 	});
 
 	function updateStatusBarItem(){

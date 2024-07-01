@@ -70,9 +70,14 @@
 
             em {
                 background-color: var(--vscode-editor-wordHighlightTextBackground);
-                font-style:normal;
+                font-style: normal;
                 font-weight: bold;
                 padding: 1px 4px;
+            }
+
+            i {
+                color: var(--vscode-textLink-foreground);
+                font-style: normal;
             }
         </style>
         <script>
@@ -141,17 +146,15 @@
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
-                    <th>Configured</th>
                 </tr>
 {% if report["misaligned-object"] %}
 {% for entry in report["misaligned-object"] %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
-                    <td>{{ entry["object-id"] | safe }}</td>
 {% if entry["is-configured"] %}
-                    <td>true</td>
+                    <td>{{ entry["object-id"] | safe }}</td>
 {% else %}
-                    <td>false</td>
+                    <td><i>{{ entry["object-id"] | safe }}</i></td>
 {% endif %}
                 </tr>
 {% endfor %}
@@ -164,17 +167,15 @@
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
-                    <th>Configured</th>
                 </tr>
 {% if report["undesired-object"] %}
 {% for entry in report["undesired-object"] %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
+{% if entry["is-configured"] %}
                     <td>{{ entry["object-id"] | safe }}</td>
-                    {% if entry["is-configured"] %}
-                    <td>true</td>
 {% else %}
-                    <td>false</td>
+                    <td><i>{{ entry["object-id"] | safe }}</i></td>
 {% endif %}
                 </tr>
 {% endfor %}
