@@ -60,8 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
 		if (e.affectsConfiguration('intentManager')) {
-			// config has changed
-			imProvider.updateSettings();
+			imProvider.updateSettings(); // config has changed
 		}
 	}));
 
