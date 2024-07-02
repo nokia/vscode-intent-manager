@@ -186,3 +186,4 @@ Updates:
   extensions are installed.
 * Show NSP version as {major}.{minor}. With this "24.4.0" is displayed now as "24.4".
 * New IPL!nk template for next-gen JavaScript engine (GraalJS)
+* Hide empty tabs in audit report

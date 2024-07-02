@@ -26,7 +26,6 @@
     },
     "health": {}
   },
-    
   "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}": {
     "config": {
       "target": "Cisco-IOS-XR-um-router-isis-cfg:/router/isis/processes/process=isis/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
@@ -47,7 +46,6 @@
     },
     "health": {}
   },
-    
   "[${site.ne\-name}] LDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "Cisco-IOS-XR-um-mpls-ldp-cfg:/mpls/ldp/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
