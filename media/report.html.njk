@@ -96,7 +96,13 @@
             };
 
             function clickFirstTab() {
-                document.getElementById("select_tab1").click();                
+{% if report["misaligned-attribute"] %}
+                document.getElementById("select_tab1").click();
+{% elif report["misaligned-object"] %}
+                document.getElementById("select_tab2").click();
+{% else %}
+                document.getElementById("select_tab3").click();
+{% endif %}
             }
 
         </script>        
@@ -115,11 +121,18 @@
         </div>
 
         <div class="tab">
+{% if report["misaligned-attribute"] %}
             <button class="tablinks" id="select_tab1" onclick="openTab(event, 'tab1')">MISALIGNED ATTRIBUTES</button>
+{% endif %}
+{% if report["misaligned-object"] %}
             <button class="tablinks" id="select_tab2" onclick="openTab(event, 'tab2')">MISSING OBJECTS</button>
+{% endif %}
+{% if report["undesired-object"] %}
             <button class="tablinks" id="select_tab3" onclick="openTab(event, 'tab3')">UNDESIRED OBJECTS</button>
+{% endif %}
         </div>
 
+{% if report["misaligned-attribute"] %}
         <div id="tab1" class="tabcontent">
             <table>
                 <tr>
@@ -128,7 +141,6 @@
                     <th>Desired Value</th>
                     <th>Observed Value</th>    
                 </tr>
-{% if report["misaligned-attribute"] %}
 {% for entry in report["misaligned-attribute"] %}                
                 <tr>
                     <td>{{ entry["device-name"]    }}</td>
@@ -137,17 +149,17 @@
                     <td>{{ entry["actual-value"]   }}</td>
                 </tr>
 {% endfor %}
-{% endif %}
             </table>
         </div>
+{% endif %}
 
+{% if report["misaligned-object"] %}
         <div id="tab2" class="tabcontent">
             <table>
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
                 </tr>
-{% if report["misaligned-object"] %}
 {% for entry in report["misaligned-object"] %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
@@ -158,17 +170,17 @@
 {% endif %}
                 </tr>
 {% endfor %}
-{% endif %}
             </table>
         </div>
+{% endif %}
 
+{% if report["undesired-object"] %}
         <div id="tab3" class="tabcontent">
             <table>
                 <tr>
                     <th>Site</th>
                     <th>Path</th>
                 </tr>
-{% if report["undesired-object"] %}
 {% for entry in report["undesired-object"] %}
                 <tr>
                     <td>{{ entry["device-name"] }}</td>
@@ -179,8 +191,8 @@
 {% endif %}
                 </tr>
 {% endfor %}
-{% endif %}
             </table>
         </div>
+{% endif %}
     </body>
 </html>

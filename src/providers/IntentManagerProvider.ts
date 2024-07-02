@@ -16,9 +16,9 @@ const COLOR_CUSTOMIZATION = new vscode.ThemeColor('list.highlightForeground'); /
 const COLOR_WARNING       = new vscode.ThemeColor('list.warningForeground');
 const COLOR_ERROR         = new vscode.ThemeColor('list.errorForeground');
 
-const DECORATION_INITIAL   = { badge: '❗', tooltip: 'Disconnected', color: COLOR_ERROR };  // should become codicon $(warning)
-const DECORATION_CONNECTED = { badge: '✔',  tooltip: 'Connected...', color: COLOR_OK };     // should become codicon $(vm-active)
-const DECORATION_SIGNED    = { badge: '🔒', tooltip: 'IntentType: Signed', color: COLOR_READONLY};
+const DECORATION_DISCONNECTED = { badge: '❗', tooltip: 'Not connected!', color: COLOR_ERROR };  // should become codicon $(warning)
+const DECORATION_CONNECTED    = { badge: '✔',  tooltip: 'Connecting...', color: COLOR_OK };     // should become codicon $(vm-active)
+const DECORATION_SIGNED       = { badge: '🔒', tooltip: 'IntentType: Signed', color: COLOR_READONLY};
 
 const DECORATION_VIEWS     = { tooltip: 'UI Form Customization', color: COLOR_CUSTOMIZATION };
 const DECORATION_INTENTS   = { tooltip: 'Intents', color: COLOR_CUSTOMIZATION };
@@ -190,7 +190,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
                     } else {
 						this.pluginLogs.warn("NSP response:", response.status, json.error);
-						vscode.window.showErrorMessage("NSP Authentication Error");
+
+						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
+						this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+
 						this.authToken = undefined; // Reset authToken on error
                         reject("Authentication Error!");
 					}
@@ -200,7 +203,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					else
 						this.pluginLogs.error("Getting authToken failed with", error.message);
 
-					vscode.window.showErrorMessage("NSP is not reachable");
+					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+
 					this.authToken = undefined; // Reset authToken on error					
                     resolve(undefined);
                 });
@@ -368,7 +373,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		if (!response.ok)
 			this._raiseRestconfError("Getting NSP release failed!", await response.json());
 		let json : any = await response.json();		
-		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+\.\d+/)[0];
+		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
+
+		this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 
 		this.pluginLogs.info("Requesting OSD version");
 		response = await this._callNSP("/logviewer/api/status", {method: "GET"});
@@ -382,7 +389,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.osdVersion = json.version.number;
 
 		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
-		this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 	}
 
 	/**
@@ -1295,8 +1301,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this.pluginLogs.debug("provideFileDecoration(im:/)");
 			if (this.nspVersion) {
 				DECORATION_CONNECTED.tooltip = "Connected to "+this.username+"@"+this.nspAddr+" (Release: "+this.nspVersion+")";
+				DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
 				return DECORATION_CONNECTED;
-			} else return DECORATION_INITIAL;
+			} else return DECORATION_DISCONNECTED;
 		}
 
 		if (parts[0]==="im:" && pattern.test(parts[1])) {
@@ -1374,6 +1381,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this.port = port;
 			this.nspVersion = undefined;
 			this.osdVersion = undefined;
+
+			DECORATION_CONNECTED.tooltip = "Connecting..."; // revert to original text
+			DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
+
 			this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 		}	
 
@@ -2432,7 +2443,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		// merge common resources
 
 		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources").fsPath)) {
-			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common-resources');
+			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_resources');
 			const j2resources = nunjucks.configure(commonsPath.fsPath);
 
 			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
@@ -2448,6 +2459,25 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					meta.resource.push({name: filename, value: j2resources.render(filename, data)});
 			});
 		}
+
+		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources_graaljs").fsPath)) {
+			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_resources_graaljs');
+			const j2resources = nunjucks.configure(commonsPath.fsPath);
+
+			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
+			fs.readdirSync(commonsPath.fsPath, {recursive: true}).forEach((filename: string) => {
+				const fullpath = vscode.Uri.joinPath(commonsPath, filename).fsPath;
+				if (!fs.lstatSync(fullpath).isFile())
+					this.pluginLogs.info("ignore "+filename+" (not a file)");
+				else if (filename.startsWith('.') || filename.includes('/.'))
+					this.pluginLogs.info("ignore hidden file/folder "+filename);
+				else if (resourcefiles.includes(filename))
+					this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
+				else
+					meta.resource.push({name: filename, value: j2resources.render(filename, data)});
+			});
+		}
+
 	
 		// Intent-type "meta" may contain the parameter "intent-type"
 		// RESTCONF API required parameter "name" instead

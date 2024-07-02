@@ -177,3 +177,12 @@ Updates:
 * Command `setPassword` can now be triggered from other extensions while passing the new password.
 * Updated badges/tooltips/colors in FileSystemProvider (Explorer View)
 * Explorer view now shows if vsCode is connected to Intent Manager. Tooltips provide extra information.
+
+## [2.5.0]
+
+Updates:
+* Workspace entry Intent Manager tooltip include details when not connected / connection errors
+  to replace error dialogue. Results in better user experience, especially when multiple NSP
+  extensions are installed.
+* Show NSP version as {major}.{minor}. With this "24.4.0" is displayed now as "24.4".
+* New IPL!nk template for next-gen JavaScript engine (GraalJS)

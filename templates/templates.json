@@ -31,6 +31,10 @@
         {
             "label": "SRX24 goldenConfiguration",
             "description": "day1 node config SReXperts 2024 | research/study, experimental"
+        },
+        {
+            "label": "ngJS iplink",
+            "description": "abstraction/assurance for next-gen java-script engine (GraalJS) | research/study, experimental"
         }
     ]
 }

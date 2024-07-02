@@ -1,0 +1,209 @@
+{
+  "{{ intent_type }}.endpoint-a.port-id": {
+    "displayKey": "name",
+    "dependsOn": "endpoint-a.ne-id",
+    "componentProps": {
+      "isPagination": true,
+      "isObject": false,
+      "paginationProps": {
+        "pageLabel": "Page"
+      }
+    },
+    "suggest": "getPorts",
+    "title": "PORT",
+    "type": "leafref",
+    "properties": [
+      {
+        "floatingFilter": true,
+        "name": "name",
+        "description": "Port Identifier",
+        "title": "PORT ID",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "description",
+        "description": "Port Description",
+        "title": "DESCRIPTION",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "port-mode",
+        "title": "MODE",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "encap-type",
+        "title": "ENCAP",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "actual-rate",
+        "title": "RATE",
+        "type": "number"
+      },
+      {
+        "floatingFilter": true,
+        "name": "mtu-value",
+        "title": "MTU",
+        "type": "number"
+      }
+    ]
+  },
+  "{{ intent_type }}.endpoint-b.ne-id": {
+    "displayKey": "ne-id",
+    "componentProps": {
+      "isPagination": true,
+      "isObject": false,
+      "paginationProps": {
+        "pageLabel": "Page"
+      }
+    },
+    "suggest": "getNodes",
+    "title": "NODE",
+    "type": "leafref",
+    "properties": [
+      {
+        "floatingFilter": true,
+        "name": "ne-id",
+        "description": "Device ID",
+        "title": "NE ID",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "ne-name",
+        "description": "Device Name",
+        "title": "NE NAME",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "ip-address",
+        "description": "Management IP",
+        "title": "MANAGEMENT IP",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "type",
+        "title": "CHASSIS TYPE",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "version",
+        "title": "VERSION",
+        "type": "string"
+      }
+    ]
+  },
+  "{{ intent_type }}.endpoint-b.port-id": {
+    "displayKey": "name",
+    "dependsOn": "endpoint-a.ne-id",
+    "componentProps": {
+      "isPagination": true,
+      "isObject": false,
+      "paginationProps": {
+        "pageLabel": "Page"
+      }
+    },
+    "suggest": "getPorts",
+    "title": "PORT",
+    "type": "leafref",
+    "properties": [
+      {
+        "floatingFilter": true,
+        "name": "name",
+        "description": "Port Identifier",
+        "title": "PORT ID",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "description",
+        "description": "Port Description",
+        "title": "DESCRIPTION",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "port-mode",
+        "title": "MODE",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "encap-type",
+        "title": "ENCAP",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "actual-rate",
+        "title": "RATE",
+        "type": "number"
+      },
+      {
+        "floatingFilter": true,
+        "name": "mtu-value",
+        "title": "MTU",
+        "type": "number"
+      }
+    ]
+  },
+  "{{ intent_type }}.adminState": {
+    "columnSpan": 1
+  },
+  "{{ intent_type }}.endpoint-a.ne-id": {
+    "displayKey": "ne-id",
+    "componentProps": {
+      "isPagination": true,
+      "isObject": false,
+      "paginationProps": {
+        "pageLabel": "Page"
+      }
+    },
+    "suggest": "getNodes",
+    "title": "NODE",
+    "type": "leafref",
+    "properties": [
+      {
+        "floatingFilter": true,
+        "name": "ne-id",
+        "description": "Device ID",
+        "title": "NE ID",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "ne-name",
+        "description": "Device Name",
+        "title": "NE NAME",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "ip-address",
+        "description": "Management IP",
+        "title": "MANAGEMENT IP",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "type",
+        "title": "CHASSIS TYPE",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "version",
+        "title": "VERSION",
+        "type": "string"
+      }
+    ]
+  }
+}
