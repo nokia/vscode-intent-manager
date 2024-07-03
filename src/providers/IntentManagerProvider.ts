@@ -213,8 +213,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	/**
 	 * Gracefully revoke NSP auth-token.
-	 */	
-
+	 */
 	private async _revokeAuthToken(): Promise<void> {
 		if (this.authToken) {
 			const token = await this.authToken;
@@ -261,7 +260,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					"Accept": "application/yang-data+json",
 					"Authorization": "Bearer " + token
 				};
-			else
+			else 
 				options.headers = {
 					'Content-Type': "application/json",
 					'Accept': "application/json",	
