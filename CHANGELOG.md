@@ -190,9 +190,12 @@ Updates:
 
 ## [2.5.1]
 
-- Settings have been moved to workspace settings rather than global user settings.
-- To allow for multi-server support, the active nsp Server, the port, and connection details has been moved to workspace settings: (window scope instead of application scope). This allows for different workspaces to connect to different NSP servers.
+- Certain settings have been moved to workspace settings rather than global user settings.
+
+- To allow for multi-server support, the active NSP server, the port, and connection details (user/pass) have been moved to workspace settings (window scope instead of application scope). This allows for different workspaces to connect to different NSP servers.
 
 - Implemented a command function nokia-wfm.connect (Provides support for NSP-Connect extension):
+
 - The command can be called by other extensions (NSP-connect - not released yet) to connect to the NSP server using certain credentials specified by the NSP-connect extension.
-- This does no affect the current functionality of the WFM extension.
+
+- This does not affect the current functionality of the WFM extension.
