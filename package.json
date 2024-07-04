@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "2.5.0", 
+  "version": "2.5.1", 
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -239,7 +239,8 @@
           "scope": "window",
           "enum": [
             "443",
-            "8545"
+            "8545",
+            "8547"
           ],
           "enumDescriptions": [
             "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
@@ -255,7 +256,7 @@
         },
         "intentManager.password": {
           "type": "null",
-          "markdownDescription": "[Set Password]",
+          "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
           "scope": "window",
           "description": "Intent Manager password"
         },
