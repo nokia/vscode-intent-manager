@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 		if (password !== undefined)
 			secretStorage.store("nsp_im_password", password);
 	});
-	
+
 	vscode.commands.registerCommand('nokia-intent-manager.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined, port: string) => {
 		const config = vscode.workspace.getConfiguration('intentManager');
 		if (username === undefined) {
@@ -89,6 +89,5 @@ export function activate(context: vscode.ExtensionContext) {
 	const fileAssociations : {[key: string]: string} = vscode.workspace.getConfiguration('files').get('associations') || {};
 	fileAssociations["/*_v*/views/*"] = "json";
 	vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
-
 	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('im:/'), name: "Intent Manager" });
 }
