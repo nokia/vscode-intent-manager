@@ -389,6 +389,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.osdVersion = json.version.number;
 
 		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
+
+		this._addViewConfigSchema();
 	}
 
 	/**
@@ -529,6 +531,33 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			vscode.window.showWarningMessage(errmsg+"\n"+response["error"][0]["error-message"]);
 		} else
 			vscode.window.showWarningMessage(errmsg);
+	}
+
+	/**
+	 * Enable json-schema for validation of .viewConfig files
+	 *  
+	 */		
+
+	private _addViewConfigSchema() {
+		const jsonSchemas : {fileMatch: string[], schema: boolean, url:string}[] | undefined = vscode.workspace.getConfiguration('json').get('schemas');
+		
+		if (jsonSchemas) {
+			const schemaPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'viewconfig-schema.json').toString();
+
+			let entryExists = false;
+			for (const schema of jsonSchemas) {
+				if (schema.fileMatch.includes("*.viewConfig")) {
+					schema.url = schemaPath;
+					entryExists = true;
+					break;
+				}
+			}
+
+			if (!entryExists)
+				jsonSchemas.push({"fileMatch": ["*.viewConfig"], "schema": false, "url": schemaPath});
+
+			vscode.workspace.getConfiguration('json').update('schemas', jsonSchemas, vscode.ConfigurationTarget.Global);
+		}
 	}
 
 	// --- SECTION: vscode.FileSystemProvider implementation ----------------

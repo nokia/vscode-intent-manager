@@ -1,0 +1,484 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "patternProperties": {
+        "^.*$": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "markdownDescription": "Attribute label to be displayed in the input form. Default: Attribute name as defined in YANG.",
+                    "type": "string"
+                },
+                "description": {
+                    "markdownDescription": "Attribute description to be displayed as tooltip. Default: Attribute description as defined in YANG.",
+                    "type": "string"
+                },
+                "readOnly": {
+                    "markdownDescription": "Attribute is read-only, blocked from getting modified by the user.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "visible": {
+                    "markdownDescription": "Attribute is hidden from the input form.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "required": {
+                    "markdownDescription": "Attribute is mandatory. Must be present to submit the form to create/update the intent.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "default": {
+                    "markdownDescription": "Default value for attribute."
+                },
+                "dependsOn": {
+                    "markdownDescription": "Attribute depends on another attribute that must be provided first.",
+                    "type": "string"
+                },
+                "when": {
+                    "markdownDescription": "XPATH expression used as condition to display/unlock the attribute on the form.",
+                    "type": "string"
+
+                },
+                "columnSpan": {
+                    "markdownDescription": "Defines the component width within the input form grid.",
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1
+                },
+                "newRow": {
+                    "markdownDescription": "Shows the input component on the next line.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "object",
+                        "string",
+                        "password",
+                        "leafref",
+                        "number",
+                        "boolean",
+                        "enum",
+                        "choice",
+                        "list",
+                        "empty",
+                        "bits",
+                        "binary",
+                        "union",
+                        "propertyGroup",
+                        "propertyList"
+                    ]
+                }
+            },
+            "additionalProperties": true,
+            "oneOf": [
+                {
+                    "properties": {
+                        "type": {
+                            "const": "string"
+                        },
+                        "default": {
+                            "type": "string"
+                        },
+                        "wrap": {
+                            "type": "string",
+                            "enum": ["soft"]
+                        },
+                        "validations": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "length": {
+                                    "type": "object",
+                                    "properties": {
+                                        "min": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                        },
+                                        "max": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                },
+                                "patterns": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "additionalProperties": false
+                        },
+                        "componentProps": {
+                            "type": "object",
+                            "properties": {
+                                "inputFieldProps": {
+                                    "type": "object",
+                                    "properties": {
+                                        "autoFocus": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                },
+                                "textAreaProps": {
+                                    "type": "object",
+                                    "properties": {
+                                        "style": {
+                                            "type": "object",
+                                            "properties": {
+                                                "height": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "additionalProperties": false
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                }
+                            },
+                            "additionalProperties": false
+                        },
+                        "component": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string",
+                                    "enum": [
+                                        "textArea"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": false
+                       }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "password"
+                        },
+                        "default": {
+                            "type": "string"
+                        },
+                        "componentProps": {
+                            "type": "object",
+                            "properties": {
+                                "inputFieldProps": {
+                                    "type": "object",
+                                    "properties": {
+                                        "encode": {
+                                            "type": "boolean"
+                                        },
+                                        "encodeCallback": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "leafref"
+                        },
+                        "default": {
+                            "type": "string"
+                        },
+                        "suggest": {
+                            "markdownDescription": "JavaScript method used as callout to populate the list of entries to pick from.",
+                            "type": "string"
+                        },
+                        "displayKey": {
+                            "markdownDescription": "Object attribute displayed, once an entry is selected. In single mode, this attribute will be send when committing the form.",
+                            "type": "string"
+                        },
+                        "componentProps": {
+                            "type": "object",
+                            "properties": {
+                                "isPagination": {
+                                    "type": "boolean"
+                                },
+                                "crossLaunch": {
+                                    "type": "string"
+                                },
+                                "launchText": {
+                                    "type": "string"
+                                },
+                                "isObject": {
+                                    "type": "boolean"
+                                },
+                                "paginationProps": {
+                                    "type": "object",
+                                    "properties": {
+                                        "pageLabel": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "enum"
+                        },
+                        "default": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            ]
+                        },
+                        "sortable": {
+                            "type": "boolean"
+                        },
+                        "floatingFilter": {
+                            "type": "boolean"
+                        },
+                        "enum": {
+                            "oneOf": [
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1
+                                },
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "value": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "integer",
+                                                        "minimum": 0
+                                                    }
+                                                ]
+                                            },
+                                            "label": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    },
+                                    "minItems": 1
+                                }
+                            ]
+                        },
+                        "component": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string",
+                                    "enum": [
+                                        "radiobutton"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": false
+                       }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "list"
+                        },
+                        "default": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "empty"
+                        },
+                        "default": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "bits"
+                        },
+                        "default": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "binary"
+                        },
+                        "default": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "union"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "choice"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "propertyGroup"
+                        },
+                        "default": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "number"
+                        },
+                        "default": {
+                            "type": "number"
+                        },
+                        "component": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string",
+                                    "enum": [
+                                        "slider",
+                                        "numberInput"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": false
+                       },
+                       "validations": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "ranges": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "min": {
+                                                "type": "number"
+                                            },
+                                            "max": {
+                                                "type": "number"
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                },
+                                "fractionDigits": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "boolean"
+                        },
+                        "default": {
+                            "type": "boolean"
+                        },
+                        "component": {
+                            "type": "string",
+                            "enum": [
+                                "toggle"
+                            ]
+                       }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "object"
+                        },
+                        "default": {
+                            "type": "object"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "const": "propertyList"
+                        },
+                        "default": {
+                            "type": "array"
+                        }
+                    },
+                    "required": ["type"]
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "not": {}
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
