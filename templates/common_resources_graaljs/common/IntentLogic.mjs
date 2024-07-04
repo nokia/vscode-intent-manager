@@ -53,7 +53,6 @@ export class IntentLogic {
      * 
      * @param {string} target Intent target
      * @param {Dict}   config Intent configuration
-     * @param {string} neId Target device 
      * @returns {Dict} site-level settings (site.*)
      */
 
