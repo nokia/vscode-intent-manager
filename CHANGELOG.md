@@ -194,7 +194,8 @@ Updates:
 * IPL!nk for GraalJS to support assurance/state (experimental)
 * IPL!nk for GraalJS to cache device-names (experimental)
 * IPL!nk for GraalJS to provide better logging / error-messages
-* NSP connection settings per workspace
+* NSP connection settings per workspace (enable multi-server support)
 * Validation for *.viewConfig files (partial coverage)
 * NSP release and OSD version improvements (performance/robbustness)
 * Retrieve list of intents including config (fix)
+* Implemented a command function nokia-intent-manager.connect (Provides support for NSP-Connect extension):

@@ -37,7 +37,24 @@ export function activate(context: vscode.ExtensionContext) {
 			secretStorage.store("nsp_im_password", password);
 	});
 
-	function updateStatusBarItem(){
+	vscode.commands.registerCommand('nokia-intent-manager.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined, port: string) => {
+		const config = vscode.workspace.getConfiguration('intentManager');
+		if (username === undefined) {
+			username = await vscode.window.showInputBox({title: "Username"});
+		}
+		if (username !== undefined) {
+			config.update("user", username, vscode.ConfigurationTarget.Workspace);
+		}
+		if (password === undefined) {
+			password = await vscode.window.showInputBox({password: true, title: "Password"});
+		} else {
+			secretStorage.store("nsp_im_password", password);
+		}
+		config.update("port", port, vscode.ConfigurationTarget.Workspace);
+		config.update("NSPIP", nspAddr, vscode.ConfigurationTarget.Workspace);
+	});
+
+	function updateStatusBarItem() {
 		const editor = vscode.window.activeTextEditor;
 		const sbar = imProvider.getStatusBarItem();
 
@@ -60,8 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
 		if (e.affectsConfiguration('intentManager')) {
-			// config has changed
-			imProvider.updateSettings();
+			imProvider.updateSettings(); // config has changed
 		}
 	}));
 
@@ -73,6 +89,5 @@ export function activate(context: vscode.ExtensionContext) {
 	const fileAssociations : {[key: string]: string} = vscode.workspace.getConfiguration('files').get('associations') || {};
 	fileAssociations["/*_v*/views/*"] = "json";
 	vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
-
 	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('im:/'), name: "Intent Manager" });
 }

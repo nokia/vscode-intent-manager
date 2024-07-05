@@ -239,7 +239,8 @@
           "scope": "window",
           "enum": [
             "443",
-            "8545"
+            "8545",
+            "8547"
           ],
           "enumDescriptions": [
             "443 port enabled in newer releases of NSP. 8545 to be deprecated.",

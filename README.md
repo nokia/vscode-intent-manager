@@ -90,19 +90,37 @@ To compile and generate the VSIX for installation, run:
 
     vsce package
 
-## Extension Settings
+## Extension Settings and Usage
 
-To make the extension work, make sure you configure the following attributes in the extension settings:
+### General Settings 
 
-![vsCode extension settings](https://raw.githubusercontent.com/nokia/vscode-intent-manager/main/media/ExtensionSettings.png)
+To configure the extension, you need to configure the following attributes in VsCode Extension Settings.
+
+```
+ctrl+shift+p > Preferences: Open Settings > Extensions > Workflow Manager
+```
+
+* `Intent Manager > Parallel Operations: Enable`: Improve performance by running things in-parallel (EXPERIMENTAL)
+* `Intent Manager: Timeout`: Client-side timeout for NSP API calls
+* `Intent Manager: Ignore Labels`: Hide intent-types from the user based on labels (helps to focus)
+
+### Connect to NSP IM
+
+To connect to an NSP IM, you need to configure the following attributes in VsCode **workspace** settings:
+
+```
+ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager
+```
+
 
 * `Intent Manager: NSPIP`: IP-address or hostname of the NSP server
 * `Intent Manager: User`: NSP username to be used
 * `Intent Manager: Password`: NSP password to be used (password is hidden, using vsCode secrets)
-* `Intent Manager: Timeout`: Client-side timeout for NSP API calls
-* `Intent Manager: Ignore Labels`: Hide intent-types from the user based on labels (helps to focus)
 * `Intent Manager: Port`: Usage of port 443 is recommended
-* `Intent Manager > Parallel Operations: Enable`: Improve performance by running things in-parallel (EXPERIMENTAL)
+
+
+
+
 
 ## Release Notes
 
