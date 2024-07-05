@@ -121,6 +121,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this._eventEmiter = new vscode.EventEmitter();
         this.onDidChangeFileDecorations = this._eventEmiter.event;
+
+		this._addViewConfigSchema();
 	}
 
 	/**
@@ -188,6 +190,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						resolve(json.access_token);
 						this.pluginLogs.info("new authToken:", json.access_token);
 						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
+						this._getNSPversion();
                     } else {
 						this.pluginLogs.warn("NSP response:", response.status, json.error);
 
@@ -365,32 +368,41 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */	
 
 	private async _getNSPversion(): Promise<void> {
-		this.pluginLogs.info("Requesting NSP version");
-		const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
-		let response: any = await this._callNSP(url, {method: "GET"});
-		if (!response)
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		if (!response.ok)
-			this._raiseRestconfError("Getting NSP release failed!", await response.json());
-		let json : any = await response.json();		
-		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
+		let updated = false;
 
-		this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-
-		this.pluginLogs.info("Requesting OSD version");
-		response = await this._callNSP("/logviewer/api/status", {method: "GET"});
-		if (!response)
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP logviewer (opensearch)");
-		if (!response.ok) {
-			const text: string = await response.text();
-			throw vscode.FileSystemError.Unavailable(text);
+		if (!this.nspVersion) {
+			this.pluginLogs.info("Requesting NSP release");
+			const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
+			const response: any = await this._callNSP(url, {method: "GET"});
+			if (!response)
+				this.pluginLogs.error("Lost connection to NSP");
+			else if (response.ok) {
+				const json = await response.json();		
+				this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
+				updated = true;
+			} else
+				this.pluginLogs.error("Getting NSP release failed!");
 		}
-		json = await response.json();
-		this.osdVersion = json.version.number;
 
-		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
+		if (!this.osdVersion) {
+			this.pluginLogs.info("Requesting OSD version");
+			const response: any = await this._callNSP("/logviewer/api/status", {method: "GET"});
+			if (!response)
+				this.pluginLogs.error("Lost connection to NSP logviewer (opensearch)");
+			else if (response.ok) {
+				const json = await response.json();		
+				this.osdVersion = json.version.number;
+				updated = true;
+			} else
+				this.pluginLogs.error("Getting OSD version failed!");	
+		}
 
-		this._addViewConfigSchema();
+		if (updated) {
+			const msg = "Connected to "+this.nspAddr+", NSP version: "+(this.nspVersion??"unknown")+", OSD version: "+(this.osdVersion??"unknown");
+			this.pluginLogs.info(msg);
+			vscode.window.showInformationMessage(msg);
+			this._eventEmiter.fire(vscode.Uri.parse('im:/'));	
+		}
 	}
 
 	/**
@@ -540,10 +552,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	private _addViewConfigSchema() {
 		const jsonSchemas : {fileMatch: string[], schema: boolean, url:string}[] | undefined = vscode.workspace.getConfiguration('json').get('schemas');
+		const schemaPath : string = vscode.Uri.joinPath(this.extensionUri, 'media', 'viewconfig-schema.json').toString();
 		
-		if (jsonSchemas) {
-			const schemaPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'viewconfig-schema.json').toString();
-
+		if (jsonSchemas !== undefined) {
 			let entryExists = false;
 			for (const schema of jsonSchemas) {
 				if (schema.fileMatch.includes("*.viewConfig")) {
@@ -556,7 +567,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!entryExists)
 				jsonSchemas.push({"fileMatch": ["*.viewConfig"], "schema": false, "url": schemaPath});
 
-			vscode.workspace.getConfiguration('json').update('schemas', jsonSchemas, vscode.ConfigurationTarget.Global);
+			vscode.workspace.getConfiguration('json').update('schemas', jsonSchemas, vscode.ConfigurationTarget.Workspace);
 		}
 	}
 
@@ -577,9 +588,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.pluginLogs.debug("readDirectory("+path+")");
 
 		let result:[string, vscode.FileType][] = [];
-
-		if (!this.nspVersion)
-			this._getNSPversion();
 
 		if (path === "im:/") {
 			// readDirectory() was executed with IM root folder
@@ -674,7 +682,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const body = {
 					"ibn:input": {
 						"filter": {
-							"config-required": false,
+							"config-required": true,
 							"intent-type-list": [
 								{
 									"intent-type": intent_type,
@@ -1928,6 +1936,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const token = await this.authToken;
 		if (!token)
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+
+		if (!this.osdVersion)
+			await this._getNSPversion();
 
 		const url = "/logviewer/api/console/proxy?path=nsp-mdt-logs-*/_search&method=GET";
 		const body = {"query": query, "sort": {"@datetime": "desc"}, "size": this.logLimit};

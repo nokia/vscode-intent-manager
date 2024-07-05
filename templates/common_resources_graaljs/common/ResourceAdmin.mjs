@@ -9,8 +9,6 @@
 /* global mds, logger, restClient, resourceProvider, utilityService */
 /* eslint no-undef: "error" */
 
-let RuntimeException = classResolver.resolveClass("java.lang.RuntimeException");
-
 export class ResourceAdmin {
   /**
     * Executes nsp-inventory:find operation
@@ -44,8 +42,34 @@ export class ResourceAdmin {
         }
         else if (httpStatus >= 400) {
           // Either client error (4xx) or server error (5xx)
+          let errmsg = "HTTP ERROR "+httpStatus;
           logger.warn("NSP response: {} {}", httpStatus, response);
-          result = { success: false, response: {}, errmsg: response};
+
+          if ((/<html/i).test(response)) {
+            // Extract error details from HTML response:
+            const errMatch = response.match(/<body[^>]*>(.*)<\/body>/i);
+            if (errMatch)
+              errmsg = errMatch[1].trim(); // extracted errmsg from html body
+          } else {
+            // Extract error details from JSON response:
+            //
+            // Error details returned in accordance to RFC802
+            //   {"ietf-restconf:errors":{"error":[{ error details }]}}
+            //
+            // Error fields:
+            //   error-type       enumeration
+            //   error-tag        string
+            //   error-app-tag?   string
+            //   error-path?      instance-identifier
+            //   error-message?   string
+            //   error-info?      anydata          
+
+            const errorObject = JSON.parse(response);
+            if ('ietf-restconf:errors' in errorObject)
+              errmsg = errorObject['ietf-restconf:errors'].error.map(error => error["error-message"]).join(', ');
+          }
+
+          result = { success: false, response: {}, errmsg: errmsg};
         }
         else {
           logger.debug("NSP response: {} {}", httpStatus, response);
@@ -106,8 +130,34 @@ export class ResourceAdmin {
         }
         else if (httpStatus >= 400) {
           // Either client error (4xx) or server error (5xx)
+          let errmsg = "HTTP ERROR "+httpStatus;
           logger.warn("NSP response: {} {}", httpStatus, response);
-          result = { success: false, response: {}, errmsg: response};
+
+          if ((/<html/i).test(response)) {
+            // Extract error details from HTML response:
+            const errMatch = response.match(/<body[^>]*>(.*)<\/body>/i);
+            if (errMatch)
+              errmsg = errMatch[1].trim(); // extracted errmsg from html body
+          } else {
+            // Extract error details from JSON response:
+            //
+            // Error details returned in accordance to RFC802
+            //   {"ietf-restconf:errors":{"error":[{ error details }]}}
+            //
+            // Error fields:
+            //   error-type       enumeration
+            //   error-tag        string
+            //   error-app-tag?   string
+            //   error-path?      instance-identifier
+            //   error-message?   string
+            //   error-info?      anydata          
+
+            const errorObject = JSON.parse(response);
+            if ('ietf-restconf:errors' in errorObject)
+              errmsg = errorObject['ietf-restconf:errors'].error.map(error => error["error-message"]).join(', ');
+          }
+
+          result = { success: false, response: {}, errmsg: errmsg};
         }
         else {
           logger.debug("NSP response: {} {}", httpStatus, response);
@@ -140,20 +190,17 @@ export class ResourceAdmin {
     const result = this.#nspFindEntry("/nsp-resource-pool:resource-pools/ip-resource-pools[name='"+pool+"' and scope='"+scope+"']/consumed-resources[reference='"+target+"']");
     
     if (!result.success)
-      throw new RuntimeException("Find subnet failed with "+result.errmsg);
+      throw new Error("Find subnet failed with "+result.errmsg);
 
-    let subnet = "";
-    if ('value' in result.response) {
-      subnet = result.response.value;
-      logger.info("subnet: {}", subnet );
-    } else {
-      logger.info("subnet: to be reserved/obtained");
-    }
+    if ('value' in result.response)
+      logger.info("subnet: {}", result.response.value );
+    else
+      throw Error("Subnet for pool="+pool+" scope="+scope+" target="+target+" must be reserved/obtained first!");
 
     const duration = Date.now()-startTS;
     logger.info("ResourceAdmin::getSubnet(pool={}, scope={}, target={}) finished within {} ms", pool, scope, target, duration|0);
 
-    return subnet;
+    return result.response.value;
   }
   
   /**
@@ -167,7 +214,7 @@ export class ResourceAdmin {
     * @param {} target reference for reservation 
     * @returns subnet as string, for example 10.0.0.0/31 (or empty string in error cases)
     * 
-    * @throws {RuntimeException} obtain subnet failed
+    * @throws {Error} obtain subnet failed
     * 
     **/
 
@@ -178,7 +225,7 @@ export class ResourceAdmin {
     const result = this.#nspFindEntry("/nsp-resource-pool:resource-pools/ip-resource-pools[name='"+pool+"' and scope='"+scope+"']/consumed-resources[reference='"+target+"']");
     
     if (!result.success)
-      throw new RuntimeException("Find subnet failed with "+result.errmsg);
+      throw new Error("Find subnet failed with "+result.errmsg);
 
     let subnet = "";
     if ('value' in result.response) {
@@ -198,7 +245,7 @@ export class ResourceAdmin {
       const result = this.#restconfNspAction(resource, input);
       
       if (!result.success)
-        throw new RuntimeException("Obtain subnet failed with "+result.errmsg);
+        throw new Error("Obtain subnet failed with "+result.errmsg);
 
       subnet = result.response["nsp-resource-pool:output"]["consumed-resources"][0][0].value;
       logger.info("subnet: {} (new entry)", subnet );
@@ -252,20 +299,17 @@ export class ResourceAdmin {
     const result = this.#nspFindEntry( "/nsp-resource-pool:resource-pools/numeric-resource-pools[name='"+pool+"' and scope='"+scope+"']/num-consumed-resources[reference='"+target+"']");
     
     if (!result.success)
-      throw new RuntimeException("Find id failed with "+result.errmsg);
+      throw new Error("Find id failed with "+result.errmsg);
 
-    let id = "";
-    if ('value' in result.response) {
-      id = result.response.value;
-      logger.info("id: {}", id );
-    } else {
-      logger.info("id: to be reserved/obtained");
-    }    
+    if ('value' in result.response)
+      logger.info("id: {}", result.response.value );
+    else
+      throw Error("Id for pool="+pool+" scope="+scope+" target="+target+" must be reserved/obtained first!");
 
     const duration = Date.now()-startTS;
     logger.info("ResourceAdmin::getId(pool={}, scope={}, target={}) finished within {} ms", pool, scope, target, duration|0);
 
-    return id;
+    return result.response.value;
   }
 
   /**
@@ -277,7 +321,7 @@ export class ResourceAdmin {
     * @param {} target reference for reservation 
     * @returns number as string
     * 
-    * @throws {RuntimeException} obtain number failed
+    * @throws {Error} obtain number failed
     * 
     **/
   
@@ -288,7 +332,7 @@ export class ResourceAdmin {
     const result = this.#nspFindEntry("/nsp-resource-pool:resource-pools/numeric-resource-pools[name='"+pool+"' and scope='"+scope+"']/num-consumed-resources[reference='"+target+"']");
     
     if (!result.success)
-      throw new RuntimeException("Find id failed with "+result.errmsg);
+      throw new Error("Find id failed with "+result.errmsg);
 
     let id = "";
     if ('value' in result.response) {
@@ -306,7 +350,7 @@ export class ResourceAdmin {
       const result = this.#restconfNspAction(resource, input);
       
       if (!result.success)
-        throw new RuntimeException("Obtain id failed with "+result.errmsg);
+        throw new Error("Obtain id failed with "+result.errmsg);
 
       id = result.response["nsp-resource-pool:output"]["num-consumed-resources"][0].value;
       logger.info("id: {} (new entry)", id );

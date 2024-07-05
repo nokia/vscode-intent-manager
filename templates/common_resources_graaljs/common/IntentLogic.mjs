@@ -53,10 +53,11 @@ export class IntentLogic {
      * 
      * @param {string} target Intent target
      * @param {Dict}   config Intent configuration
+     * @param {Dict}   siteNames Used to translate siteId to siteNames (w/o API calls)
      * @returns {Dict} site-level settings (site.*)
      */
 
-    static getSiteParameters(target, config) {
+    static getSiteParameters(target, config, siteNames) {
         return config;
     }
 

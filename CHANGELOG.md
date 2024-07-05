@@ -187,3 +187,14 @@ Updates:
 * Show NSP version as {major}.{minor}. With this "24.4.0" is displayed now as "24.4".
 * New IPL!nk template for next-gen JavaScript engine (GraalJS)
 * Hide empty tabs in audit report
+
+## [3.0.0]
+
+Updates:
+* IPL!nk for GraalJS to support assurance/state (experimental)
+* IPL!nk for GraalJS to cache device-names (experimental)
+* IPL!nk for GraalJS to provide better logging / error-messages
+* NSP connection settings per workspace
+* Validation for *.viewConfig files (partial coverage)
+* NSP release and OSD version improvements (performance/robbustness)
+* Retrieve list of intents including config (fix)

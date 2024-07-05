@@ -1,7 +1,7 @@
 <#setting number_format="computer">
-<#assign ifname="${site['ne-name']}_to_${site.peer['ne-name']}">
+<#assign ifname="${target}_${site['ne-name']}_to_${site.peer['ne-name']}">
 {
-    "[${site.ne\-name}] PORT ${site.port\-id}": {
+    "PORT ${site.port\-id}": {
         "config": {
             "target": "nokia-conf:/configure/port=${site.port\-id?url('ISO-8859-1')}",
             "operation": "replace",
@@ -60,7 +60,7 @@
           }
         }
     },
-    "[${site.ne\-name}] IP INTERFACE ${ifname}": {
+    "IP INTERFACE ${ifname}": {
         "config": {
             "target": "nokia-conf:/configure/router=Base/interface=${ifname?url('ISO-8859-1')}",
             "operation": "replace",
@@ -85,7 +85,7 @@
             }
         }
     },
-    "[${site.ne\-name}] ISIS INTERFACE ${ifname}": {
+    "ISIS INTERFACE ${ifname}": {
         "config": {
             "target": "nokia-conf:/configure/router=Base/isis=0/interface=${ifname?url('ISO-8859-1')}",
             "operation": "replace",
@@ -113,7 +113,7 @@
             }
         }
     },
-    "[${site.ne\-name}] LDP INTERFACE ${ifname}": {
+    "LDP INTERFACE ${ifname}": {
         "config": {
             "target": "nokia-conf:/configure/router=Base/ldp/interface-parameters/interface=${ifname?url('ISO-8859-1')}",
             "operation": "replace",
@@ -133,7 +133,7 @@
             }
         }
     },
-    "[${site.ne\-name}] TWAMP REFLECTOR": {
+    "TWAMP REFLECTOR": {
       "config": {
         "target": "nokia-conf:/configure/router=Base/twamp-light/reflector",
         "operation": "replace",
@@ -152,7 +152,7 @@
         }
       }
     },
-    "[${site.ne\-name}] TWAMP SESSION ${target}": {
+    "TWAMP SESSION ${target}": {
       "config": {
         "target": "nokia-conf:/configure/oam-pm/session=${target?url('ISO-8859-1')}",
         "operation": "replace",

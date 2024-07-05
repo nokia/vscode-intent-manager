@@ -16,13 +16,14 @@ let SynchronizeResult = classResolver.resolveClass("com.nokia.fnms.controller.ib
 let AuditReport = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.AuditReport");
 let MisAlignedObject = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedObject");
 let MisAlignedAttribute = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedAttribute");
-let RuntimeException = classResolver.resolveClass("java.lang.RuntimeException");
 
 let ArrayList = classResolver.resolveClass("java.util.ArrayList");
 
 export class IntentHandler extends CalloutHandler
 {
   #logic;
+  #deviceCache;
+  #dcLastUpdated;
 
   /**
     * Create IntentHandler
@@ -35,6 +36,8 @@ export class IntentHandler extends CalloutHandler
   {
     super();    
     this.#logic = intentLogic;
+    this.#deviceCache = {};
+    this.#dcLastUpdated = -1;
   }
 
   /**
@@ -67,15 +70,19 @@ export class IntentHandler extends CalloutHandler
           logger.error("Exception {} occured.", exception);
           result = { success: false, errmsg: "Couldn't connect to mediator. Exception "+exception+" occured." };
         }
-        else if (httpStatus === 404) {
-          // Treat resource not found as normal case
-          // This is to avoid confusing developers when reading the logs
-          logger.info("NSP response: {} {}", httpStatus, "Resource not found");
-          result = { success: false, response: JSON.parse(response), errmsg: "Not Found" };
-        }
         else if (httpStatus >= 400) {
           // Either client error (4xx) or server error (5xx)
-          logger.warn("NSP response: {} {}", httpStatus, response);
+
+          // Note:
+          // 404 (resource not found) is considered a normal case, while it might happen during
+          // audits when the resource was not yet created. To avoid confusing developers getting
+          // in panic when reading the logs, status-code 404 using log-level info instead of warn
+
+          if (httpStatus === 404) {
+            logger.info("NSP response: {} {}", httpStatus, response);  
+          }
+          else
+            logger.warn("NSP response: {} {}", httpStatus, response);  
 
           // Error details returned in accordance to RFC8020 ch7.1
           //   {"ietf-restconf:errors":{"error":[{ ___error details__ }]}}
@@ -111,11 +118,7 @@ export class IntentHandler extends CalloutHandler
               break;
           }
 
-          const errorObject = JSON.parse(response);
-          if ('ietf-restconf:errors' in errorObject)
-            errorObject['ietf-restconf:errors'].error.forEach( errorDetails => errmsg += "\n\t"+errorDetails['error-message'] );
-
-          result = { success: false, response: JSON.parse(response), errmsg: errmsg };
+          result = { success: false, errmsg: errmsg };
         }
         else {
           // Should be 200 OK
@@ -159,7 +162,7 @@ export class IntentHandler extends CalloutHandler
       restClient.setPort(managerInfo.getPort());
       restClient.setProtocol(managerInfo.getProtocol().toString());
 
-      restClient.patch(url, "application/yang-patch+json", body, "application/json", (exception, httpStatus, response) => {
+      restClient.patch(url, "application/yang-patch+json", body, "application/yang-data+json", (exception, httpStatus, response) => {
         const duration = Date.now()-startTS;
         logger.info("PATCH {} {} finished within {} ms", url, body, duration|0);
 
@@ -171,44 +174,56 @@ export class IntentHandler extends CalloutHandler
           // Either client error (4xx) or server error (5xx)
           logger.warn("NSP response: {} {}", httpStatus, response);
 
-          // Error details returned in accordance to RFC8072 ch2.3 (2 options: global errors OR edit errors )
-          //   {"ietf-yang-patch:yang-patch-status":{"ietf-restconf:errors":{"error":[{ error details }]}}}
-          //   {"ietf-yang-patch:yang-patch-status":{"edit-status":{"edit":[{"ietf-restconf:errors":{"error":[{ error details }]}}]}}}
-          //
-          // Error fields:
-          //   error-type       enumeration
-          //   error-tag        string
-          //   error-app-tag?   string
-          //   error-path?      instance-identifier
-          //   error-message?   string
-          //   error-info?      anydata          
-
-          // extract error details from response:
-          const errorObject = JSON.parse(response);
-          if ('ietf-yang-patch:yang-patch-status' in errorObject) {
-            const yangPatchStatus = errorObject['ietf-yang-patch:yang-patch-status'];
-
-            if ('ietf-restconf:errors' in yangPatchStatus) {
-              // global errors
-              let errmsg = "[site:"+neId+"] rfc8072 global-errors:";
-              yangPatchStatus['ietf-restconf:errors'].error.forEach( errorDetails => errmsg += "\n\t"+errorDetails['error-message'] );
-              result = { success: false, response: errorObject, errmsg: errmsg };
-            }
-            else if ('edit-status' in yangPatchStatus) {
-              // edit errors
-              let errmsg = "[site:"+neId+"] rfc8072 edit-errors:";
-              yangPatchStatus['edit-status'].edit.forEach( edit => {
-                errmsg += "\n\t"+edit['edit-id']+":";
-                edit['ietf-restconf:errors'].error.forEach( errorDetails => {
-                  errmsg += "\n\t\t" + errorDetails['error-tag'] + " path:" + errorDetails['error-path'] + " details:" + errorDetails['error-message'];
-                });
-              });
-              result = { success: false, response: errorObject, errmsg: errmsg };
-            }
+          let errmsg="";
+          if ((/<html/i).test(response)) {
+            // Extract error details from HTML response:
+            const errMatch = response.match(/<body[^>]*>(.*)<\/body>/i);
+            if (errMatch)
+              errmsg = errMatch[1]; // extracted errmsg from html body
             else
-              result = { success: false, response: errorObject, errmsg: "HTTP ERROR "+httpStatus};
-          } else
-            result = { success: false, response: errorObject, errmsg: "HTTP ERROR "+httpStatus};
+              errmsg = "HTTP ERROR "+httpStatus;
+          } else {
+            // Extract error details from JSON response:
+            //
+            // Error details returned in accordance to RFC8072 ch2.3 (2 options: global errors OR edit errors )
+            //   {"ietf-yang-patch:yang-patch-status":{"ietf-restconf:errors":{"error":[{ error details }]}}}
+            //   {"ietf-yang-patch:yang-patch-status":{"edit-status":{"edit":[{"ietf-restconf:errors":{"error":[{ error details }]}}]}}}
+            //
+            // Error fields:
+            //   error-type       enumeration
+            //   error-tag        string
+            //   error-app-tag?   string
+            //   error-path?      instance-identifier
+            //   error-message?   string
+            //   error-info?      anydata          
+
+            const errorObject = JSON.parse(response);
+            if ('ietf-yang-patch:yang-patch-status' in errorObject) {
+              const yangPatchStatus = errorObject['ietf-yang-patch:yang-patch-status'];
+
+              // Check for RFC8072 YANG-PATCH ERRORS: global-errors
+              if ('ietf-restconf:errors' in yangPatchStatus) {
+                const errList = yangPatchStatus['ietf-restconf:errors'].error;
+                errmsg = errList.map(error => error["error-message"]).join(', ');
+              }
+
+              // Check for RFC8072 YANG-PATCH ERRORS: edit-errors
+              if ('edit-status' in yangPatchStatus) {
+                yangPatchStatus['edit-status'].edit.forEach( edit => {
+                  if (edit['edit-id'])
+                    errmsg += "[object: "+edit['edit-id']+"] ";
+                  const errList = edit['ietf-restconf:errors'].error;
+                  errmsg += errList.map(error => {
+                    if (error['error-path'])
+                      return "[path: " + error['error-path'] + "] " + error['error-message'];
+                    else
+                      return error['error-message'];
+                  }).join(', ')+" ";
+                });
+              }
+            }
+          }
+          result = { success: false, errmsg: errmsg.trim() };
         } else {
           // 2xx - Success
           logger.info("NSP response: {} {}", httpStatus, response);
@@ -276,14 +291,74 @@ export class IntentHandler extends CalloutHandler
     return result;
   }
 
-/**
-  * Get list-keys from YANG model for MDC-managed nodes
-  *
-  * @param {} neId device
-  * @param {} listPath  path of list to get the keys
-  * @returns listKeys[]
-  *
-  **/
+  #updateDeviceCache() {
+    const startTS = Date.now();
+
+    if (startTS - this.#dcLastUpdated < 300000)
+      // Keep cache! Content was updated within the last 5min
+      return;
+
+    this.#dcLastUpdated = startTS;
+    logger.debug("IntentHandler::#updateDeviceCache()");
+    
+    var managerInfo = mds.getManagerByName('NSP');
+    if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
+      restClient.setIp(managerInfo.getIp());
+      restClient.setPort(managerInfo.getPort());
+      restClient.setProtocol(managerInfo.getProtocol().toString());
+    
+      var url = "https://restconf-gateway/restconf/operations/nsp-inventory:find";
+      var options = {
+        "xpath-filter": "/nsp-equipment:network/network-element",
+        "depth": 3,
+        "fields": "ne-id;ne-name",
+        "offset": 0
+      };
+
+      let total=1;
+      let offset=0;
+      let newCache = {};
+
+      while (offset<total) {
+        options.offset = offset;
+        restClient.post(url, "application/json", JSON.stringify({"input": options}), "application/json", (exception, httpStatus, response) => {
+          if (exception) {
+            logger.error("Exception {} occured.", exception);
+            this.#dcLastUpdated = -1;
+            total = offset;
+          }
+          else if (httpStatus >= 400) {
+            // Either client error (4xx) or server error (5xx)
+            logger.warn("NSP response: {} {}", httpStatus, response);
+            this.#dcLastUpdated = -1;
+            total = offset;
+          }
+          else {
+            const output = JSON.parse(response)["nsp-inventory:output"];
+            total = output["total-count"];
+            offset = output["end-index"]+1;
+            output.data.forEach(entry => newCache[entry['ne-id']] = entry['ne-name']);
+          }
+        });
+      }
+
+      this.#deviceCache = newCache;
+      this.#dcLastUpdated = Date.now();
+      logger.info("device cache updated: {} entries", total);
+    }
+
+    const duration = Date.now()-startTS;
+    logger.debug("CalloutHandler::#updateDeviceCache() finished within {} ms", duration|0);    
+  }
+  
+  /**
+    * Get list-keys from YANG model for MDC-managed nodes
+    *
+    * @param {} neId device
+    * @param {} listPath  path of list to get the keys
+    * @returns listKeys[]
+    *
+    **/
   
   #getListKeys(neId, listPath) {
     const startTS = Date.now();
@@ -320,7 +395,7 @@ export class IntentHandler extends CalloutHandler
         }
       }
     } else
-      logger.error("#getListKeys() failed with error:\n{}", result["errmsg"]);
+      logger.error("#getListKeys() failed with {}", result["errmsg"]);
     
     const duration = Date.now()-startTS;
     logger.debug("IntentHandler::#getListKeys({}, {}) finished within {} ms", neId, listPath, duration|0);
@@ -328,21 +403,21 @@ export class IntentHandler extends CalloutHandler
     return listKeys;
   }
 
-/**
-  * JSONPath 0.8.4 - XPath for JSON
-  * available from https://code.google.com/archive/p/jsonpath/
-  *
-  * Copyright (c) 2007 Stefan Goessner (goessner.net)
-  * Licensed under the MIT (MIT-LICENSE.txt) licence.
-  * 
-  * @param {} obj
-  * @param {} expr
-  * @param {} arg
-  * @returns result
-  * 
-  * @throws SyntaxError
-  *
-  **/
+  /**
+    * JSONPath 0.8.4 - XPath for JSON
+    * available from https://code.google.com/archive/p/jsonpath/
+    *
+    * Copyright (c) 2007 Stefan Goessner (goessner.net)
+    * Licensed under the MIT (MIT-LICENSE.txt) licence.
+    * 
+    * @param {} obj
+    * @param {} expr
+    * @param {} arg
+    * @returns result
+    * 
+    * @throws SyntaxError
+    *
+    **/
 
   #jsonPath(obj, expr, arg) {
     var P = {
@@ -436,7 +511,7 @@ export class IntentHandler extends CalloutHandler
     * @param {string} rootXPath  Root XPATH of configuration
     * @param {Object} config     Desired configuration
     * 
-    * @throws {RuntimeException} /resolve-synchronize failed
+    * @throws {Error} /resolve-synchronize failed
     * 
     **/
 
@@ -453,7 +528,7 @@ export class IntentHandler extends CalloutHandler
     };
     const resolveResponse = this.#fwkAction("/resolve-synchronize", unresolvedConfig);
     if (!resolveResponse.success)
-      throw new RuntimeException("Resolve Synchronize failed with {}", resolveResponse.errmsg);      
+      throw new Error("Resolve Synchronize failed with {}", resolveResponse.errmsg);      
 
     // enable for detailed debugging:
     // logger.info("desired config:  {}", JSON.stringify(config));
@@ -472,18 +547,18 @@ export class IntentHandler extends CalloutHandler
   * @param {string} target Intent target
   * @param {AuditReport} auditReport Audit report before applying approvals
   * 
-  * @throws {RuntimeException} /resolve-audit failed
+  * @throws {Error} /resolve-audit failed
   * 
   **/
 
-  #resolveAudit(target, auditReport) {
+  #resolveAudit(auditReport) {
     const startTS = Date.now();
     logger.debug("IntentHandler::#resolveAudit()");
   
     // Convert audit report to JSON
     const auditReportJson = {
-      "target": target,
-      "intent-type": this.#logic.INTENT_TYPE
+      "target": auditReport.getTarget(),
+      "intent-type": auditReport.getIntentType()
     };
 
     if (auditReport.getMisAlignedAttributes()) {
@@ -515,7 +590,7 @@ export class IntentHandler extends CalloutHandler
     // Call the mediator to resolve audit report
     let resolveResponse = this.#fwkAction("/resolve-audit", auditReportJson);
     if (!resolveResponse.success)
-      throw new RuntimeException("/resolve-audit failed with " + resolveResponse.errmsg);
+      throw new Error("/resolve-audit failed with {}", resolveResponse.errmsg);
 
     const resolvedAuditReportJson = resolveResponse.response;
     logger.info("resolved audit report:\n{}", JSON.stringify(resolvedAuditReportJson, null, "  "));
@@ -611,9 +686,6 @@ export class IntentHandler extends CalloutHandler
           else
             // missing object: is-configured=true, is-undesired=default(false)
             auditReport.addMisAlignedObject(new MisAlignedObject('/'+basePath+'/'+path+key, true, neId));
-
-          // Alternative option: Report as misaligned attribute (JSON string)
-          // auditReport.addMisAlignedAttribute(new MisAlignedAttribute(path+key, JSON.stringify(iCfg[key]), null, obj));
         } else {
           // mismatch: leaf is unconfigured
           auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+basePath+'/'+path+key, iCfg[key].toString(), null, obj));
@@ -645,13 +717,10 @@ export class IntentHandler extends CalloutHandler
               
               const aVal = JSON.stringify(aCfg[key]);
               if ((aVal === '{}') || (aVal === '[]') || (aVal === '[null]')) 
-                auditReport.addMisAlignedAttribute(new MisAlignedAttribute(aKey, null, aVal, obj));
+                auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+basePath+'/'+aKey, null, aVal, obj));
               else
                 // undesired object: is-configured=true, is-undesired=default(true)
-                auditReport.addMisAlignedObject(new MisAlignedObject('/'+basePath+'/'+aKey, true, neId, true));
-              
-              // Alternative option: Report as misaligned attribute (JSON string)
-              // auditReport.addMisAlignedAttribute(new MisAlignedAttribute(aKey, null, JSON.stringify(aCfg[key]), obj));            
+                auditReport.addMisAlignedObject(new MisAlignedObject('/'+basePath+'/'+aKey, true, neId, true));              
             } else {
               // mismatch: additional leaf
               auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+basePath+'/'+aKey, null, aCfg[key].toString(), obj));
@@ -674,7 +743,7 @@ export class IntentHandler extends CalloutHandler
   * @param {} auditReport used to report differences
   * @param {} obj object reference used for report
   * 
-  * @throws RuntimeException
+  * @throws {Error}
   * 
   **/
     
@@ -716,20 +785,20 @@ export class IntentHandler extends CalloutHandler
                   match = RegExp(iValue).test(aValue[0]);
                   break;
                 default:
-                  throw new RuntimeException("Unsupported check '"+check+"' for object("+path+"), jsonpath("+path+"), expected value("+iValue+")");
+                  throw new Error("Unsupported check '"+check+"' for object("+path+"), jsonpath("+path+"), expected value("+iValue+")");
               }    
               if (!match)
-                auditReport.addMisAlignedAttribute(new MisAlignedAttribute(qPath+'/'+key, iValue.toString(), aValue[0].toString(), siteName));
+                auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+qPath+'/'+key, iValue.toString(), aValue[0].toString(), siteName));
             } else {
-              auditReport.addMisAlignedAttribute(new MisAlignedAttribute(qPath+'/'+key, iValue.toString(), null, siteName));
+              auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+qPath+'/'+key, iValue.toString(), null, siteName));
             }
           }
         }
       } else if (key in aState) {
         if (iState[key] !== aState[key])
-          auditReport.addMisAlignedAttribute(new MisAlignedAttribute(qPath+'/'+key, iState[key].toString(), aState[key].toString(), siteName));
+          auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+qPath+'/'+key, iState[key].toString(), aState[key].toString(), siteName));
       } else {
-        auditReport.addMisAlignedAttribute(new MisAlignedAttribute(qPath+'/'+key, iState[key].toString(), null, siteName));
+        auditReport.addMisAlignedAttribute(new MisAlignedAttribute('/'+qPath+'/'+key, iState[key].toString(), null, siteName));
       }
     }
 
@@ -748,7 +817,10 @@ export class IntentHandler extends CalloutHandler
   * mediator and if the corresponding freemarker template (ftl) could be loaded.
   * 
   * @param {} input input provided by intent-engine
-  * @returns {ValidateResult} *
+  * @returns {ValidateResult}
+  * 
+  * @throws ContextErrorException
+  * 
   **/
 
   validate(input) {
@@ -822,127 +894,142 @@ export class IntentHandler extends CalloutHandler
     logger.info("IntentHandler::synchronize() in state {} ", state);
 
     const config  = JSON.parse(input.getJsonIntentConfiguration())[0][this.#logic.INTENT_ROOT];
-    
+     
     var topology   = input.getCurrentTopology();
     var syncResult = new SynchronizeResult();
-    
+    var syncErrors = [];
+
     var sitesConfigs = {};
     var sitesCleanups = {};
-    var deploymentErrors = [];
 
-    const yangPatchTemplate = resourceProvider.getResource("common/patch.ftl");
+    try {
+      // Update device-cache (as needed)
+      this.#updateDeviceCache();
+      
+      const yangPatchTemplate = resourceProvider.getResource("common/patch.ftl");
 
-    // Recall nodal configuration elements from previous synchronize (for cleanup/housekeeping)
-    if (topology && topology.getXtraInfo()!==null && !topology.getXtraInfo().isEmpty()) {
-      topology.getXtraInfo().forEach(item => {
-        if (item.getKey() === 'sitesCleanups') {
-          sitesCleanups = JSON.parse(item.getValue());
-          sitesConfigs  = JSON.parse(item.getValue()); // deep-clone of sitesCleanups
-          logger.info("sitesCleanups restored: "+item.getValue());
-        }
-      });
-    }
-
-    // Secure resources from Resource Admin
-    // Right now, we are assuming that reservation is required in any state but delete
-
-    if (state !== 'delete')
-      this.#logic.obtainResources(target, config);
-
-    if (state === "active") {
-      const global = this.#logic.getGlobalParameters(target, config);
-
-      // Iterate sites to populate/update sitesConfigs per target device
-      this.#logic.getSiteParameters(target, config).forEach(site => {
-        const neId = site['ne-id'];
-        const neInfo = mds.getAllInfoFromDevices(neId);
-        const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
-        const neType = neFamilyTypeRelease.split(':')[0];
-        const neVersion = neFamilyTypeRelease.split(':')[1];
-
-        if (!(neId in sitesConfigs))
-          sitesConfigs[neId] = {};
-
-        const siteFTL = resourceProvider.getResource(this.#logic.getTemplateName(neId, neType));
-        const objects = JSON.parse(utilityService.processTemplate(siteFTL, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'sync'}));
-          
-        for (const objectName in objects) {
-          if ("config" in objects[objectName]) {
-            sitesConfigs[neId][objectName] = objects[objectName].config;
-                
-            // Convert 'value' object to JSON string as required as input for PATCH.ftl
-            if (objects[objectName].config.value) {
-              let value = this.#resolveSynchronize(target, neId, '/'+objects[objectName].config.target, objects[objectName].config.value);
-              sitesConfigs[neId][objectName].value = JSON.stringify(value);
-            }
+      // Recall nodal configuration elements from previous synchronize (for cleanup/housekeeping)
+      if (topology && topology.getXtraInfo()!==null && !topology.getXtraInfo().isEmpty()) {
+        topology.getXtraInfo().forEach(item => {
+          if (item.getKey() === 'sitesCleanups') {
+            sitesCleanups = JSON.parse(item.getValue());
+            sitesConfigs  = JSON.parse(item.getValue()); // deep-clone of sitesCleanups
+            logger.info("sitesCleanups restored: "+item.getValue());
           }
-        }
-      });
-    }
-    
-    // Deploy changes to target devices and update topology objects and xtra-data
-    if (state === "active" || state === "suspend" || state === "delete") {
-      let topologyObjects = [];
-      for (const neId in sitesConfigs) {
-        const body = utilityService.processTemplate(yangPatchTemplate, {'patchId': target, 'patchItems': sitesConfigs[neId]});
-        
-        let result = this.#restconfPatchDevice(neId, body);
-        
-        if (result.success) {
-          // RESTCONF YANG PATCH was successful
-          //  - objects that have been added/updated are added to the new topology
-          //  - objects that have been added/updated are added to siteCleanups (extraData) to enable housekeeping
-          
-          sitesCleanups[neId] = {};
-          for (const objectName in sitesConfigs[neId]) {
-            if (sitesConfigs[neId][objectName]["operation"]==="replace") {
-              // For operation "replace" remember how to clean-up the object created (house-keeping).
-              // For cleanup we are using operation "remove", to avoid the operation from failing,
-              // if the corresponding device configuration was deleted from the network already.
-              
-              sitesCleanups[neId][objectName] = {'target': sitesConfigs[neId][objectName].target, 'operation': 'remove'};
-              topologyObjects.push(topologyFactory.createTopologyObjectFrom(objectName, sitesConfigs[neId][objectName].target, "INFRASTRUCTURE", neId));
-            }
-
-            // NOTE:
-            //   Operations "merge", and "remove" will not be reverted back!
-            //   Operations "create", and "delete" should not be used (not reverted back either)!
-          }
-          
-          if (Object.keys(sitesCleanups[neId]).length === 0)
-            delete sitesCleanups[neId];
-          
-        } else {
-          logger.error("Deployment on {} failed with error:\n{}", neId, result.errmsg);
-          deploymentErrors.push(result.errmsg);
-          
-          // RESTCONF YANG PATCH failed
-          //  - Keep siteCleanups (extraData) for this site to enable housekeeping
-          //  - Generate topology from siteCleanup (same content as it was before)
-          
-          if (neId in sitesCleanups) {
-            for (const objectName in sitesCleanups[neId]) {
-              topologyObjects.push(topologyFactory.createTopologyObjectFrom(objectName, sitesCleanups[neId][objectName].target, "INFRASTRUCTURE", neId));
-            }
-          }
-        }
-        
-        if (topology === null)
-          topology = topologyFactory.createServiceTopology();
-
-        let xtrainfo = topologyFactory.createTopologyXtraInfoFrom("sitesCleanups", JSON.stringify(sitesCleanups));
-
-        topology.setXtraInfo([xtrainfo]);
-        topology.setTopologyObjects(topologyObjects);
+        });
       }
-    }
 
-    syncResult.setTopology(topology);
-    
-    if (deploymentErrors.length > 0) {
+      // Secure resources from Resource Admin
+      // Right now, we are assuming that reservation is required in any state but delete
+
+      if (state !== 'delete')
+        this.#logic.obtainResources(target, config);
+
+      if (state === "active") {
+        const global = this.#logic.getGlobalParameters(target, config);
+
+        // Iterate sites to populate/update sitesConfigs per target device
+        this.#logic.getSiteParameters(target, config, this.#deviceCache).forEach(site => {
+          const neId = site['ne-id'];
+          const neInfo = mds.getAllInfoFromDevices(neId);
+          const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+          const neType = neFamilyTypeRelease.split(':')[0];
+          const neVersion = neFamilyTypeRelease.split(':')[1];
+
+          // ensure we've got the user-friendly deviceName
+          site['ne-name'] = this.#deviceCache[neId];
+
+          if (!(neId in sitesConfigs))
+            sitesConfigs[neId] = {};
+
+          const siteFTL = resourceProvider.getResource(this.#logic.getTemplateName(neId, neType));
+          const objects = JSON.parse(utilityService.processTemplate(siteFTL, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'sync'}));
+            
+          for (const objectName in objects) {
+            if ("config" in objects[objectName]) {
+              sitesConfigs[neId][objectName] = objects[objectName].config;
+                  
+              // Convert 'value' object to JSON string as required as input for PATCH.ftl
+              if (objects[objectName].config.value) {
+                let value = this.#resolveSynchronize(target, neId, '/'+objects[objectName].config.target, objects[objectName].config.value);
+                sitesConfigs[neId][objectName].value = JSON.stringify(value);
+              }
+            }
+          }
+        });
+      }
+
+      // Deploy changes to target devices and update topology objects and xtra-data
+      if (state === "active" || state === "suspend" || state === "delete") {
+        let topologyObjects = [];
+        for (const neId in sitesConfigs) {
+          const body = utilityService.processTemplate(yangPatchTemplate, {'patchId': target, 'patchItems': sitesConfigs[neId]});
+          
+          let result = this.#restconfPatchDevice(neId, body);
+          
+          if (result.success) {
+            // RESTCONF YANG PATCH was successful
+            //  - objects that have been added/updated are added to the new topology
+            //  - objects that have been added/updated are added to siteCleanups (extraData) to enable housekeeping
+            
+            sitesCleanups[neId] = {};
+            for (const objectName in sitesConfigs[neId]) {
+              if (sitesConfigs[neId][objectName]["operation"]==="replace") {
+                // For operation "replace" remember how to clean-up the object created (house-keeping).
+                // For cleanup we are using operation "remove", to avoid the operation from failing,
+                // if the corresponding device configuration was deleted from the network already.
+                
+                sitesCleanups[neId][objectName] = {'target': sitesConfigs[neId][objectName].target, 'operation': 'remove'};
+                topologyObjects.push(topologyFactory.createTopologyObjectFrom(objectName, sitesConfigs[neId][objectName].target, "INFRASTRUCTURE", neId));
+              }
+
+              // NOTE:
+              //   Operations "merge", and "remove" will not be reverted back!
+              //   Operations "create", and "delete" should not be used (not reverted back either)!
+            }
+            
+            if (Object.keys(sitesCleanups[neId]).length === 0)
+              delete sitesCleanups[neId];
+            
+          } else {
+            if (neId in this.#deviceCache) {
+              logger.error("Deployment on {} ({}) failed with {}", this.#deviceCache[neId], neId, result.errmsg);
+              syncErrors.push("[site: "+this.#deviceCache[neId]+", "+neId+"] "+result.errmsg);
+            } else {
+              logger.error("Deployment on {} failed with {}", neId, result.errmsg);
+              syncErrors.push("[site: "+neId+"] "+result.errmsg);
+            }
+            
+            // RESTCONF YANG PATCH failed
+            //  - Keep siteCleanups (extraData) for this site to enable housekeeping
+            //  - Generate topology from siteCleanup (same content as it was before)
+            
+            if (neId in sitesCleanups) {
+              for (const objectName in sitesCleanups[neId]) {
+                topologyObjects.push(topologyFactory.createTopologyObjectFrom(objectName, sitesCleanups[neId][objectName].target, "INFRASTRUCTURE", neId));
+              }
+            }
+          }
+          
+          if (topology === null)
+            topology = topologyFactory.createServiceTopology();
+
+          let xtrainfo = topologyFactory.createTopologyXtraInfoFrom("sitesCleanups", JSON.stringify(sitesCleanups));
+
+          topology.setXtraInfo([xtrainfo]);
+          topology.setTopologyObjects(topologyObjects);
+        }
+      }
+
+      syncResult.setTopology(topology);
+    } catch (err) {
+      syncErrors.push(err.message);
+    }
+  
+    if (syncErrors.length > 0) {
       syncResult.setSuccess(false);
       syncResult.setErrorCode("500");
-      syncResult.setErrorDetail(deploymentErrors.toString());    
+      syncResult.setErrorDetail(syncErrors.join('; '));    
     } else {
       syncResult.setSuccess(true);
       if (state === 'delete')
@@ -961,8 +1048,7 @@ export class IntentHandler extends CalloutHandler
     * Compares actual against desired configuration to produce the AuditReport.
     * 
     * @param {} input input provided by intent-engine
-    * 
-    * @throws {RuntimeException} config/state retrieval failed
+    * @returns {AuditReport} audit report
     * 
     **/
 
@@ -977,127 +1063,141 @@ export class IntentHandler extends CalloutHandler
 
     var topology    = input.getCurrentTopology();
     var auditReport = new AuditReport();
+    auditReport.setIntentType(this.#logic.INTENT_TYPE);
+    auditReport.setTarget(target);
 
-    // Recall nodal configuration elements from previous synchronize
-    var obsoleted = {};
-    if (topology && topology.getXtraInfo()!==null && !topology.getXtraInfo().isEmpty()) {
-      topology.getXtraInfo().forEach(item => {
-        if (item.getKey() === 'sitesCleanups') {
-          obsoleted = JSON.parse(item.getValue());
-        }
-      });
-    }
-    
-    if (state === 'active') {
-      // Obtain resources from Resource Admin
-      // Remind, this is done even if the intent was not synchronized before!
-      // Required for getSiteParameters() and getGlobalParameters()
-      this.#logic.obtainResources(target, config);
-      const global = this.#logic.getGlobalParameters(target, config);
+    try {
+      // Update device-cache (as needed)
+      this.#updateDeviceCache();
 
-      // Iterate sites to populate/update sitesConfigs per target device
-      this.#logic.getSiteParameters(target, config).forEach(site => {
-        const neId = site['ne-id'];
-        const neInfo = mds.getAllInfoFromDevices(neId);
-        const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
-        const neType = neFamilyTypeRelease.split(':')[0];
-        const neVersion = neFamilyTypeRelease.split(':')[1];
-
-        const siteFTL = resourceProvider.getResource(this.#logic.getTemplateName(neId, neType));
-        const objects = JSON.parse(utilityService.processTemplate(siteFTL, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'audit'}));
-
-        // Audit device configuration
-        for (const objectName in objects) {
-          if ("config" in objects[objectName]) {
-            const result = this.#restconfGetDevice(neId, objects[objectName].config.target+"?content=config");
-            if (result.success) {
-              let iCfg = objects[objectName].config.value;
-              for (const key in iCfg) {
-                iCfg = iCfg[key];
-                break;
-              }
-              
-              let aCfg = result.response;
-              for (const key in aCfg) {
-                aCfg = aCfg[key];
-                break;
-              }
-
-              if (Array.isArray(aCfg))
-                if (aCfg.length === 0) {
-                  // an empty was returned
-                  // missing object: is-configured=true, is-undesired=default(false)
-                  auditReport.addMisAlignedObject(new MisAlignedObject('/'+objects[objectName].config.target, true, neId));
-                  aCfg = null;
-                } else {
-                  // Due to the nature of RESTCONF GET, we've received a single entry list
-                  // Execute the audit against this single entry
-                  aCfg = aCfg[0];
-                }
-
-              if (aCfg) {
-                this.#compareConfig(neId, objects[objectName].config.target, aCfg, iCfg, objects[objectName].config.operation, objects[objectName].config.ignoreChildren, auditReport, neId, '');
-                // this.#compareConfig(neId, objects[objectName].config.target, aCfg, iCfg, objects[objectName].config.operation, objects[objectName].config.ignoreChildren, auditReport, objectName, '');
-              }
-            }
-            else if (result.errmsg === "Not Found") {
-              // get failed, because path is not configured
-              // missing object: is-configured=true, is-undesired=default(false)
-              auditReport.addMisAlignedObject(new MisAlignedObject('/'+objects[objectName].config.target, true, neId));
-            } else {
-              logger.error("RESTCONF GET failed with error:\n" + result.errmsg);
-              throw new RuntimeException("RESTCONF GET failed with " + result.errmsg);
-            }
-
-            // Configuration object is still present, remove from obsoleted
-            if (neId in obsoleted)
-              if (objectName in obsoleted[neId])
-                delete obsoleted[neId][objectName];
+      // Recall nodal configuration elements from previous synchronize
+      var obsoleted = {};
+      if (topology && topology.getXtraInfo()!==null && !topology.getXtraInfo().isEmpty()) {
+        topology.getXtraInfo().forEach(item => {
+          if (item.getKey() === 'sitesCleanups') {
+            obsoleted = JSON.parse(item.getValue());
           }
-        }
+        });
+      }
 
-        for (const objectName in objects) {
-          if ("health" in objects[objectName]) {
-            for (const path in objects[objectName].health) {
-              const iState = objects[objectName].health[path];
-              const result = this.#restconfGetDevice(neId, path);
+      if (state === 'active') {
+        // Obtain resources from Resource Admin
+        // Remind, this is done even if the intent was not synchronized before!
+        // Required for getSiteParameters() and getGlobalParameters()
+        this.#logic.obtainResources(target, config);
+        const global = this.#logic.getGlobalParameters(target, config);
+
+        // Iterate sites to populate/update sitesConfigs per target device
+        this.#logic.getSiteParameters(target, config, this.#deviceCache).forEach(site => {
+          const neId = site['ne-id'];
+          const neInfo = mds.getAllInfoFromDevices(neId);
+          const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+          const neType = neFamilyTypeRelease.split(':')[0];
+          const neVersion = neFamilyTypeRelease.split(':')[1];
+
+          // ensure we've got the user-friendly deviceName
+          site['ne-name'] = this.#deviceCache[neId];
+
+          const siteFTL = resourceProvider.getResource(this.#logic.getTemplateName(neId, neType));
+          const objects = JSON.parse(utilityService.processTemplate(siteFTL, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'audit'}));
+
+          // Audit device configuration
+          for (const objectName in objects) {
+            if ("config" in objects[objectName]) {
+              const result = this.#restconfGetDevice(neId, objects[objectName].config.target+"?content=config");
               if (result.success) {
-                let aState = result.response;
-                for (const key in aState) {
-                  aState = aState[key];
+                let iCfg = objects[objectName].config.value;
+                for (const key in iCfg) {
+                  iCfg = iCfg[key];
                   break;
                 }
-                if (Array.isArray(aState))
-                  aState = aState[0];
+                
+                let aCfg = result.response;
+                for (const key in aCfg) {
+                  aCfg = aCfg[key];
+                  break;
+                }
 
-                this.#compareState(neId, aState, iState, auditReport, '/'+path);
-              } 
+                if (Array.isArray(aCfg))
+                  if (aCfg.length === 0) {
+                    // an empty was returned
+                    // missing object: is-configured=true, is-undesired=default(false)
+                    auditReport.addMisAlignedObject(new MisAlignedObject('/'+objects[objectName].config.target, true, neId));
+                    aCfg = null;
+                  } else {
+                    // Due to the nature of RESTCONF GET, we've received a single entry list
+                    // Execute the audit against this single entry
+                    aCfg = aCfg[0];
+                  }
+
+                if (aCfg)
+                  this.#compareConfig(neId, objects[objectName].config.target, aCfg, iCfg, objects[objectName].config.operation, objects[objectName].config.ignoreChildren, auditReport, neId, '');
+              }
               else if (result.errmsg === "Not Found") {
-                // get failed, because path is not available
-                // missing state object: is-configured=false, is-undesired=default(false)
-                auditReport.addMisAlignedObject(new MisAlignedObject('/'+path, false, neId));
-                // this.#compareState(neId, {}, iState, auditReport, '/'+path);
+                // get failed, because path is not configured
+                // missing object: is-configured=true, is-undesired=default(false)
+                auditReport.addMisAlignedObject(new MisAlignedObject('/'+objects[objectName].config.target, true, neId));
               } else {
-                logger.error("RESTCONF GET failed with error:\n" + result.errmsg);
-                throw new RuntimeException("RESTCONF GET failed with " + result.errmsg);
+                logger.error("RESTCONF GET failed with {}" + result.errmsg);
+                throw new Error("RESTCONF GET failed with " + result.errmsg);
+              }
+
+              // Configuration object is still present, remove from obsoleted
+              if (neId in obsoleted)
+                if (objectName in obsoleted[neId])
+                  delete obsoleted[neId][objectName];
+            }
+          }
+
+          for (const objectName in objects) {
+            if ("health" in objects[objectName]) {
+              for (const path in objects[objectName].health) {
+                const iState = objects[objectName].health[path];
+                const result = this.#restconfGetDevice(neId, path);
+                if (result.success) {
+                  let aState = result.response;
+                  for (const key in aState) {
+                    aState = aState[key];
+                    break;
+                  }
+                  if (Array.isArray(aState))
+                    aState = aState[0];
+
+                  this.#compareState(neId, aState, iState, auditReport, path);
+                } 
+                else if (result.errmsg === "Not Found") {
+                  // get failed, because path is not available
+                  // missing state object: is-configured=false, is-undesired=default(false)
+                  auditReport.addMisAlignedObject(new MisAlignedObject('/'+path, false, neId));
+                } else {
+                  logger.error("RESTCONF GET failed with {}", result.errmsg);
+                  throw new Error("RESTCONF GET failed with " + result.errmsg);
+                }
               }
             }
           }
-        }
-      });
+        });
+      }
+
+      // Report undesired objects: is-configured=true, is-undesired=true
+      for (const neId in obsoleted)
+        for (const objectName in obsoleted[neId])
+          auditReport.addMisAlignedObject(new MisAlignedObject('/'+obsoleted[neId][objectName].target, true, neId, true));
+
+      auditReport = this.#resolveAudit(auditReport);
+    } catch (err) {
+      auditReport.setErrorCode("500");
+      auditReport.setErrorDetail(err.message);
+
+      // under review with altiplano-team:
+      // auditReport.setSuccess(false);
+      throw err;
     }
-
-    // Report undesired objects: is-configured=true, is-undesired=true
-    for (const neId in obsoleted)
-      for (const objectName in obsoleted[neId])
-        auditReport.addMisAlignedObject(new MisAlignedObject('/'+obsoleted[neId][objectName].target, true, neId, true));
-
-    const resolvedAuditReport =  this.#resolveAudit(target, auditReport);
 
     const duration = Date.now()-startTS;
     logger.info("IntentHandler::onAudit() finished within {} ms", duration|0);
       
-    return resolvedAuditReport;
+    return auditReport;
   }
 
   /**
@@ -1121,12 +1221,15 @@ export class IntentHandler extends CalloutHandler
     
     // Iterate sites to get indiciators
     let indicators = {};
-    this.#logic.getSiteParameters(target, config).forEach(site => {
+    this.#logic.getSiteParameters(target, config, this.#deviceCache).forEach(site => {
       const neId = site['ne-id'];
       const neInfo = mds.getAllInfoFromDevices(neId);
       const neFamilyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
       const neType = neFamilyTypeRelease.split(':')[0];
       const neVersion = neFamilyTypeRelease.split(':')[1];
+
+      // ensure we've got the user-friendly deviceName
+      site['ne-name'] = this.#deviceCache[neId];
       
       const global  = this.#logic.getGlobalParameters(target, config);
       const siteFTL = resourceProvider.getResource(this.#logic.getTemplateName(neId, neType));
