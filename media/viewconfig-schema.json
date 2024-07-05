@@ -16,17 +16,17 @@
                 "readOnly": {
                     "markdownDescription": "Attribute is read-only, blocked from getting modified by the user.",
                     "type": "boolean",
-                    "default": false
+                    "default": true
                 },
                 "visible": {
                     "markdownDescription": "Attribute is hidden from the input form.",
                     "type": "boolean",
-                    "default": true
+                    "default": false
                 },
                 "required": {
                     "markdownDescription": "Attribute is mandatory. Must be present to submit the form to create/update the intent.",
                     "type": "boolean",
-                    "default": false
+                    "default": true
                 },
                 "default": {
                     "markdownDescription": "Default value for attribute."
@@ -43,13 +43,12 @@
                 "columnSpan": {
                     "markdownDescription": "Defines the component width within the input form grid.",
                     "type": "integer",
-                    "default": 2,
                     "minimum": 1
                 },
                 "newRow": {
                     "markdownDescription": "Shows the input component on the next line.",
                     "type": "boolean",
-                    "default": false
+                    "default": true
                 },
                 "type": {
                     "type": "string",
