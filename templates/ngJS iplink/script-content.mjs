@@ -19,14 +19,14 @@ class IPLink extends (IntentLogic) {
       contextualErrorJsonObj["Value inconsistency"] = "endpoint-a and endpoint-b must resite on different devices!";
   }
 
-  static getSiteParameters(target, config) {
+  static getSiteParameters(target, config, siteNames) {
     var sites = [];
     sites.push(config["endpoint-a"]);
     sites.push(config["endpoint-b"]);
 
     // Obtain ne-name from NSP inventory
-    sites[0]['ne-name'] = IntentHandler.getDeviceDetails(sites[0]['ne-id'])['ne-name'];
-    sites[1]['ne-name'] = IntentHandler.getDeviceDetails(sites[1]['ne-id'])['ne-name'];
+    sites[0]['ne-name'] = siteNames[sites[0]['ne-id']];
+    sites[1]['ne-name'] = siteNames[sites[1]['ne-id']];
 
     // Obtain an /31 subnet
     var subnet = ResourceAdmin.getSubnet("ip-pool", "global", target);

@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-  "[${site.ne\-name}] INTERFACE ${site.port\-id}": {
+  "INTERFACE ${site.port\-id}": {
     "config": {
       "target": "srl_nokia-interfaces:/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -45,7 +45,7 @@
       }
     }
   },
-  "[${site.ne\-name}] LLDP INTERFACE ${site.port\-id}": {
+  "LLDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "srl_nokia-system:/system/srl_nokia-lldp:lldp/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -70,7 +70,7 @@
       }
     }      
   },
-  "[${site.ne\-name}] IP INTERFACE BINDING ${site.port\-id}.1": {
+  "IP INTERFACE BINDING ${site.port\-id}.1": {
     "config": {
       "target": "srl_nokia-network-instance:/network-instance=default/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",
@@ -97,7 +97,7 @@
       }
     }
   },
-  "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}.1": {
+  "ISIS INTERFACE ${site.port\-id}.1": {
     "config": {
       "target": "srl_nokia-network-instance:/network-instance=default/protocols/srl_nokia-isis:isis/instance=0/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",

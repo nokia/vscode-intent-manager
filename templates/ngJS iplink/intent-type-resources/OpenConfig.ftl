@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {  
-  "[${site.ne\-name}] INTERFACE ${site.port\-id}": {
+  "INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-interfaces:/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -75,7 +75,7 @@
       }
     }
   },
-  "[${site.ne\-name}] LLDP INTERFACE ${site.port\-id}": {
+  "LLDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-lldp:/lldp/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -90,7 +90,7 @@
       }
     }
   },
-  "[${site.ne\-name}] NETWORK INTERFACE ${site.port\-id}": {
+  "NETWORK INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-network-instance:/network-instances/network-instance=Base/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -107,7 +107,7 @@
       }
     }
   },
-  "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}": {
+  "ISIS INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-network-instance:/network-instances/network-instance=Base/protocols/protocol=ISIS,0/isis/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -168,7 +168,7 @@
 -->        
     }      
   },
-  "[${site.ne\-name}] MPLS INTERFACE ${site.port\-id}": {
+  "MPLS INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-network-instance:/network-instances/network-instance=Base/mpls/global/interface-attributes/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -188,7 +188,7 @@
       }
     }
   },
-  "[${site.ne\-name}] TE INTERFACE ${site.port\-id}": {
+  "TE INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-network-instance:/network-instances/network-instance=Base/mpls/te-interface-attributes/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -208,7 +208,7 @@
       }
     }
   },
-  "[${site.ne\-name}] LDP INTERFACE ${site.port\-id}": {
+  "LDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "openconfig-network-instance:/network-instances/network-instance=Base/mpls/signaling-protocols/ldp/interface-attributes/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",

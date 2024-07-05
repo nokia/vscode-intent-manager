@@ -1,5 +1,5 @@
 <state-report xmlns="http://www.nokia.com/management-solutions/ibn">
-  <iplink-state xmlns="http://www.nokia.com/management-solutions/iplink-graal">
+  <{{ intent_type }}-state xmlns="http://www.nokia.com/management-solutions/{{ intent_type }}">
     <subnet>${state.subnet}</subnet>
 <#if indicators.state??>
     <oper-state>${indicators.state?values[0]}</oper-state>
@@ -17,5 +17,5 @@
       <utilization>${indicators.utilization?values[0]?c}</utilization>
 </#if>
     </performance>
-   </iplink-state>
+   </{{ intent_type }}-state>
 </state-report>

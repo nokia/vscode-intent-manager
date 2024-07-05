@@ -188,14 +188,14 @@ Updates:
 * New IPL!nk template for next-gen JavaScript engine (GraalJS)
 * Hide empty tabs in audit report
 
-## [2.5.1]
+## [3.0.0]
 
-- Certain settings have been moved to workspace settings rather than global user settings.
-
-- To allow for multi-server support, the active NSP server, the port, and connection details (user/pass) have been moved to workspace settings (window scope instead of application scope). This allows for different workspaces to connect to different NSP servers.
-
-- Implemented a command function nokia-intent-manager.connect (Provides support for NSP-Connect extension):
-
-- The command can be called by other extensions (NSP-connect - not released yet) to connect to the NSP server using certain credentials specified by the NSP-connect extension.
-
-- This does not affect the current functionality of the IM extension.
+Updates:
+* IPL!nk for GraalJS to support assurance/state (experimental)
+* IPL!nk for GraalJS to cache device-names (experimental)
+* IPL!nk for GraalJS to provide better logging / error-messages
+* NSP connection settings per workspace (enable multi-server support)
+* Validation for *.viewConfig files (partial coverage)
+* NSP release and OSD version improvements (performance/robbustness)
+* Retrieve list of intents including config (fix)
+* Implemented a command function nokia-intent-manager.connect (Provides support for NSP-Connect extension):
