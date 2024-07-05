@@ -187,3 +187,15 @@ Updates:
 * Show NSP version as {major}.{minor}. With this "24.4.0" is displayed now as "24.4".
 * New IPL!nk template for next-gen JavaScript engine (GraalJS)
 * Hide empty tabs in audit report
+
+## [2.5.1]
+
+- Certain settings have been moved to workspace settings rather than global user settings.
+
+- To allow for multi-server support, the active NSP server, the port, and connection details (user/pass) have been moved to workspace settings (window scope instead of application scope). This allows for different workspaces to connect to different NSP servers.
+
+- Implemented a command function nokia-intent-manager.connect (Provides support for NSP-Connect extension):
+
+- The command can be called by other extensions (NSP-connect - not released yet) to connect to the NSP server using certain credentials specified by the NSP-connect extension.
+
+- This does not affect the current functionality of the IM extension.

@@ -78,7 +78,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	};
 
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
-    private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
+    private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>; // = new vscode.EventEmitter(); it is defined in constructor
 
 	/**
 	 * Create IntentManagerProvider
@@ -190,10 +190,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
                     } else {
 						this.pluginLogs.warn("NSP response:", response.status, json.error);
-
 						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
 						this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-
 						this.authToken = undefined; // Reset authToken on error
                         reject("Authentication Error!");
 					}
@@ -215,8 +213,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	/**
 	 * Gracefully revoke NSP auth-token.
-	 */	
-
+	 */
 	private async _revokeAuthToken(): Promise<void> {
 		if (this.authToken) {
 			const token = await this.authToken;
@@ -263,7 +260,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					"Accept": "application/yang-data+json",
 					"Authorization": "Bearer " + token
 				};
-			else
+			else 
 				options.headers = {
 					'Content-Type': "application/json",
 					'Accept': "application/json",	
@@ -1384,7 +1381,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 			DECORATION_CONNECTED.tooltip = "Connecting..."; // revert to original text
 			DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
-
 			this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 		}	
 
