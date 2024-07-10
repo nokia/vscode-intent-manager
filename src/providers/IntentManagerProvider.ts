@@ -112,8 +112,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.nspVersion = undefined;
 		this.osdVersion = undefined;
 
-		this.serverLogs = vscode.window.createOutputChannel('nsp-server-logs/intents', 'log');
-		this.pluginLogs = vscode.window.createOutputChannel('nsp-intent-manager-plugin', {log: true});
+		this.serverLogs = vscode.window.createOutputChannel('NSP Server (remote logs)', 'log');
+		this.pluginLogs = vscode.window.createOutputChannel('NSP Client (plugin logs)', {log: true});
 
 		this.authToken = undefined;
 
@@ -257,7 +257,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!token)
 				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 
-			if (url.startsWith('/restconf'))
+			if (url.startsWith('/restconf') || url.startsWith('/mdt/rest/restconf'))
 				options.headers = {
 					"Content-Type": "application/yang-data+json",
 					"Accept": "application/yang-data+json",
@@ -912,10 +912,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					for (const resource of this.intentTypes[intent_type_folder].data.resource) {
 						if (resource.name === resourcename)
 							return {type: vscode.FileType.File, ctime: 0, mtime: timestamp, size: 0, permissions: access};
-						if (resource.name.startsWith(resourcename))
-							return {type: vscode.FileType.Directory, ctime: 0, mtime: timestamp, size: 0, permissions: vscode.FilePermission.Readonly};
+						if (resource.name.startsWith(resourcename+'/'))
+							return {type: vscode.FileType.Directory, ctime: 0, mtime: timestamp, size: 0, permissions: access};
 					}
 					this.pluginLogs.warn("Resource "+resourcename+" not found!");
+					throw vscode.FileSystemError.FileNotFound('Unknown resouce!');
 				}
 		
 				if (parts[2]==="views") {
@@ -1203,28 +1204,38 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					throw vscode.FileSystemError.NoPermissions("Deletion of "+path+" is prohibited");
 				}
 
-				let url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+intent_type+","+intent_type_version;
-
+				let url:string|undefined = undefined;
 				if (parts.length>3) {
 					if (parts[2]==="intents") {
 						const target = decodeURIComponent(parts[3].slice(0,-5)); // remove .json extension and decode
-						url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
+						url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}`;
 						this.pluginLogs.info("delete intent", intent_type, target);
-					} else if (parts[2]==="intent-type-resources") {
-						const resourcename = parts.slice(3).join("/");
-						url = url+"/resource="+encodeURIComponent(resourcename);
-						this.pluginLogs.info("delete resource", intent_type, resourcename);
 					} else if (parts[2]==="yang-modules") {
 						const modulename = parts[3];
-						url = url+"/module="+modulename;
+						url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}/module=${modulename}`;
 						this.pluginLogs.info("delete module", intent_type, modulename);
 					} else if (parts[2]==="views") {
 						const viewname = parts[3].slice(0,-11); // remove .viewConfig extension
-						url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version+"/views="+viewname;
+						url = `/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs=${intent_type},${intent_type_version}/views=${viewname}`;
 						this.pluginLogs.info("delete view", intent_type, viewname);
-					}
+					} else if (parts[2]==="intent-type-resources") {
+						const resourcepath = parts.slice(3).join("/");
+						const resources = this.intentTypes[intent_type_folder].data.resource.filter((resource:{name:string, value:string}) => resource.name.startsWith(resourcepath));
+						if (resources.length>0)
+							for (const resource of resources) {
+								this.pluginLogs.info("delete resource", intent_type, resource.name);
+								const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}/resource=${encodeURIComponent(resource.name)}`;
+								const response: any = await this._callNSP(url, {method: "DELETE"});
+								if (!response)
+									throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+								if (!response.ok)
+									this._raiseRestconfError("Delete resource failed!", await response.json());
+							}
+						else throw vscode.FileSystemError.FileNotFound(`Unknown resource ${path}!`);
+					} else throw vscode.FileSystemError.Unavailable(`Delete ${path} unsupported!`);
 				} else {
 					this.pluginLogs.info("delete intent-type", intent_type);
+					url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
 
 					if (Object.keys(this.intentTypes[intent_type_folder].intents).length===0)
 						await this.readDirectory(vscode.Uri.joinPath(uri, "intents"));
@@ -1237,8 +1248,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 							for (const target of targets) {
 								this.pluginLogs.info("delete intent", intent_type, target);
-								const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
-
+								const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}`;
 								const response: any = await this._callNSP(url, {method: "DELETE"});
 								if (!response)
 									throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -1252,11 +1262,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					}
 				}
 
-				const response: any = await this._callNSP(url, {method: "DELETE"});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (!response.ok)
-					this._raiseRestconfError("Delete intent-type failed!", await response.json());
+				if (url) {
+					const response: any = await this._callNSP(url, {method: "DELETE"});
+					if (!response)
+						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+					if (!response.ok)
+						this._raiseRestconfError("Delete intent-type failed!", await response.json());	
+				}
 
 				// Deletion was successful, let's update the cache
 				if (parts.length>3) {
@@ -1295,7 +1307,45 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
 		this.pluginLogs.debug("rename(", oldUri, newUri, ")");
-		throw vscode.FileSystemError.NoPermissions('Unsupported operation!');	
+
+		const oldPath = oldUri.toString();
+		const oldParts = oldPath.split('/').map(decodeURIComponent);
+
+		const newPath = newUri.toString();
+		const newParts = newPath.split('/').map(decodeURIComponent);
+
+		const pattern = /^([a-z][a-z0-9_-]+)_v\d+$/;
+
+		if (oldParts.length>3 && pattern.test(oldParts[1]) && oldParts[2]==="intent-type-resources" &&
+			newParts.length>3 && newParts[1]===oldParts[1] && newParts[2]==="intent-type-resources")
+		{
+			const intent_type_folder = oldParts[1];
+			const intent_type_version = intent_type_folder.split('_v')[1];
+			const intent_type = intent_type_folder.split('_v')[0];
+
+			const oldprefix = oldParts.slice(3).join("/");
+			const newprefix = newParts.slice(3).join("/");
+
+			for (const resource of this.intentTypes[intent_type_folder].data.resource)
+				if (resource.name.startsWith(oldprefix)) {
+					const newname = newprefix + resource.name.substring(oldprefix.length);
+					this.pluginLogs.info(`renaming resource ${resource.name} to ${newname}`);
+					resource.name = newname;
+				}
+
+			const forCleanup = ["default-version"];
+			for (const parameter of forCleanup) delete this.intentTypes[intent_type_folder].data[parameter];
+			
+			const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
+			const body = {"ibn-administration:intent-type": this.intentTypes[intent_type_folder].data};
+
+			const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
+			if (!response)
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			if (response.ok)
+				vscode.window.showInformationMessage(intent_type_folder+" succesfully saved");
+
+		} else throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
 	}
 
 	/**
@@ -1309,11 +1359,16 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		const path = uri.toString();
 		const parts = path.split('/').map(decodeURIComponent);
-		const pattern = /^([a-z][a-z0-9_-]+)(_v\d+)?$/;
+		const pattern = /^([a-z][a-z0-9_-]+)_v1$/;
 
 		if (parts.length===2 && pattern.test(parts[1])) {
 			await this.newIntentTypeFromTemplate([uri]);
-		} else throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
+		}
+		if (parts.length>3 && parts[2]==="intent-type-resources") {
+			this.pluginLogs.info(uri.toString());
+			await this.writeFile(vscode.Uri.joinPath(uri, "__placeholder__"), Buffer.from(""), {create: true, overwrite: true});
+		}
+		else throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
 	}	
 
 	// --- SECTION: vscode.FileDecorationProvider implementation ------------
@@ -1870,6 +1925,40 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	}
 
 	/**
+	 * Update log-level for intent engine using IBN API
+	 * During design and for troubleshooting use log-level "debug"
+	 * 
+	 * To validate in karaf CLI run:
+	 * 
+	 * karaf@root()> log:get
+	 * Logger                                                                      | Level
+	 * ----------------------------------------------------------------------------+------
+	 * com.nokia.fnms.controller.ibn.impl.ScriptedEngine                           | DEBUG
+	 * com.nokia.fnms.controller.ibn.impl.graal.GraalJSScriptedEngine              | DEBUG
+	 * com.nokia.fnms.controller.ibn.impl.graal.IntentTypeResourcesFileSystem      | DEBUG
+	 * 
+	 */
+
+	public async setLogLevel() {
+		this.pluginLogs.debug("setLogLevel()");
+
+		const loglevels = [{label: "default"}, {label: "trace"}, {label: "debug"}, {label: "info"}, {label: "warn"}, {label: "error"}];
+		await vscode.window.showQuickPick(loglevels).then( async selection => {
+			if (selection) {
+				const url = "/mdt/rest/restconf/data/anv-platform:platform/anv-logging:logging/logger-config=ibn.intent,debug,global";
+				const body = {"anv-logging:logger-config": {"log-level": selection.label}};
+
+				const response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
+				if (!response)
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				if (response.ok) {
+					vscode.window.showInformationMessage("Intent engine log-level updated to "+selection.label);
+				} else this._raiseRestconfError("Update intent engine log-level failed!", await response.json());
+			}
+		});
+	}
+
+	/**
 	 * Get server logs for the intent script execution from OpenSearch. Filtering is applied
 	 * based on intent-type(s) and/or intent instances being selected.
 	 * 
@@ -1889,7 +1978,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	public async logs(args:any[]): Promise<void> {
 		this.pluginLogs.debug("logs()");
-		
+
 		const query : {[key: string]: any} = {
 			"bool": {
 				"must": [{
@@ -1973,7 +2062,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			let pdate = logs[0]['date'];
 			for (const logentry of logs) {
 				const timestamp = new Date(logentry.date);
-				const level = logentry.level;
+				const level = logentry.level.toLowerCase();
 				const target = logentry.target;
 				const intent_type = logentry.intent_type;
 				const intent_type_version = logentry.intent_type_version;
@@ -1987,10 +2076,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (logentry.date > pdate+30000)
 					this.serverLogs.appendLine("");
 
+				const logdate = timestamp.toLocaleDateString('en-CA', {year: 'numeric', month:  '2-digit', day:    '2-digit'});
+				const logtime = timestamp.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+				const ms      = String(timestamp.getMilliseconds()).padStart(3, '0');
+				
 				if (target)
-					this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type_folder + ' ' + target + "] " + message);
+					this.serverLogs.appendLine(`${logdate} ${logtime}.${ms} [${level}]\t[ ${intent_type_folder} ${target} ] ${message}`);				
 				else
-					this.serverLogs.appendLine(timestamp.toISOString().slice(-13) + " " + level+ "\t[" + intent_type_folder + "] " + message);
+					this.serverLogs.appendLine(`${logdate} ${logtime}.${ms} [${level}]\t[ ${intent_type_folder} ] ${message}`);
 
 				// append error-details, if available
 				if ('throwable' in logentry && logentry.throwable)

@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -105,6 +105,11 @@
         "command": "nokia-intent-manager.newIntentType",
         "category": "IntentManager",
         "title": "Create intent-type"
+      },
+      {
+        "command": "nokia-intent-manager.loglevel",
+        "category": "IntentManager",
+        "title": "Set log-level"
       }
     ],
     "menus": {
@@ -171,6 +176,11 @@
           "group": "nokia_im",
           "when": "resource =~ /^im:\\/$/"
         },
+        {
+          "command": "nokia-intent-manager.loglevel",
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/$/"
+        },       
         {
           "command": "nokia-intent-manager.newIntent",
           "group": "nokia_im",

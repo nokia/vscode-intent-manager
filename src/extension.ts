@@ -18,6 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.sync',  async (...args) => imProvider.sync(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.logs',  async (...args) => imProvider.logs(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.state', async (...args) => imProvider.setState(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.loglevel', async (...args) => imProvider.setLogLevel()));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.retrieveState', async (...args) => imProvider.retrieveState(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.lastAuditReport', async (...args) => imProvider.lastAuditReport(args)));
 	

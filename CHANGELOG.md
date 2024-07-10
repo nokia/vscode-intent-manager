@@ -199,3 +199,13 @@ Updates:
 * NSP release and OSD version improvements (performance/robbustness)
 * Retrieve list of intents including config (fix)
 * Implemented a command function nokia-intent-manager.connect (Provides support for NSP-Connect extension):
+
+## [3.1.0]
+
+Updates:
+* Set log-level for intent-engine to debug intent scripts
+* Renamed log/output channels to `NSP Server (remote logs)` and `NSP Client (plugin logs)`
+* Format of timestamps (date/time) aligned for server and client logs
+* Added support to create resource folders
+* Added support to rename/move intent-type resources and folders
+* Added support to remove resource folders
