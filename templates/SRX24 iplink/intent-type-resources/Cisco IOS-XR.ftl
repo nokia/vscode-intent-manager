@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-  "[${site.ne\-name}] INTERFACE ${site.port\-id}": {
+  "INTERFACE ${site.port\-id}": {
     "config": {
       "target": "Cisco-IOS-XR-um-interface-cfg:/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -10,7 +10,7 @@
                 "shutdown": {},
                 "mtu": 9000,
 <#if global.description??>
-                "description": "iplink: ${global.description}",
+                "description": "{{ intent_type }}: ${global.description}",
 </#if>
                 "ipv4": {
                     "addresses": {
@@ -26,7 +26,7 @@
     },
     "health": {}
   },
-  "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}": {
+  "ISIS INTERFACE ${site.port\-id}": {
     "config": {
       "target": "Cisco-IOS-XR-um-router-isis-cfg:/router/isis/processes/process=isis/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -46,7 +46,7 @@
     },
     "health": {}
   },
-  "[${site.ne\-name}] LDP INTERFACE ${site.port\-id}": {
+  "LDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "Cisco-IOS-XR-um-mpls-ldp-cfg:/mpls/ldp/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",

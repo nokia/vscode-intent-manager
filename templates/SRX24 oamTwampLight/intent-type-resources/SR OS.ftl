@@ -2,7 +2,7 @@
 <#assign sessionname="${site['ne-name']}_to_${site.peer['ne-name']}_${target}">
 
 {
-    "[${site.ne\-name}] TWAMP REFLECTOR": {
+    "TWAMP REFLECTOR": {
       "config": {
         "target": "nokia-conf:/configure/router=Base/twamp-light/reflector",
         "operation": "merge",
@@ -26,7 +26,7 @@
       }
     },
 
-    "[${site.ne\-name}] TWAMP STREAMING TEMPLATE": {
+    "TWAMP STREAMING TEMPLATE": {
       "config": {
         "target": "nokia-conf:/configure/oam-pm/streaming",
         "operation": "merge",
@@ -55,7 +55,7 @@
       }
     },
 
-    "[${site.ne\-name}] PM ACCOUNTING POLICY": {
+    "PM ACCOUNTING POLICY": {
       "config": {
         "target": "nokia-conf:/configure/log/accounting-policy=75",
         "operation": "merge",
@@ -73,7 +73,7 @@
       }
     },
 
-    "[${site.ne\-name}] PM ACC FILE POLICY": {
+    "PM ACC FILE POLICY": {
       "config": {
         "target": "nokia-conf:/configure/log/file=75",
         "operation": "merge",
@@ -90,7 +90,7 @@
       }
     },
 
-    "[${site.ne\-name}] TWAMP SESSION ${target}": {
+    "TWAMP SESSION ${target}": {
       "config": {
         "target": "nokia-conf:/configure/oam-pm/session=${sessionname}",
         "operation": "replace",

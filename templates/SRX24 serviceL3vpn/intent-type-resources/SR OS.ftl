@@ -1,7 +1,7 @@
 <#setting number_format="computer">
 {
 <#if site.ebgp??>
-    "[${site.ne\-name}] Export Policy": {
+    "Export Policy": {
         "config": {
             "target": "nokia-conf:/configure/policy-options/policy-statement=export-all-${target}",
             "operation": "replace",
@@ -26,7 +26,7 @@
             }
         }
     },
-    "[${site.ne\-name}] Import Policy": {
+    "Import Policy": {
         "config": {
             "target": "nokia-conf:/configure/policy-options/policy-statement=import-all-${target}",
             "operation": "replace",
@@ -45,7 +45,7 @@
         }
     },
 </#if>
-    "[${site.ne\-name}] VPRN Site": {
+    "VPRN Site": {
         "config": {
             "target": "nokia-conf:/configure/service/vprn=${target?url('ISO-8859-1')}",
             "operation": "replace",

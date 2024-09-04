@@ -1,20 +1,20 @@
 module {{ intent_type }} {
   namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
   prefix {{ intent_type }};
-  
-  organization
-    "{{ author }}";
-  contact
-    "{{ author }}";
-  description
-    "";
 
-  revision "{{ date }}" {
+  organization
+    "NOKIA";
+  contact
+    "NSP DevOps";
+  description
+    "base device configuration (day1)";
+
+  revision "2024-07-17" {
     description
       "Initial revision.";
   }
 
-  container {{ intent_type }} {   
+  container {{ intent_type }} {
     container location {
       leaf name {
         type string;
@@ -50,5 +50,5 @@ module {{ intent_type }} {
     leaf contact {
       type string;
     }
-  }
+  }  
 }

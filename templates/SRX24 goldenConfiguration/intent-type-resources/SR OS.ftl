@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-    "[${site.ne\-name}] SYSTEM": {
+    "SYSTEM": {
         "config": {
             "target": "nokia-conf:/configure/system",
             "operation": "merge",
@@ -24,7 +24,7 @@
         }
     },
   
-    "[${site.ne\-name}] QOS": {
+    "COMMON QOS POLICIES": {
         "config": {
             "target": "nokia-conf:/configure/qos",
             "operation": "merge",
@@ -41,10 +41,10 @@
         }
     },  
 
-    "[${site.ne\-name}] ETH-CFM level 7": {
+    "ETH-CFM domain/level 7": {
         "config": {
             "target": "nokia-conf:/configure/eth-cfm",
-            "operation": "merge",
+            "operation": "replace",
             "value": {
                 "nokia-conf:eth-cfm": {
                     "domain": [{
@@ -58,7 +58,7 @@
         }
     },
   
-    "[${site.ne\-name}] BASE ROUTER": {
+    "BASE ROUTER": {
         "config": {
             "target": "nokia-conf:/configure/router=Base",
             "operation": "merge",
@@ -66,40 +66,30 @@
                 "nokia-conf:router": {
                     "router-name": "Base",
                     "autonomous-system": 65000,
-                    "router-id": "${site.routerId}",
-                  
-                    "interface": [{
-                      "interface-name": "system",
-                      "ipv4": {
-                        "primary": {
-                          "address": "${site.systemIp}",
-                          "prefix-length": 32
-                        }
-                      }
-                    }],
-                  
+                    "router-id": "10.${site.countryCode?string}.0.${site.nodeId?string}",
+                                    
                     "isis": [{
                       "isis-instance": 0,
                       "admin-state": "enable",
-                      "level-capability": "1",
+                      "level-capability": "2",
                       "lsp-lifetime": 65535,
-                      "system-id": "${site.systemId}",
+                      "system-id": "0000.${site.countryCode?string('0000')}.${site.nodeId?string('0000')}",
                       "traffic-engineering": true,
-                      "area-address": ["${site.isisArea}"],
+                      "area-address": ["${site.countryCode?string}.cafe.cafe.cafe"],
                       "interface": [{
                         "interface-name": "system",
                         "passive": true,
-                        "level-capability": "1"
+                        "level-capability": "2"
                       }],
                       "level": [{
-                          "level-number": "1",
+                          "level-number": "2",
                           "wide-metrics-only": true
                       }]
                     }],
                   
                     "bgp": {
                         "admin-state": "enable",
-<#if site.ne\-id = '10.10.10.1'>
+<#if site.nodeId = 1>
                         "vpn-apply-export": true,
                         "vpn-apply-import": true,
                         "peer-ip-tracking": true,
@@ -120,7 +110,7 @@
                                 "vpn-ipv6": true,
                                 "evpn": true
                             },
-<#if site.ne\-id = '10.10.10.1'>
+<#if site.nodeId = 1>
                             "cluster": {
                                 "cluster-id": "1.1.1.1"
                             },
@@ -134,7 +124,6 @@
                     "ospf": [{
                         "ospf-instance": 0,
                         "admin-state": "enable",
-                        "router-id": "${site.systemIp}",
                         "advertise-router-capability": "area",
                         "traffic-engineering": true,
                         "loopfree-alternate": {
@@ -147,7 +136,7 @@
                                 {
                                     "interface-name": "system",
                                     "node-sid": {
-                                        "index": ${site.nodeSID}
+                                        "index": ${site.nodeId}
                                     }
                                 }
                             ]
@@ -170,10 +159,10 @@
                               "frr-method": "facility"
                           }
                         }],
-                        "auto-lsp": {
+                        "auto-lsp": [{
                             "template-name": "Full-Mesh",
                             "policy": ["Accept-System-Addresses"]
-                        }                      
+                        }]          
                     },
   
                     "rsvp": {
@@ -183,7 +172,7 @@
                     "twamp-light": {
                         "reflector": {
                             "admin-state": "enable",
-                            "udp-port": 64372,
+                            "udp-port": 64364,
                             "prefix": [{
                                 "ip-prefix": "0.0.0.0/0"
                             }]
@@ -194,12 +183,12 @@
         },
         "health": {
           "nokia-state:/state/router=Base/isis=0": {
-            "isis/oper-state": {
+            "isis=0/oper-state": {
               "path": "oper-state",
               "equals": "up"
             },
-            "isis/l1-state": {
-              "path": "l1-state",
+            "isis=0/l2-state": {
+              "path": "l2-state",
               "equals": "on"
             }
           },
@@ -216,7 +205,7 @@
         }
     },
 
-    "[${site.ne\-name}] Prefix List: System Addresses": {
+    "Prefix List: System Addresses": {
         "config": {
             "target": "nokia-conf:/configure/policy-options/prefix-list=System-Addresses",
             "operation": "replace",
@@ -225,7 +214,7 @@
                     "name": "System-Addresses",
                     "prefix": [
                         {
-                            "ip-prefix": "10.10.10.0/24",
+                            "ip-prefix": "10.${site.countryCode?string}.0.0/24",
                             "type": "range",
                             "start-length": 32,
                             "end-length": 32
@@ -236,7 +225,7 @@
         }
     },
       
-    "[${site.ne\-name}] Policy Statement: Accept All System Addresses": {
+    "Policy Statement: Accept All System Addresses": {
         "config": {
             "target": "nokia-conf:/configure/policy-options/policy-statement=Accept-System-Addresses",
             "operation": "replace",

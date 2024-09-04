@@ -3,7 +3,7 @@
   "version": "1",
   "build": "-",
   "author": "{{ author }}",
-  "mapping-engine": "js-scripted",
+  "mapping-engine": "js-scripted-graal",
   "label": ["NSP DevOps using vsCode"],
   "priority": 50,
   "return-config-as-json": true,

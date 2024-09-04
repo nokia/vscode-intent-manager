@@ -2,39 +2,39 @@
     "templates": [
         {
             "label": "helloWorld",
-            "description": "basic intent-type | mapping-engine js-scripted (Nashorn)"
+            "description": "basic intent-type"
         },
         {
-            "label": "helloGraal",
-            "description": "basic intent-type | next-gen javascript engine (GraalJS)"
+            "label": "helloWorld2",
+            "description": "basic intent-type using next-gen js-engine"
         },
         {
-            "label": "SRX24 deviceSecurity",
-            "description": "device security SReXperts 2024 | research/study, experimental"
-        },
-        {
-            "label": "SRX24 iplink",
-            "description": "ipl!nk (abstraction and assurance) SReXperts 2024 | research/study, experimental"
-        },
-        {
-            "label": "SRX24 oamTwampLight",
-            "description": "latency measurement using TWAMP/light SReXperts 2024 | research/study, experimental"
-        },
-        {
-            "label": "SRX24 serviceL3vpn",
-            "description": "abstract l3vpn service SReXperts 2024 | research/study, experimental"
-        },
-        {
-            "label": "SRX24 serviceEvpnEline",
-            "description": "abstract EVWS service SReXperts 2024 | research/study, experimental"
+            "label": "helloWorld3",
+            "description": "basic intent-type applying best practices"
         },
         {
             "label": "SRX24 goldenConfiguration",
-            "description": "day1 node config SReXperts 2024 | research/study, experimental"
+            "description": "SReXperts 2024 | device base configure (day1) | next-gen js-engine"
         },
         {
-            "label": "ngJS iplink",
-            "description": "abstraction/assurance for next-gen java-script engine (GraalJS) | research/study, experimental"
+            "label": "SRX24 iplink",
+            "description": "SReXperts 2024 | ipl!nk (abstraction and assurance) | next-gen js-engine"
+        },
+        {
+            "label": "SRX24 oamTwampLight",
+            "description": "SReXperts 2024 | latency measurement using TWAMP/light | next-gen js-enginel"
+        },
+        {
+            "label": "SRX24 deviceSecurity",
+            "description": "SReXperts 2024 | device security | next-gen js-engine"
+        },
+        {
+            "label": "SRX24 serviceL3vpn",
+            "description": "SReXperts 2024 | abstract l3vpn service | research/study, experimental"
+        },
+        {
+            "label": "SRX24 serviceEvpnEline",
+            "description": "SReXperts 2024 | abstract EVWS service | research/study, experimental"
         }
     ]
 }

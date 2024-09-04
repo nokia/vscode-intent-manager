@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import yaml = require('yaml');
 
@@ -15,6 +16,7 @@ const COLOR_READONLY      = new vscode.ThemeColor('list.deemphasizedForeground')
 const COLOR_CUSTOMIZATION = new vscode.ThemeColor('list.highlightForeground'); // appears blue
 const COLOR_WARNING       = new vscode.ThemeColor('list.warningForeground');
 const COLOR_ERROR         = new vscode.ThemeColor('list.errorForeground');
+const COLOR_FOCUS         = new vscode.ThemeColor('list.highlightForeground');
 
 const DECORATION_DISCONNECTED = { badge: '❗', tooltip: 'Not connected!', color: COLOR_ERROR };  // should become codicon $(warning)
 const DECORATION_CONNECTED    = { badge: '✔',  tooltip: 'Connecting...', color: COLOR_OK };     // should become codicon $(vm-active)
@@ -23,7 +25,7 @@ const DECORATION_SIGNED       = { badge: '🔒', tooltip: 'IntentType: Signed', 
 const DECORATION_VIEWS     = { tooltip: 'UI Form Customization', color: COLOR_CUSTOMIZATION };
 const DECORATION_INTENTS   = { tooltip: 'Intents', color: COLOR_CUSTOMIZATION };
 
-const DECORATION_UNSIGNED  = { tooltip: 'IntentType: Unsigned' }; // default colors
+const DECORATION_UNSIGNED  = { badge: '📘', tooltip: 'IntentType: Unsigned', color: COLOR_FOCUS }; // default colors
 const DECORATION_MODULES   = { tooltip: 'YANG Modules' }; // default colors
 const DECORATION_RESOURCES = { tooltip: 'Resources' }; // default colors
 
@@ -107,7 +109,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.extensionPath = context.extensionPath;
 		this.extensionUri = context.extensionUri;
 
-		console.debug("IntentManagerProvider("+this.nspAddr+")");
+		console.log("IntentManagerProvider("+this.nspAddr+")");
 
 		this.nspVersion = undefined;
 		this.osdVersion = undefined;
@@ -161,7 +163,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
         if (this.password && !this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
-                this.pluginLogs.warn("No valid auth-token; Getting a new one...");
+                this.pluginLogs.warn("No valid auth-token for IM plugin; Getting a new one...");
                 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 				// for getting the auth-token, we are using a reduced timeout of 10sec
@@ -186,13 +188,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					const json = await response.json();
                     if (response.ok) {
-						this.pluginLogs.info("NSP response:", response.status);
+						this.pluginLogs.info("IM response:", response.status);
 						resolve(json.access_token);
 						this.pluginLogs.info("new authToken:", json.access_token);
 						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
 						this._getNSPversion();
                     } else {
-						this.pluginLogs.warn("NSP response:", response.status, json.error);
+						this.pluginLogs.warn("IM response:", response.status, json.error);
 						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
 						this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 						this.authToken = undefined; // Reset authToken on error
@@ -200,10 +202,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					}
                 }).catch((error:any) => {
 					if (error.message.includes('user aborted'))
-						this.pluginLogs.error("No response for getting authToken within 10sec");
+						this.pluginLogs.error("Getting authToken for IM plugin timed out (no response within 10sec)");
 					else
-						this.pluginLogs.error("Getting authToken failed with", error.message);
+						this.pluginLogs.error("Getting authToken for IM plugin failed with", error.message);
 
+					this.nspVersion = undefined;
+					this.osdVersion = undefined;
+					
 					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
 					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 
@@ -294,11 +299,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					this.pluginLogs.info(options.method, url, options.body??"", "finished within", duration, "ms");
 
 					if (response.status >= 400)
-						this.pluginLogs.warn("NSP response:", response.status, body);
+						this.pluginLogs.warn("IM response:", response.status, body);
 					else if ((body.length < 1000) || (this.pluginLogs.logLevel == vscode.LogLevel.Trace))
-						this.pluginLogs.info("NSP response:", response.status, body);
+						this.pluginLogs.info("IM response:", response.status, body);
 					else
-						this.pluginLogs.info("NSP response:", response.status, body.substring(0,1000)+'...');
+						this.pluginLogs.info("IM response:", response.status, body.substring(0,1000)+'...');
 				});
 				return response;
 			})
@@ -308,6 +313,16 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			.catch((error:any) => {
 				const duration = Date.now()-startTS;
 				let errmsg = options.method+" "+url+" failed with "+error.message+" after "+duration.toString()+"ms!";
+
+				if (error.message.includes("ENETUNREACH")) {
+					this.nspVersion = undefined;
+					this.osdVersion = undefined;
+					this.authToken  = undefined;
+					
+					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+				}
+
 				if (error.message.includes("user aborted"))
 					errmsg = "No response for "+options.method+" "+url+". Call terminated after "+duration.toString()+"ms.";
 
@@ -368,11 +383,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		let updated = false;
 
 		if (!this.nspVersion) {
-			this.pluginLogs.info("Requesting NSP release");
+			this.pluginLogs.info("IM plugin is getting NSP release");
 			const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
 			const response: any = await this._callNSP(url, {method: "GET"});
 			if (!response)
-				this.pluginLogs.error("Lost connection to NSP");
+				this.pluginLogs.error("Lost connection to IM");
 			else if (response.ok) {
 				const json = await response.json();		
 				this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
@@ -398,7 +413,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const msg = "Connected to "+this.nspAddr+", NSP version: "+(this.nspVersion??"unknown")+", OSD version: "+(this.osdVersion??"unknown");
 			this.pluginLogs.info(msg);
 			vscode.window.showInformationMessage(msg);
-			this._eventEmiter.fire(vscode.Uri.parse('im:/'));	
+			this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 		}
 	}
 
@@ -2296,6 +2311,96 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	}
 
 	/**
+	 * Migrate selected intent(s)
+	 * 
+	 * @param {any[]} args context used to issue command
+	 */
+
+	public async migrate(args:any[]): Promise<void> {
+		const uriList:vscode.Uri[] = this._getUriList(args);
+
+		const intent_type_folders = Array.from(
+			new Set(uriList.map(uri => decodeURIComponent(uri.toString().split('/')[1])))
+		);
+
+		const intent_types = Array.from(
+			new Set(intent_type_folders.map(folder => folder.split('_v')[0]))
+		);
+
+		if (intent_types.length !== 1) {
+			const errmsg = 'All intents must be of the same intent-type to migrate!';
+			vscode.window.showInformationMessage(errmsg);
+			throw vscode.FileSystemError.NoPermissions(errmsg);
+		}
+		const intent_type = intent_types[0];
+
+		const usedVersions = Array.from(
+			new Set(intent_type_folders.map(folder => folder.split('_v')[1]))
+		);
+
+		const allVersions = Array.from(new Set(
+			Object.keys(this.intentTypes).
+				filter(folder => folder.split('_v')[0] === intent_type).
+				map(folder => folder.split('_v')[1])
+		));
+
+		const items = [];
+		for (const version of allVersions)
+			if (usedVersions.includes(version))
+				items.push({label:version, description:`${intent_type}_v${version} ✔`});
+			else
+				items.push({label:version, description:`${intent_type}_v${version}`});
+
+		await vscode.window.showQuickPick(items).then( async selection => {
+			if (selection) {
+				const newVersion = selection.label;
+
+				const body = {
+					'ibn:input': {
+						'target-intent-type-version': newVersion
+					}
+				};
+
+				let refreshRequired = false;
+				const migrations = uriList.map(async(entry) => {
+					const parts = entry.toString().split('/').map(decodeURIComponent);
+					const target = decodeURIComponent(parts[3].slice(0,-5));
+					const intent_type_folder = parts[1];
+					const intent_type = intent_type_folder.split('_v')[0];
+
+					if (intent_type_folder.split('_v')[1] !== newVersion) {
+						this.pluginLogs.info(`migrate( ${entry.toString()} )`);
+						const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/migrate-intent`;
+
+						try {
+							const response:any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
+
+							if (response.ok) {
+								refreshRequired = true;
+								delete this.intentTypes[intent_type_folder].aligned[target];
+								delete this.intentTypes[intent_type_folder].desired[target];
+								delete this.intentTypes[intent_type_folder].intents[target];
+								vscode.window.showInformationMessage(`Intent ${intent_type}/${target} migrated to version ${newVersion}`);
+							} else {
+								response.json().then((response:any) => this._printRestconfError(`Intent ${intent_type}/${target} migration to version ${newVersion} failed!`, response));
+							}
+						} catch (error) {
+							this.pluginLogs.error(`Intent ${intent_type}/${target} migration to version ${newVersion} failed!`);
+						}
+					} else {
+						this.pluginLogs.info(`migrate( ${entry.toString()} ) skipped!`);
+					}
+				});
+
+				await Promise.all(migrations);
+
+				if (refreshRequired)
+					vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+			}
+		});
+	}
+
+	/**
 	 * Open NSP WebUI Intent Manager for an intent or intent-type
 	 * 
 	 * @param {any[]} args context used to issue command
@@ -2358,7 +2463,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 			if (this._fromRelease(23,11))
 				// URL for new navigation since nsp23.11
-				this._openWebUI("/web/intent-manager/intent-types/create-intent?intentTypeId="+intent_type+"&version="+intent_type_version);
+				// Note: nsp24.8 adds cross-launch support (option ignored in 23.11/24.4) 
+				this._openWebUI(`/web/intent-manager/intent-types/create-intent?intentTypeId=${intent_type}&version=${intent_type_version}&mode=cross-launch`);
 			else
 				this._openWebUI("/intent-manager/intentTypes/"+intent_type+"/"+intent_type_version+"/intents/createIntent");
 		}
@@ -2444,8 +2550,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	public async newIntentTypeFromTemplate(args:any[]): Promise<void> {
-		const path = this._getUriList(args)[0].toString();
-		const parts = path.split('/').map(decodeURIComponent);
+		const patharg = this._getUriList(args)[0].toString();
+		const parts   = patharg.split('/').map(decodeURIComponent);
 		const pattern = /^([a-z][a-z0-9_-]+)(_v\d+)?$/;
 
 		let intent_type_name = "default";
@@ -2533,51 +2639,57 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			return;
 		}
 
-		const modulesPath = vscode.Uri.joinPath(templatePath, "yang-modules").fsPath;
-		const j2modules = nunjucks.configure(modulesPath);
+		// create modules
 
 		if (!('module' in meta)) meta.module=[];
-		fs.readdirSync(modulesPath).forEach((filename: string) => {
-			const fullpath = vscode.Uri.joinPath(templatePath, "yang-modules", filename).fsPath;
+
+		const modulesPath = vscode.Uri.joinPath(templatePath, "yang-modules");
+		for (const filename of fs.readdirSync(modulesPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+			const fullpath = vscode.Uri.joinPath(modulesPath, filename).fsPath;
+			const j2modules = nunjucks.configure(path.dirname(fullpath));
+
 			if (!fs.lstatSync(fullpath).isFile())
 				this.pluginLogs.info("ignore "+filename+" (not a file)");
 			else if (filename.startsWith('.'))
 				this.pluginLogs.info("ignore hidden file "+filename);
 			else if (filename!="[intent_type].yang")
-				meta.module.push({name: filename, "yang-content": fs.readFileSync(fullpath, {encoding: 'utf8', flag: 'r'})});
+				meta.module.push({name: filename.split('\\').join('/'), "yang-content": fs.readFileSync(fullpath, {encoding: 'utf8', flag: 'r'})});
 			else
 				meta.module.push({name: data.intent_type+".yang", "yang-content": j2modules.render(filename, data)});
-		});
+		}
 
-		const resourcesPath = vscode.Uri.joinPath(templatePath, "intent-type-resources").fsPath;
-		const j2resources = nunjucks.configure(resourcesPath);
+		// create resources
 
-		const resourcefiles:string[] = [];
 		if (!('resource' in meta)) meta.resource=[];
-		if (fs.existsSync(resourcesPath))
-			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
-			fs.readdirSync(resourcesPath, {recursive: true}).forEach((filename: string) => {
-				const fullpath = vscode.Uri.joinPath(templatePath, "intent-type-resources", filename).fsPath;
+		const resourcefiles:string[] = [];
+		
+		const resourcesPath = vscode.Uri.joinPath(templatePath, "intent-type-resources");
+		if (fs.existsSync(resourcesPath.fsPath))
+			for (const filename of fs.readdirSync(resourcesPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+				const fullpath = vscode.Uri.joinPath(resourcesPath, filename).fsPath;
+				const j2resources = nunjucks.configure(path.dirname(fullpath));
+
 				if (!fs.lstatSync(fullpath).isFile())
 					this.pluginLogs.info("ignore "+filename+" (not a file)");
 				else if (filename.startsWith('.') || filename.includes('/.'))
 					this.pluginLogs.info("ignore hidden file/folder "+filename);
 				else
-					meta.resource.push({name: filename, value: j2resources.render(filename, data)});
+					meta.resource.push({name: filename.split('\\').join('/'), value: j2resources.render(path.basename(fullpath), data)});
 
 				resourcefiles.push(filename);
-			});
+			}
 		else vscode.window.showWarningMessage("Intent-type template has no resources");
 
 		// merge common resources
 
-		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources").fsPath)) {
-			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_resources');
-			const j2resources = nunjucks.configure(commonsPath.fsPath);
+		for (const folder of fs.readdirSync(templatePath.fsPath).filter(item => item.startsWith('merge_')).map(item => item.substring(6))) {
+			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
 
-			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
-			fs.readdirSync(commonsPath.fsPath, {recursive: true}).forEach((filename: string) => {
+			this.pluginLogs.info("merge common resources from "+folder);
+			for (const filename of fs.readdirSync(commonsPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
 				const fullpath = vscode.Uri.joinPath(commonsPath, filename).fsPath;
+				const j2resources = nunjucks.configure(path.dirname(fullpath));
+
 				if (!fs.lstatSync(fullpath).isFile())
 					this.pluginLogs.info("ignore "+filename+" (not a file)");
 				else if (filename.startsWith('.') || filename.includes('/.'))
@@ -2585,28 +2697,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				else if (resourcefiles.includes(filename))
 					this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
 				else
-					meta.resource.push({name: filename, value: j2resources.render(filename, data)});
-			});
+					meta.resource.push({name: filename.split('\\').join('/'), value: j2resources.render(path.basename(fullpath), data)});
+			}
 		}
-
-		if (fs.existsSync(vscode.Uri.joinPath(templatePath, "merge_common_resources_graaljs").fsPath)) {
-			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_resources_graaljs');
-			const j2resources = nunjucks.configure(commonsPath.fsPath);
-
-			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
-			fs.readdirSync(commonsPath.fsPath, {recursive: true}).forEach((filename: string) => {
-				const fullpath = vscode.Uri.joinPath(commonsPath, filename).fsPath;
-				if (!fs.lstatSync(fullpath).isFile())
-					this.pluginLogs.info("ignore "+filename+" (not a file)");
-				else if (filename.startsWith('.') || filename.includes('/.'))
-					this.pluginLogs.info("ignore hidden file/folder "+filename);
-				else if (resourcefiles.includes(filename))
-					this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
-				else
-					meta.resource.push({name: filename, value: j2resources.render(filename, data)});
-			});
-		}
-
 	
 		// Intent-type "meta" may contain the parameter "intent-type"
 		// RESTCONF API required parameter "name" instead
@@ -2636,6 +2729,35 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		vscode.window.showInformationMessage("Intent-Type "+data.intent_type+" successfully created!");
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");			
 	}
+
+    /**
+     * Export intent-type to file-system (as ZIP)
+	 * 
+	 * @param {any[]} args options required to export
+     * @param {string} folder - Export path.
+     * @param {string} intent_type - Name of the intent-type (string).
+     * @param {string} intent_type_version - Version of the intent-type (string).
+     */
+
+    public async exportIntentType(folder:string, intent_type:string, intent_type_version:string): Promise<void> {
+		const url = `/mdt/export/${intent_type}/${intent_type_version}`;
+        const response: any = await this._callNSP(url, {method: "GET"});
+        if (!response)
+            this.pluginLogs.error("Lost connection to NSP");
+        else if (!response.ok)
+			vscode.window.showErrorMessage("Issue exporting intent-type");
+		else {
+            const buf = await response.buffer();
+            this.pluginLogs.info("Exporting intent-type");
+			try {
+				const filename = vscode.Uri.joinPath(vscode.Uri.parse(folder), `${intent_type}_v${intent_type_version}.zip`).fsPath;
+                fs.writeFileSync(filename, buf);
+			}
+			catch(error:any) {
+				vscode.window.showErrorMessage("Issue exporting intent-type");
+			}
+		}
+    }
 
 	public getStatusBarItem(): vscode.StatusBarItem {
 		return myStatusBarItem;

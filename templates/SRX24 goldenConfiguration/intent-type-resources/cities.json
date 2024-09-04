@@ -1,25 +1,5 @@
 [
   {
-    "name": "s-Hertogenbosch",
-    "country": "Netherlands",
-    "iso2": "NL",
-    "iso3": "NLD",
-    "latitude": 51.6833,
-    "longitude": 5.3167,
-    "coordinates": "N 51 40 59, E 5 19 0",
-    "population": 134520
-  },
-  {
-    "name": "A Coruna",
-    "country": "Spain",
-    "iso2": "ES",
-    "iso3": "ESP",
-    "latitude": 43.3667,
-    "longitude": -8.3833,
-    "coordinates": "N 43 22 0, W 8 22 59",
-    "population": 245468
-  },
-  {
     "name": "Aachen",
     "country": "Germany",
     "iso2": "DE",
@@ -11128,6 +11108,16 @@
     "longitude": -81.2137,
     "coordinates": "N 28 54 18, W 81 12 49",
     "population": 198361
+  },
+  {
+    "name": "Den Bosch",
+    "country": "Netherlands",
+    "iso2": "NL",
+    "iso3": "NLD",
+    "latitude": 51.6833,
+    "longitude": 5.3167,
+    "coordinates": "N 51 40 59, E 5 19 0",
+    "population": 134520
   },
   {
     "name": "Dengtacun",
@@ -23118,6 +23108,16 @@
     "longitude": -86.7878,
     "coordinates": "N 15 46 48, W 86 47 16",
     "population": 196856
+  },
+  {
+    "name": "La Coruna",
+    "country": "Spain",
+    "iso2": "ES",
+    "iso3": "ESP",
+    "latitude": 43.3667,
+    "longitude": -8.3833,
+    "coordinates": "N 43 22 0, W 8 22 59",
+    "population": 245468
   },
   {
     "name": "La Crosse",

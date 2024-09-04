@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-    "[${site.ne\-name}] EPIPE Site": {
+    "EPIPE Site": {
         "config": {
             "target": "nokia-conf:/configure/service/epipe=${target?url('ISO-8859-1')}",
             "operation": "replace",
@@ -74,7 +74,7 @@
         }
 <#if global.enableOAM>
     },
-    "[${site.ne\-name}] Y.1731 MEG": {
+    "Y.1731 MEG": {
         "config": {
             "target": "nokia-conf:/configure/eth-cfm/domain=level7/association=${target?url('ISO-8859-1')}",
             "operation": "replace",
@@ -92,7 +92,7 @@
             }
         }
     },
-    "[${site.ne\-name}] OAM-PM TEST": {
+    "OAM-PM TEST": {
         "config": {
             "target": "nokia-conf:/configure/oam-pm/session=${target?url('ISO-8859-1')}",
             "operation": "replace",

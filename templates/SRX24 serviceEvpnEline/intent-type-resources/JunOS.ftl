@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-    "[${site.ne\-name}] VPWS Site": {
+    "VPWS Site": {
         "config": {
             "target": "junos-conf-root:/configuration/instance=${target?url('ISO-8859-1')}",
             "operation": "replace",
@@ -34,7 +34,7 @@
         }
     },
 
-    "[${site.ne\-name}] VPWS Interface ${site.port\-id} VLAN ${site.vlan\-id}": {
+    "VPWS Interface ${site.port\-id} VLAN ${site.vlan\-id}": {
         "config": {
             "target": "junos-conf-root:/configuration/interfaces/interface==${site.port\-id?url('ISO-8859-1')}/unit=${site.vlan\-id?url('ISO-8859-1')}",
             "operation": "replace",

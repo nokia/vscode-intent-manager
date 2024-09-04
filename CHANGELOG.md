@@ -209,3 +209,19 @@ Updates:
 * Added support to create resource folders
 * Added support to rename/move intent-type resources and folders
 * Added support to remove resource folders
+
+## [3.2.0]
+
+Fixes:
+* Improved error-handling in case of connectivity issues
+* Fixed nunjucks issues for Windows (create new intent-type from template)
+
+Extension Updates:
+* Improved logs, avoiding confusion with other NSP vsCode plugins
+* Support for intent migrations has been added
+* New command exportIntentTypes has been added (used for Artifact Manager extension)
+
+Template Updates:
+* Alignment of HelloWorld examples
+* SRX24 templates migrated to GraalJS: DeviceSecurity, GoldenConfig, IPL!nk, OAM TWL
+* Method #nspFindAC() for GraalJS applies access-control for pickers/suggest. Used for getNodes(), getAccessPorts(), getPorts(), suggestTargetDevices()

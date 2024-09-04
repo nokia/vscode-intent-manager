@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-    "[${site.ne\-name}] disable insecure protocols (ftp, telnet)": {
+    "disable insecure protocols (ftp, telnet)": {
         "config": {
             "target": "nokia-conf:/configure/system/security",
             "operation": "merge",
@@ -13,7 +13,7 @@
             }
         }
     },
-    "[${site.ne\-name}] management-access-filter": {
+    "management-access-filter": {
         "config": {
             "target": "nokia-conf:/configure/system/security/management-access-filter",
             "operation": "replace",
@@ -96,7 +96,7 @@
             }
         }
     },
-    "[${site.ne\-name}] security logs": {
+    "security logs": {
         "config": {
             "target": "nokia-conf:/configure/log/log-id=90",
             "operation": "replace",

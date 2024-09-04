@@ -18,15 +18,17 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.sync',  async (...args) => imProvider.sync(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.logs',  async (...args) => imProvider.logs(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.state', async (...args) => imProvider.setState(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.migrate',  async (...args) => imProvider.migrate(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.loglevel', async (...args) => imProvider.setLogLevel()));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.retrieveState', async (...args) => imProvider.retrieveState(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.lastAuditReport', async (...args) => imProvider.lastAuditReport(args)));
-	
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.openInBrowser', async (...args) => imProvider.openInBrowser(args)));
+
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newIntent',     async (...args) => imProvider.newIntent(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.openInBrowser', async (...args) => imProvider.openInBrowser(args)));
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.uploadIntentType', async (...args) => imProvider.uploadIntentType(args)));
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.uploadIntents',    async (...args) => imProvider.uploadIntents(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.exportIntentType', async (localPath, intentType, intentTypeVersion) => imProvider.exportIntentType(localPath, intentType, intentTypeVersion)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.uploadIntents',    async (...args) => imProvider.uploadIntents(args)));	
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.clone',            async (...args) => imProvider.clone(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newVersion',       async (...args) => imProvider.newVersion(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newIntentType',    async (...args) => imProvider.newIntentTypeFromTemplate(args)));

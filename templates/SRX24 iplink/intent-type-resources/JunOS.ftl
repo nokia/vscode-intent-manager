@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-  "[${site.ne\-name}] INTERFACE ${site.port\-id}": {
+  "INTERFACE ${site.port\-id}": {
     "config": {
       "target": "junos-conf-root:/configuration/interfaces/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -9,7 +9,7 @@
                 "name" : "${site.port\-id}",
                 "mtu": "9000",         <#-- JunOS uses union of string/uint32, MDC returns string  -->
 <#if global.description??>
-                "description": "iplink: ${global.description}",
+                "description": "{{ intent_type }}: ${global.description}",
 </#if>
                 "vlan-tagging": [null],
                 "unit" : [{
@@ -30,7 +30,7 @@
     },
     "health": {}
   },
-  "[${site.ne\-name}] LLDP INTERFACE ${site.port\-id}": {
+  "LLDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "junos-conf-root:/configuration/protocols/lldp/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -43,7 +43,7 @@
     },
     "health": {}
   },
-  "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}.1": {
+  "ISIS INTERFACE ${site.port\-id}.1": {
     "config": {
       "target": "junos-conf-root:/configuration/protocols/isis/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",
@@ -57,7 +57,7 @@
     },
     "health": {}
   },
-  "[${site.ne\-name}] LDP INTERFACE ${site.port\-id}.1": {
+  "LDP INTERFACE ${site.port\-id}.1": {
     "config": {
       "target": "junos-conf-root:/configuration/protocols/ldp/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",

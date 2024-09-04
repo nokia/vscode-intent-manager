@@ -1,142 +1,179 @@
-/* global logger, mds, utilityService, synchronizeResultFactory, auditFactory */
+/* global Java, logger, mds, utilityService */
+/* global synchronizeResultFactory, auditFactory */
 /* eslint no-undef: "error" */
 
-const intentTypeName  = "{{ intent_type }}";
-const intentContainer = "{{ intent_type }}:{{ intent_type }}";
+const INTENT_TYPE_NAME  = "{{ intent_type }}";
+const INTENT_ROOT = "{{ intent_type }}:{{ intent_type }}";
+
+const StringUtils = Java.type('org.apache.commons.lang3.StringUtils');
 
 /**
-  * Deployment of intents to the network, called for synchronize operations.
-  * Used to apply create, update, delete and reconcile to managed devices.
-  *
+  * Deployment of the intent to the network, called for synchronize operations.
+  * Used to execute create, update, delete and reconcile operations.
+  * 
   * For house-keeping it is recommended to remember created objects
   * as part of topology/extra-data. This is to enable update and delete
   * operations to remove network objects that are no longer required.
   * 
-  * @param {} input input provided by intent-engine
+  * @param {SynchronizeInput} input Used to access information about the intent to be synchronized
+  * @returns {SynchronizeResult} provide information about the execution/success back to the engine
   **/
 
 function synchronize(input) {
   const startTS = Date.now();
   const target  = input.getTarget();
   const state   = input.getNetworkState().name();
-  logger.info(intentTypeName+":synchronize(" + target + ") in state " + state);
+  logger.info(INTENT_TYPE_NAME+":synchronize(" + target + ") in state " + state);
 
-  // CODE FOR SYNCHRONIZE | BEGIN >>>
-
-  const config = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
-  var result   = synchronizeResultFactory.createSynchronizeResult();
-
+  const config = JSON.parse(input.getJsonIntentConfiguration())[0][INTENT_ROOT];
   logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
+  // doing some logs
   logger.debug("logging example (level:debug)");
   logger.info ("logging example (level:info)");
   logger.warn ("logging example (level:warn)");
   logger.error("logging example (level:error)");
 
+  // doing some string operations around target/ne-id
+  let areaCode;
+  let areaCode4d;  
+  if (StringUtils.contains(target, ':')) {
+    logger.info('ne-id is IPv6 address');
+    areaCode = StringUtils.substring(target.split(':')[0], 2);
+    areaCode4d = StringUtils.leftPad(areaCode, 4, '0');
+  } else {
+    logger.info('ne-id is IPv4 address');
+    areaCode = target.split('.')[1];
+    areaCode4d = StringUtils.leftPad(areaCode, 4, '0');
+  }
+  logger.info('extracted areaCode from ne-id '+areaCode);
+  logger.info('4 digit areaCode '+areaCode4d);
+
+  const result = synchronizeResultFactory.createSynchronizeResult();
   result.setSuccess(true);
 
-  // <<< END | CODE FOR SYNCHRONIZE
-
   const duration = Date.now()-startTS;
-  logger.info(intentTypeName+":synchronize(" + target + ") finished within "+duration+" ms");
+  logger.info(INTENT_TYPE_NAME+":synchronize(" + target + ") finished within "+duration+" ms");
   
   return result;
 }
 
-
-
 /**
-  * Function to audit intents.
+  * Execute intent audits by comparing desired vs actual configuration (and state).
   * 
-  * @param {} input input provided by intent-engine
+  * @param {AuditInput} input used to access information about the intent to be audited
+  * @returns {AuditReport} audit-report object containing the misaligned attributed and objects 
   **/
 
 function audit(input) {
   const startTS = Date.now();
   const target  = input.getTarget();
   const state   = input.getNetworkState().name();
-  logger.info(intentTypeName+":audit(" + target + ") in state " + state);
+  logger.info(INTENT_TYPE_NAME+":audit(" + target + ") in state " + state);
 
-  // CODE FOR AUDIT | BEGIN >>>
-
-  const config = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const config = JSON.parse(input.getJsonIntentConfiguration())[0][INTENT_ROOT];
   logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
-  var report   = auditFactory.createAuditReport(null, null);
-
-  // misaligned object (is-configured=false)
-  report.addMisAlignedObject(
-    auditFactory.createMisAlignedObject("/root/misaligned=1", false, target));
-
-  // misaligned object (is-configured=true)
-  report.addMisAlignedObject(
-    auditFactory.createMisAlignedObject("/root/misaligned=2", true, target));
-
-  // misaligned object (is-configured=true, is=undesired=true)
-  report.addMisAlignedObject(
-    auditFactory.createMisAlignedObject("/root/misaligned=3", true, target, true));
+  const report = auditFactory.createAuditReport(INTENT_TYPE_NAME, target);
 
   // misaligned attribute
-  report.addMisAlignedAttribute(
-    auditFactory.createMisAlignedAttribute("/root/misligned=4/attribute", "expected", "actual", target));
+  report.addMisAlignedAttribute(auditFactory.createMisAlignedAttribute("namespace:root/misaligned=1/attribute", "expected", "actual", target));
 
-  // <<< END | CODE FOR AUDIT
+  // missing objects (is-undesired=false)
+  report.addMisAlignedObject(auditFactory.createMisAlignedObject("namespace:root/missing=2", false, target)); // (is-configured=false)
+  report.addMisAlignedObject(auditFactory.createMisAlignedObject("namespace:root/missing=3", true, target));  // (is-configured=true)
+
+  // undesired objects (is-undesired=true)
+  report.addMisAlignedObject(auditFactory.createMisAlignedObject("namespace:root/undesired=4", false, target, true)); // (is-configured=false)
+  report.addMisAlignedObject(auditFactory.createMisAlignedObject("namespace:root/undesired=5", true, target, true));  // (is-configured=true)
   
   const duration = Date.now()-startTS;
-  logger.info(intentTypeName+":audit(" + target + ") finished within "+duration+" ms");
+  logger.info(INTENT_TYPE_NAME+":audit(" + target + ") finished within "+duration+" ms");
 
   return report;
 }
 
-
-
 /**
- * Validation of intent config/target that is automatically called for intent 
- * edit operations. This function is doing enhanced validation, in addition to
- * checks against the intent model (YANG).
- * If the intent config is identified invalid, the C/U/D operation will fail.
- * Execution happens before synchronize() to ensure intent is valid.
- * 
- * @param {} input input provided by intent-engine
- **/
+  * Validation of intent config/target that is automatically called for intent 
+  * create/edit and state-change operations. This method may do enhanced
+  * validation, in addition to checks against the intent model (YANG), that is
+  * automatically executed by the intent engine.
+  * 
+  * If the intent config is identified invalid, the create/edit operation will
+  * fail. Execution happens before synchronize() to ensure intent is valid.
+  * 
+  * @param {} input input provided by intent-engine
+  **/
 
 function validate(input) {
   const startTS = Date.now();
   const target  = input.getTarget();
-  logger.info(intentTypeName+":validate(" + target + ")");
+  logger.info(INTENT_TYPE_NAME+":validate(" + target + ")");
 
-  // CODE FOR VALIDATION | BEGIN >>>
-
-  const config = JSON.parse(input.getJsonIntentConfiguration())[0][intentContainer];
+  const config = JSON.parse(input.getJsonIntentConfiguration())[0][INTENT_ROOT];
   logger.info("intent configuration provided:\n" + JSON.stringify(config, null, "  "));
 
-  var contextualErrorJsonObj = {};  
+  const contextualErrorJsonObj = {};
+
   const neInfo = mds.getAllInfoFromDevices(target);
   if (neInfo === null || neInfo.size() === 0) {
-    logger.error(target+" not found!");
+    logger.error("Node "+target+" not found!");
     contextualErrorJsonObj["NODE "+target] = "Node not found";
   }
-  // <<< END | CODE FOR VALIDATION
 
   const duration = Date.now()-startTS;
-  logger.info(intentTypeName+":validate(" + target + ") finished within "+duration+" ms");
+  logger.info(INTENT_TYPE_NAME+":validate(" + target + ") finished within "+duration+" ms");
   
   if (Object.keys(contextualErrorJsonObj).length !== 0)
     utilityService.throwContextErrorException(contextualErrorJsonObj);
 }
 
-
-
 /**
- * WebUI callout for suggesting devices (neId).
- * 
- **/
+  * Returns the list of managed devices (neId) for WebUI suggest
+  * @param {ValueProviderContext} valueProviderContext
+  * @returns Suggestion data as JavaScript object
+  **/  
 
-function getNodes() {
-  var devices = mds.getAllManagedDevicesFrom(['MDC','NFM-P']);
-  var rvalue = {};
-  devices.forEach(function(device) {
-    rvalue[device.getName()] = device.getName();
-  });
+function suggestTargetDevices(valueProviderContext) {
+  const startTS = Date.now();
+  const searchString = valueProviderContext.getSearchQuery();
+
+  if (searchString)
+    logger.info(INTENT_TYPE_NAME+":suggestTargetDevices("+searchString+")");
+  else
+    logger.info(INTENT_TYPE_NAME+":suggestTargetDevices()");
+
+  const rvalue = {};
+  try  {
+    // get connected mediators
+    const mediators = [];
+    mds.getAllManagersOfType("REST").forEach((mediator) => {
+      if (mds.getManagerByName(mediator).getConnectivityState().toString() === 'CONNECTED')
+        mediators.push(mediator);
+    });
+
+    // get managed devices from mediator(s)
+    const devices = mds.getAllManagedDevicesFrom(mediators);
+
+    // filter result by searchString provided from WebUI
+    const filteredDevicenames = [];
+    devices.forEach(function(device) {
+      if (!searchString || device.getName().indexOf(searchString) !== -1)
+        filteredDevicenames.push(device.getName());
+    });
+    logger.info("Found "+filteredDevicenames.length+" devices!");
+
+    // convert output as required by WebUI framework
+    filteredDevicenames.sort().forEach(function(devicename) {
+      rvalue[devicename]=devicename;
+    });
+  }
+  catch (e) {
+    logger.error("Exception catched: " + e);
+  }
+
+  const duration = Date.now()-startTS;
+  logger.info(INTENT_TYPE_NAME+":suggestTargetDevices() finished within "+duration+" ms");
+
   return rvalue;
 }

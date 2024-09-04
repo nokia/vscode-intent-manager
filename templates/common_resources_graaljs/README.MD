@@ -2,10 +2,7 @@
 *created by {{author}}*
 
 This is an **abstract intent-type** applying IPL!nk principles.
-It uses the next-generation JavaScript engine (GraalJS) planned to be added in NSP24.8.
-
-## DISCLAIMER
-**THIS INTENT-TYPE IS FOR RESEARCH/STUDY ONLY!**
+It uses the next-generation JavaScript engine (GraalJS) added in NSP24.8.
 
 ## APPLY YOUR CHANGES
 Following files are considered common framework files:<br/>
@@ -20,7 +17,7 @@ Following files are considered common framework files:<br/>
       └── patch.ftl
 ```
 
-To adjust the intent-type to the specific needs of your use-case, consider changing the following:
+To adjust the intent-type to the specific needs of your use-case, consider adding/changing the following:
 ```
   meta-info.json
   script-content.mjs
@@ -40,11 +37,10 @@ business logic to drive audit and sync operations. The input-form can be customi
 `default.viewConfig`.
 
 ## RESTRICTIONS
-* Performance constraints apply for audits
-* Limited error-handling (FTL, ...)
-* Requires MDC mediation (devices with NETCONF or gRPC support)
+* Limited error-handling (FTL)
+* Nodes with NETCONF/gRPC support only (requires MDC mediation)
 
 ## EXPERIMENTAL FEATURES
+* ignore-children (pre-approved misalignments)
 * operation merge and delete
-* ignore-children
 * intend-based assurance

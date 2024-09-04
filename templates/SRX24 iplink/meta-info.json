@@ -2,9 +2,10 @@
   "intent-type": "{{ intent_type }}",
   "version": "1",
   "author": "{{ author }}",
-  "mapping-engine": "js-scripted",
+  "mapping-engine": "js-scripted-graal",
   "label": [
     "ApprovedMisalignments",
+    "GraalJS",
     "SReXperts2024"
   ],
   "target-component": [
@@ -15,7 +16,7 @@
       "order": 1
     }
   ],
-  "supports-network-state-suspend": false,
+  "supports-network-state-suspend": true,
   "return-config-as-json": true,
   "lifecycle-state": "released",
   "priority": 50,
@@ -23,5 +24,12 @@
   "composite": false,
   "supports-health": "never",
   "notify-intent-instance-events": false,
-  "live-state-retrieval": true
+  "live-state-retrieval": true,
+  "supports-asynchronous-operations": false,
+  "targetted-device": [
+    {
+      "function": "getTargettedDevices",
+      "index": 0
+    }
+  ]
 }

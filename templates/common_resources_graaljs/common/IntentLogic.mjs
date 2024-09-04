@@ -5,17 +5,15 @@
  ********************************************************************************/
 
 export class IntentLogic {
-    static INTENT_TYPE = "##"; 
-    static INTENT_ROOT = "##:##";
+    static INTENT_TYPE = '##'; 
+    static INTENT_ROOT = '##:##';
 
     /**
       * Produces a list of sites (neId: string) to be configured.
-      * Default implementation assumes target holds the (single) device
-      * to be configured.
       * 
       * Default implementation returns the target, assuming intents for
-      * a single site, typically used for any sort of golden site-level
-      * configuration.
+      * configuring a single site, typically used for any sort of golden
+      * site-level configuration.
       * 
       * @param {string} target Intent target
       * @param {object} config Intent configuration (dict)
@@ -24,9 +22,7 @@ export class IntentLogic {
       **/
 
     static getSites(target, config) {
-        var sites = [];
-        sites.push(target);
-        return sites;
+        return [target];
     }
     
     /**
@@ -47,9 +43,12 @@ export class IntentLogic {
      * If site-level attributes are calculated or retrieved from other sources,
      * for example inventory lookups or resource administrator, here is the place
      * to put the corresponding logic. For resource allocation (obtain/release)
-     * there is dedicated methods available.
+     * there are dedicated methods available.
      * 
-     * Default implementation returns the entire device config.
+     * Default implementation returns a single entry list, assuming intents
+     * for configuring a single site, typically used for any sort of golden
+     * site-level configuration. The single entry is the intent config itself
+     * while `ne-id` and `ne-name` are inserted (from target).
      * 
      * @param {string} target Intent target
      * @param {Dict}   config Intent configuration
@@ -58,7 +57,9 @@ export class IntentLogic {
      */
 
     static getSiteParameters(target, config, siteNames) {
-        return config;
+        config['ne-id'] = target;
+        config['ne-name'] = siteNames[target];
+        return [config];
     }
 
     /**
@@ -72,7 +73,9 @@ export class IntentLogic {
      * to put the corresponding logic. For resource allocation (obtain/release)
      * there is dedicated methods available.
      * 
-     * Default implementation returns the entire device config.
+      * Default implementation returns the config, assuming intents for
+      * configuring a single site, typically used for any sort of golden
+      * site-level configuration.
      *
      * @param {string} target Intent target
      * @param {Dict}   config Intent configuration
@@ -98,8 +101,10 @@ export class IntentLogic {
     /**
      * Migrate from/to a different versions of this intent-type.
      * Method supports upgrades to this version and downgrades from this version.
-     * Default implementation assumes intent-type-version 1 and therefore
-     * does not contain migration code.
+     * 
+     * WARNING:
+     * This is a placeholder for now!
+     * Implementation and examples will be made available soon.
      * 
      * @param {object} migrationInput object that has the migration input
      * 
@@ -110,7 +115,7 @@ export class IntentLogic {
         let targetVersion = parseInt(migrationInput.getTargetVersion());
         let intentConfigJson = JSON.parse(migrationInput.getJsonIntentConfiguration())[0][this.modelRoot];
         let intentTopology = migrationInput.getCurrentTopology();
-        return "";
+        return '';
     }
  
     /**
@@ -140,7 +145,7 @@ export class IntentLogic {
 
     /**
      * Releases resources from resource administrator (or external).
-     * Called if intent moves into "not present" state to ensure resources are released.
+     * Called if intent moves into 'not present' state to ensure resources are released.
      *
      * @param {string} target Intent target
      * @param {Dict}   config Intent configuration
@@ -151,7 +156,7 @@ export class IntentLogic {
   
     /**
       * Returns the name of free-marker template (ftl) to be used (specific per site).
-      * Generic recommendation is to use a common pattern like "{neType}.ftl"
+      * Generic recommendation is to use a common pattern like '{neType}.ftl'
       *
       * NOTE:
       *   In some cases we need to understand the role of a node like hub-site, server-site,
@@ -164,20 +169,20 @@ export class IntentLogic {
       */
 
     static getTemplateName(neId, familyTypeRelease) {
-        var neType = familyTypeRelease.split(':')[0];
+        const neType = familyTypeRelease.split(':')[0];
     
         switch (neType) {
-            case "7220 IXR SRLinux":
-            case "7250 IXR SRLinux":
-            case "7730 SXR SRLinux":
-                return "SRLinux.ftl";
-            case "7750 SR":
-            case "7450 ESS":
-            case "7950 XRS":
-            case "7250 IXR":
-                return "SR OS.ftl";
+            case '7220 IXR SRLinux':
+            case '7250 IXR SRLinux':
+            case '7730 SXR SRLinux':
+                return 'SRLinux.ftl';
+            case '7750 SR':
+            case '7450 ESS':
+            case '7950 XRS':
+            case '7250 IXR':
+                return 'SR OS.ftl';
             default:
-                return "OpenConfig.ftl";
+                return 'OpenConfig.ftl';
         }
     }
 }

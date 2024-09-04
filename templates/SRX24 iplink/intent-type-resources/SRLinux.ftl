@@ -1,6 +1,6 @@
 <#setting number_format="computer">
 {
-  "[${site.ne\-name}] INTERFACE ${site.port\-id}": {
+  "INTERFACE ${site.port\-id}": {
     "config": {
       "target": "srl_nokia-interfaces:/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
@@ -14,9 +14,9 @@
                 "mtu": 9000,
                 "subinterface": [{
                     "index": 1,
-                    "admin-state": "enable",
+                    "admin-state": "${global.adminState}",
                     "ipv4": {
-                        "admin-state": "enable",
+                        "admin-state": "${global.adminState}",
                         "address": [{
                             "ip-prefix": "${site.addr}/31"
                         }]
@@ -45,14 +45,14 @@
       }
     }
   },
-  "[${site.ne\-name}] LLDP INTERFACE ${site.port\-id}": {
+  "LLDP INTERFACE ${site.port\-id}": {
     "config": {
       "target": "srl_nokia-system:/system/srl_nokia-lldp:lldp/interface=${site.port\-id?url('ISO-8859-1')}",
       "operation": "replace",
       "value": {
             "srl_nokia-system:interface": {
                 "name": "${site.port\-id}",                  
-                "admin-state": "enable"
+                "admin-state": "${global.adminState}"
             }
       },
       "ignoreChildren": []
@@ -70,7 +70,7 @@
       }
     }      
   },
-  "[${site.ne\-name}] IP INTERFACE BINDING ${site.port\-id}.1": {
+  "IP INTERFACE BINDING ${site.port\-id}.1": {
     "config": {
       "target": "srl_nokia-network-instance:/network-instance=default/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",
@@ -97,12 +97,12 @@
       }
     }
   },
-  "[${site.ne\-name}] ISIS INTERFACE ${site.port\-id}.1": {
+  "ISIS INTERFACE ${site.port\-id}.1": {
     "config": {
       "target": "srl_nokia-network-instance:/network-instance=default/protocols/srl_nokia-isis:isis/instance=0/interface=${site.port\-id?url('ISO-8859-1')}.1",
       "operation": "replace",
       "value": {
-            "interface":
+            "srl_nokia-isis:interface":
                 {
                     "interface-name": "${site.port\-id}.1",
                     "circuit-type": "point-to-point",
@@ -112,7 +112,7 @@
 <#else>
                     "ipv4-unicast": {
 </#if>
-                      "admin-state": "enable"
+                      "admin-state": "${global.adminState}"
                     }
                 }
       },

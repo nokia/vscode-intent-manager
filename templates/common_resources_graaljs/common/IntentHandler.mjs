@@ -826,7 +826,7 @@ export class IntentHandler extends CalloutHandler
   validate(input) {
     const startTS = Date.now();
 
-    const target  = input.getTarget();
+    const target = input.getTarget();
     const config = JSON.parse(input.getJsonIntentConfiguration())[0][this.#logic.INTENT_ROOT];
 
     logger.info("IntentHandler::validate()");

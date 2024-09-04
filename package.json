@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -44,6 +44,11 @@
         "icon": "$(sync)"
       },
       {
+        "command": "nokia-intent-manager.migrate",
+        "category": "IntentManager",
+        "title": "Migrate intent(s)"
+      },
+      {
         "command": "nokia-intent-manager.logs",
         "category": "IntentManager",
         "title": "Server Logs",
@@ -72,6 +77,10 @@
         "category": "IntentManager",
         "title": "Upload intent-type",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "nokia-intent-manager.exportIntentType",
+        "title": "Export intent-type"
       },
       {
         "command": "nokia-intent-manager.uploadIntents",
@@ -213,6 +222,11 @@
         },
         {
           "command": "nokia-intent-manager.sync",
+          "group": "nokia_im",
+          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+        },
+        {
+          "command": "nokia-intent-manager.migrate",
           "group": "nokia_im",
           "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
         },

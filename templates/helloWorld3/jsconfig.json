@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "baseUrl": "../common_resources_graaljs/",
+        "paths": {
+            "common/*": [
+                "common/*"
+            ]
+        }
+    },
+    "include": [
+        "*.mjs",
+        "../common_resources_graaljs/**/*.mjs"
+    ]
+}
