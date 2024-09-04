@@ -7,9 +7,8 @@ This vsCode extension connects to Nokia NSP Intent Manager to facilitate Intent 
 > **Known Issues and Limitations:**
 > * Intent decorations are automatically updated by audit/sync methods to reduce server load. In some error scenarios the displayed alignment state does not reflect the server state. Consider to trigger a manual resync to reload alignment states from the backend server.
 > * `process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"` disables SSL verification (not recommended).
-> * By changing the extension config, the data does not get updated. User needs to reload vsCode to get config updated.
-> * OpenSearch logs retrieved filtering by target and limited to 1000 logs and 10min.
-> * No local validation. NSP will validate changes during upload/save.
+> * Log access (opensearch) is on-demand. Limits are applied (default: 1000 logs / 10min).
+> * No local validation of intent-types. NSP will validate changes during upload/save.
 > * If running NSP releases 23.11 and prior, some of the functionality may not be supported due to API restrictions
 
 ## License
