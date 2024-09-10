@@ -626,11 +626,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				// apply blacklist for label(s) provided in extension settings
 				intentTypes = intentTypes.filter((entry:any) => !entry.label.includes(label));
 			}
-			result = intentTypes.map((entry: { name: string; version: string; }) => [entry.name+"_v"+entry.version, vscode.FileType.Directory]);
+			result = intentTypes.map((entry: { name: string; version: string; }) => [entry.name+'_v'+entry.version, vscode.FileType.Directory]);
 
 			// Create missing intentType entries in cache
 			for (const entry of intentTypes) {
-				const intent_type_folder = entry.name+"_v"+entry.version;
+				const intent_type_folder = entry.name+'_v'+entry.version;
 				if (!(intent_type_folder in this.intentTypes))
 					this.intentTypes[intent_type_folder] = {
 						signed:  entry.label.includes('ArtifactAdmin'),
@@ -645,8 +645,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		} else {
 			const parts = path.split('/').map(decodeURIComponent);
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			if (parts.length===2) {
 				// readDirectory() was executed on folder "im:/{intent-type}_v{version}".
@@ -819,8 +819,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (pattern.test(parts[1])) {
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 	
 			this.pluginLogs.debug("readFile("+path+")");
 			if (!(intent_type_folder in this.intentTypes)) {
@@ -987,8 +987,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (pattern.test(parts[1])) {
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			let name_changed = false;
 	
@@ -1205,8 +1205,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (pattern.test(parts[1])) {
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 	
 			this.pluginLogs.debug("delete("+path+")");
 			if (!(intent_type_folder in this.intentTypes)) {
@@ -1335,8 +1335,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			newParts.length>3 && newParts[1]===oldParts[1] && newParts[2]==="intent-type-resources")
 		{
 			const intent_type_folder = oldParts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			const oldprefix = oldParts.slice(3).join("/");
 			const newprefix = newParts.slice(3).join("/");
@@ -1568,7 +1568,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const parts = entry.toString().split('/').map(decodeURIComponent);
 					const target = decodeURIComponent(parts[3].slice(0,-5));
 					const intent_type_folder = parts[1];
-					const intent_type = intent_type_folder.split('_v')[0];
+					const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 					if (this.intentTypes[intent_type_folder].desired[target] !== state) {
 						const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
@@ -1642,7 +1642,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		let intent_type_folder = parts.pop() ?? "";
 
 		if (matchImportedIntentType.test(intent_type_folder))
-			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, "_v"); 
+			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, '_v'); 
 
 		if (matchIntentType.test(intent_type_folder))
 			this.pluginLogs.debug("uploadIntentType("+path.fsPath+")");
@@ -1713,11 +1713,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		//   RESTCONF API requires "name" to be added (and intent-type to be removed)
 		//   RESTCONF API required "version" to be a number
 
-		const intent_type = intent_type_folder.split('_v')[0];
-		const intent_type_version = intent_type_folder.split('_v')[1];
+		const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
+		const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
 	
-		if ('intent-type' in meta && 'version' in meta && intent_type_folder!==meta["intent-type"]+"_v"+meta.version)
-			vscode.window.showWarningMessage("Mismatch with meta-info: "+meta["intent-type"]+"_v"+meta.version+"! Uploading under: "+intent_type_folder);
+		if ('intent-type' in meta && 'version' in meta && intent_type_folder!==meta["intent-type"]+'_v'+meta.version)
+			vscode.window.showWarningMessage("Mismatch with meta-info: "+meta["intent-type"]+'_v'+meta.version+"! Uploading under: "+intent_type_folder);
 
 		delete meta["intent-type"];
 		meta.name = intent_type;
@@ -1890,8 +1890,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const intent_type_folder = parts.pop();
 
 			if (intent_type_folder && matchIntentType.test(intent_type_folder) && intent_folder &&  intent_folder==="intents" && filename && filename.endsWith(".json")) {
-				const intent_type = intent_type_folder.split('_v')[0];
-				const intent_type_version = intent_type_folder.split('_v')[1];
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
+				const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
 				const target = decodeURIComponent(decodeURIComponent(filename.slice(0,-5)));
 				const content = fs.readFileSync(entry.fsPath, {encoding:'utf8', flag:'r'});
 		
@@ -2017,8 +2017,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (parts[0]==='im:') {
 				this.pluginLogs.info("get logs for "+entry.toString());
 				const intent_type_folder = parts[1];
-				const intent_type_version = intent_type_folder.split('_v')[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 	
 				const qentry = {"bool": {"must": [
 					{"match_phrase": {"log": "\"intent_type\":\""+intent_type+"\""}},
@@ -2081,7 +2081,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = logentry.target;
 				const intent_type = logentry.intent_type;
 				const intent_type_version = logentry.intent_type_version;
-				const intent_type_folder = intent_type+"_v"+intent_type_version;
+				const intent_type_folder = intent_type+'_v'+intent_type_version;
 
 				// avoid duplication of logging intent-type/version/target (from sf-logger.js)
 				let message = logentry.message.slice(logentry.message.indexOf("]")+1);
@@ -2129,7 +2129,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (parts.length===4 && parts[2]==="intents") {
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/audit";
 
 				this.pluginLogs.info("audit(", entry.toString(), ")");
@@ -2197,7 +2197,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (parts.length===4 && parts[2]==="intents") {
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 
 				const response: any = await this._callNSP(url, {method: "GET"});
@@ -2233,7 +2233,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (parts.length===4 && parts[2]==="intents") {
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/synchronize";
 
 				this.pluginLogs.info("sync(", entry.toString(), ")");
@@ -2283,7 +2283,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (parts.length===4 && parts[2]==="intents") {
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 
 				this._callNSP(url, {method: "GET"})
@@ -2324,7 +2324,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		);
 
 		const intent_types = Array.from(
-			new Set(intent_type_folders.map(folder => folder.split('_v')[0]))
+			new Set(intent_type_folders.map(folder => folder.substring(0, folder.lastIndexOf('_v'))))
 		);
 
 		if (intent_types.length !== 1) {
@@ -2335,13 +2335,13 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const intent_type = intent_types[0];
 
 		const usedVersions = Array.from(
-			new Set(intent_type_folders.map(folder => folder.split('_v')[1]))
+			new Set(intent_type_folders.map(folder => folder.substring(folder.lastIndexOf('_v')+2)))
 		);
 
 		const allVersions = Array.from(new Set(
 			Object.keys(this.intentTypes).
-				filter(folder => folder.split('_v')[0] === intent_type).
-				map(folder => folder.split('_v')[1])
+				filter(folder => folder.substring(0, folder.lastIndexOf('_v')) === intent_type).
+				map(folder => folder.substring(folder.lastIndexOf('_v')+2))
 		));
 
 		const items = [];
@@ -2366,9 +2366,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const parts = entry.toString().split('/').map(decodeURIComponent);
 					const target = decodeURIComponent(parts[3].slice(0,-5));
 					const intent_type_folder = parts[1];
-					const intent_type = intent_type_folder.split('_v')[0];
+					const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
-					if (intent_type_folder.split('_v')[1] !== newVersion) {
+					if (intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2) !== newVersion) {
 						this.pluginLogs.info(`migrate( ${entry.toString()} )`);
 						const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/migrate-intent`;
 
@@ -2422,8 +2422,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			} else {
 				const parts = path.split('/').map(decodeURIComponent);
 				const intent_type_folder = parts[1];
-				const intent_type_version = intent_type_folder.split('_v')[1];
-				const intent_type = intent_type_folder.split('_v')[0];
+				const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 					
 				if (parts.length>3 && parts[2]==='intents') {
 					const target = decodeURIComponent(parts[3].slice(0,-5));
@@ -2456,8 +2456,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const path = uriList[0].toString();
 			const parts = path.split('/').map(decodeURIComponent);
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			this.pluginLogs.debug("newIntent(", path, ")");
 
@@ -2483,8 +2483,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const path = uriList[0].toString();
 			const parts = path.split('/').map(decodeURIComponent);
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			this.pluginLogs.debug("newVersion(", path, ")");
 	
@@ -2513,8 +2513,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const path = uriList[0].toString();
 			const parts = path.split('/').map(decodeURIComponent);
 			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.split('_v')[1];
-			const intent_type = intent_type_folder.split('_v')[0];
+			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
+			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 			this.pluginLogs.debug("clone(", path, ")");
 

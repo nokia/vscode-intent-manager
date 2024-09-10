@@ -26,7 +26,7 @@ export class ResourceAdmin {
     var managerInfo = mds.getManagerByName('NSP');
     if (managerInfo.getConnectivityState().toString() === 'CONNECTED') {
       var url = "https://restconf-gateway/restconf/operations/nsp-inventory:find";
-      var body = JSON.stringify({"input": {"xpath-filter": xpath}});
+      var body = JSON.stringify({"input": {"xpath-filter": xpath, 'include-meta': false}});
 
       restClient.setIp(managerInfo.getIp());
       restClient.setPort(managerInfo.getPort());

@@ -281,7 +281,7 @@ export class CalloutHandler
   **/
   
   static getDeviceDetails(neId) {
-    const options = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']"};
+    const options = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']", 'include-meta': false};
     const result = CalloutHandler.#nspFind(options, true);
     
     if (!result.success)
@@ -310,7 +310,7 @@ export class CalloutHandler
     var neId = args;
     attribute.split('.').forEach( elem => neId = neId[elem] );
     
-    var options = {'depth': 3, 'fields': 'ne-id;ne-name;type;version;ip-address'};
+    var options = {'depth': 3, 'fields': 'ne-id;ne-name;type;version;ip-address', 'include-meta': false};
     if (neId)
       options['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']";
     else
@@ -349,7 +349,7 @@ export class CalloutHandler
     var neId = args;
     attribute.replace('port-id', 'ne-id').split('.').forEach( elem => neId = neId[elem] );
     
-    var options = {'depth': 3, 'fields': 'name;description;port-details'};
+    var options = {'depth': 3, 'fields': 'name;description;port-details', 'include-meta': false};
     if (neId && portId)
       options['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']/hardware-component/port[name='"+portId+"']";
     else if (neId)
@@ -390,7 +390,7 @@ export class CalloutHandler
     var neId = args;
     attribute.replace('port-id', 'ne-id').split('.').forEach( elem => neId = neId[elem] );
     
-    var options = {'depth': 3, 'fields': 'name;description;port-details'};
+    var options = {'depth': 3, 'fields': 'name;description;port-details', 'include-meta': false};
     if (neId && portId)
       options['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']/hardware-component/port[name='"+portId+"']";
     else if (neId)
@@ -480,7 +480,8 @@ export class CalloutHandler
     var options = {
       'xpath-filter': '/nsp-equipment:network/network-element',
       'depth': 3,
-      'fields': 'ne-id;ne-name'
+      'fields': 'ne-id;ne-name',
+      'include-meta': false
     };
 
     var rvalue = new HashMap();

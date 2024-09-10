@@ -28,7 +28,7 @@ function getNodes(context) {
   let neId = args;
   attribute.split('.').forEach( function(elem) {neId = neId[elem];});
   
-  var input = {'depth': 3, 'fields': 'ne-id;ne-name;type;version;ip-address'};
+  var input = {'depth': 3, 'fields': 'ne-id;ne-name;type;version;ip-address', 'include-meta': false};
   if (neId)
     input['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']";
   else
@@ -63,7 +63,7 @@ function getAccessPorts(context) {
   let neId = args;
   attribute.replace('port-id', 'ne-id').split('.').forEach( function(elem) {neId = neId[elem];});
   
-  var input = {'depth': 3, 'fields': 'name;description;port-details'};
+  var input = {'depth': 3, 'fields': 'name;description;port-details', 'include-meta': false};
   if (neId && portId)
     input['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']/hardware-component/port[name='"+portId+"']";
   else if (neId)
@@ -103,7 +103,7 @@ function getPorts(context) {
   let neId = args;
   attribute.replace('port-id', 'ne-id').split('.').forEach( function(elem) {neId = neId[elem];} );
   
-  var input = {'depth': 3, 'fields': 'name;description;port-details'};
+  var input = {'depth': 3, 'fields': 'name;description;port-details', 'include-meta': false};
   if (neId && portId)
     input['xpath-filter'] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']/hardware-component/port[name='"+portId+"']";
   else if (neId)

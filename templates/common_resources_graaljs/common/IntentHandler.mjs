@@ -312,7 +312,8 @@ export class IntentHandler extends CalloutHandler
         "xpath-filter": "/nsp-equipment:network/network-element",
         "depth": 3,
         "fields": "ne-id;ne-name",
-        "offset": 0
+        "offset": 0,
+        'include-meta': false
       };
 
       let total=1;

@@ -238,7 +238,7 @@
    **/
   
   this.getDeviceDetails = function(neId) {
-    const input = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']"};
+    const input = {"depth": 3, "xpath-filter": "/nsp-equipment:network/network-element[ne-id='"+neId+"']", 'include-meta': false};
     const result = this.restconfNspRpc("nsp-inventory:find", input);
     
     if (!result.success)
