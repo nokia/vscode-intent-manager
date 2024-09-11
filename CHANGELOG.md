@@ -231,8 +231,8 @@ Template Updates:
 Fixes:
 * Handle case, when intent-type name contains "_v"
 * Align way of compiling URLs
-* Added `include-meta: false` to improve performance
+* Disable meta in restconf queries for better performance/footage
 
 Template Updates:
-* Disable meta in inventory query responses for better performance/footage
+* Disable meta in restconf queries for better performance/footage
 * Associate accounting policy for OAM TWL demo
