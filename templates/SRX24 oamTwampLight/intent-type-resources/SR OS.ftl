@@ -114,7 +114,8 @@
             "measurement-interval": [{
                 "duration": "5-mins",
                 "clock-offset": 0,
-                "intervals-stored": 1
+                "intervals-stored": 1,
+                "accounting-policy": 75
             }]
           }
         }

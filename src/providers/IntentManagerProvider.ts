@@ -478,7 +478,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const body = {"input": {
 			'xpath-filter': '/nsp-equipment:network/network-element',
 			'depth': 3,
-			'fields': 'ne-id;ne-name'
+			'fields': 'ne-id;ne-name',
+			'include-meta': false
 		}};
 		
 		const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
@@ -652,8 +653,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				// readDirectory() was executed on folder "im:/{intent-type}_v{version}".
 				// Get intent-type defintion using IM API to create/update cache entry.
 
-				const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+intent_type+","+intent_type_version;
-
+				const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
 				const response: any = await this._callNSP(url, {method: "GET"});
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -751,7 +751,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				// Function will get and return the list of all views for
 				// the selected intent-type/version
 
-				const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version;
+				const url = `/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs=${intent_type},${intent_type_version}?include-meta=false`;
 				const response: any = await this._callNSP(url, {method: "GET"});
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -1012,7 +1012,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 						if (target in this.intentTypes[intent_type_folder].intents) {
 							this.pluginLogs.info("update intent", intent_type, target);
-							const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/intent-specific-data";
+							const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/intent-specific-data`;
+
 							const body = {"ibn:intent-specific-data": JSON.parse(content.toString())};
 							const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
 							if (!response)
@@ -1075,7 +1076,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							viewjson = "{}";
 						}
 
-						const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version;
+						const url = `/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs=${intent_type},${intent_type_version}`;
 						const body = {
 							"nsp-intent-type-config-store:intent-type-configs":[{
 								"views": [{
@@ -1151,7 +1152,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 						for (const parameter of forCleanup) delete data[parameter];		
 					}
 
-					const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+intent_type+","+intent_type_version;
+					const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
 					const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify({"ibn-administration:intent-type": data})});
 					if (!response)
 						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -1571,7 +1572,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
 
 					if (this.intentTypes[intent_type_folder].desired[target] !== state) {
-						const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
+						const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}`;
 
 						this.pluginLogs.info("setState(", entry.toString(), ")");
 						if (this.parallelOps) {
@@ -1757,7 +1758,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (intent_type_folder in this.intentTypes) {
 			const body = {"ibn-administration:intent-type": meta};
-			const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type="+intent_type+","+intent_type_version;
+			const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
 
 			this.pluginLogs.info("update intent-type", intent_type);
 			const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
@@ -1807,7 +1808,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const viewname = view.slice(0,-11);			
 			const content = fs.readFileSync(vscode.Uri.joinPath(path, "views", view).fsPath, {encoding:'utf8', flag:'r'});
 
-			const url = "/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs="+intent_type+","+intent_type_version;
+			const url = `/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs=${intent_type},${intent_type_version}`;			
 			const body = {
 				"nsp-intent-type-config-store:intent-type-configs": [{
 					"views": [{
@@ -1833,7 +1834,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			const content = fs.readFileSync(vscode.Uri.joinPath(path, "intents", filename).fsPath, {encoding:'utf8', flag:'r'});
 
 			if (target in this.intentTypes[intent_type_folder].intents) {
-				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/intent-specific-data";
+				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/intent-specific-data`;
 				const body = {"ibn:intent-specific-data": JSON.parse(content)};
 				this.pluginLogs.info("update intent", intent_type, target);
 				const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
@@ -1896,7 +1897,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const content = fs.readFileSync(entry.fsPath, {encoding:'utf8', flag:'r'});
 		
 				if (target in this.intentTypes[intent_type_folder].intents) {
-					const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/intent-specific-data";
+					const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/intent-specific-data`;
 					const body = {"ibn:intent-specific-data": JSON.parse(content)};
 					this.pluginLogs.info("update intent", intent_type, target);
 					const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
@@ -2130,7 +2131,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
 				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/audit";
+				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/audit`;
 
 				this.pluginLogs.info("audit(", entry.toString(), ")");
 				if (this.parallelOps && uriList.length>1) {
@@ -2198,8 +2199,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
 				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 
+				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}`;
 				const response: any = await this._callNSP(url, {method: "GET"});
 				if (!response)
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
@@ -2234,7 +2235,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
 				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type+"/synchronize";
+				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/synchronize`;
 
 				this.pluginLogs.info("sync(", entry.toString(), ")");
 				if (this.parallelOps && uriList.length>1) {
@@ -2284,8 +2285,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				const target = decodeURIComponent(parts[3].slice(0,-5));
 				const intent_type_folder = parts[1];
 				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-				const url = "/restconf/data/ibn:ibn/intent="+encodeURIComponent(target)+","+intent_type;
 
+				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}`;
 				this._callNSP(url, {method: "GET"})
 				.then((response:any) => {
 					if (response.ok)
