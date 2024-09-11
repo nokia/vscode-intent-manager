@@ -225,3 +225,14 @@ Template Updates:
 * Alignment of HelloWorld examples
 * SRX24 templates migrated to GraalJS: DeviceSecurity, GoldenConfig, IPL!nk, OAM TWL
 * Method #nspFindAC() for GraalJS applies access-control for pickers/suggest. Used for getNodes(), getAccessPorts(), getPorts(), suggestTargetDevices()
+
+## [3.2.1]
+
+Fixes:
+* Handle case, when intent-type name contains "_v"
+* Align way of compiling URLs
+* Added `include-meta: false` to improve performance
+
+Template Updates:
+* Disable meta in inventory query responses for better performance/footage
+* Associate accounting policy for OAM TWL demo
