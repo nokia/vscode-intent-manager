@@ -1,5 +1,6 @@
 module {{ intent_type }} {
-  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  namespace "urn:nokia.com:nsp:yang:im:{{ intent_type }}";
+
   prefix {{ intent_type }};
 
   organization
@@ -15,11 +16,17 @@ module {{ intent_type }} {
   }
 
   container {{ intent_type }} {
+
+    description
+        "Physical/logical interfaces (including IGP/MPLS) to connect two routers.";
+
     leaf description {
+      description "Used to populate description fields for node-level configuration objects.";
       type string;
     }
     
-    leaf adminState {
+    leaf admin-state {
+      description "Used to administratively enable/disable interfaces and protocol bindings";
       type enumeration {
         enum enable;
         enum disable;
@@ -29,20 +36,24 @@ module {{ intent_type }} {
     
     container endpoint-a {
       leaf ne-id {
+        description "ne-id of the first router.";
         type string;
         mandatory true;
       }
       leaf port-id {
+        description "physical port of the first router.";
         type string;
         mandatory true;
       }
     }
-    container endpoint-b {
+    container endpoint-b {      
       leaf ne-id {
+        description "ne-id of the second router.";
         type string;
         mandatory true;
       }
       leaf port-id {
+        description "physical port of the second router.";
         type string;
         mandatory true;
       }

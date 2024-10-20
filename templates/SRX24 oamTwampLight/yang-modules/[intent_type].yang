@@ -1,5 +1,5 @@
 module {{ intent_type }} {
-  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  namespace "urn:nokia.com:nsp:yang:im:{{ intent_type }}";
   prefix {{ intent_type }};
   
   organization
@@ -15,11 +15,16 @@ module {{ intent_type }} {
   }
 
   container {{ intent_type }} {
+    description
+        "A twamp/light session will be setup between two enpoints.";
+        
     leaf endpoint-a {
+        description "ne-id of the first endpoint.";
         type string;
         mandatory true;
     }
     leaf endpoint-b {
+        description "ne-id of the second endpoint.";
         type string;
         mandatory true;
     }

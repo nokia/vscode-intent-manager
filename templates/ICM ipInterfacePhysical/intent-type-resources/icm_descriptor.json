@@ -1,0 +1,7 @@
+{
+  "category": "port",
+  "role": "physical",
+  "device-scope": "all",
+  "description": "Physical/Logic interface (GRT) with IS-IS enabled (default instance, L1/P2P)",
+  "target-xpath": "/nsp-equipment:network/network-element/hardware-component/port[boolean(port-details[port-type='ethernet-port'])]"  
+}

@@ -11,7 +11,7 @@
 import { IntentLogic }   from 'common/IntentLogic.mjs';
 import { IntentHandler } from 'common/IntentHandler.mjs';
 
-let HashMap = classResolver.resolveClass('java.util.HashMap');
+const HashMap = classResolver.resolveClass('java.util.HashMap');
 
 const iso2_to_idd = {
   'AF': 93, 'AL': 355, 'DZ': 213, 'AS': 1, 'AD': 376, 'AO': 244, 'AI': 1,
@@ -49,12 +49,10 @@ const iso2_to_idd = {
   'ZW': 263
 };
 
-class DeviceConfig extends (IntentLogic) {
-  static INTENT_TYPE = '{{ intent_type }}';
-  static INTENT_ROOT = '{{ intent_type }}:{{ intent_type }}';
-  
-  static validate(target, config, contextualErrorJsonObj) {
-    const countryCodeFromISO2 = iso2_to_idd[config.location.ccode].toString();
+class DeviceConfig extends (IntentLogic) {  
+  static validate(intentType, InterTypeVersion, target, config, contextualErrorJsonObj) {
+    const cfg = Object.values(config)[0]; // top-level container has the details
+    const countryCodeFromISO2 = iso2_to_idd[cfg.location.ccode].toString();
 
     if (target.indexOf(':') >= 0) {
       if (/^10\d\d::cafe:\d+$/.test(target)) {
@@ -71,12 +69,12 @@ class DeviceConfig extends (IntentLogic) {
     }
   }
 
-  static getSiteParameters(target, config, siteNames) {
-    let sites = [config];
+  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+    let sites = Object.values(config); // top-level container has the details
   
     sites[0]['ne-id'] = target;
     sites[0]['ne-name'] = siteNames[target];
-    sites[0]['countryCode'] = iso2_to_idd[config.location.ccode];
+    sites[0]['countryCode'] = iso2_to_idd[sites[0].location.ccode];
 
     if (target.indexOf(':') > 0)
       sites[0]['nodeId'] = parseInt(target.split(':')[3]); // extract nodeId from IPv6 address '10{country-code}::cafe:{node-id}'

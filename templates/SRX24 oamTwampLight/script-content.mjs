@@ -9,27 +9,26 @@ import { IntentLogic }   from 'common/IntentLogic.mjs';
 import { IntentHandler } from 'common/IntentHandler.mjs';
 
 class OAMConfig extends (IntentLogic) {
-  static INTENT_TYPE = '{{ intent_type }}';
-  static INTENT_ROOT = '{{ intent_type }}:{{ intent_type }}';
-
   static getSites(target, config) {
-    return [config['endpoint-a'], config['endpoint-b']];
+    return [Object.values(config)[0]['endpoint-a'], Object.values(config)[0]['endpoint-b']];
   }
 
-  static validate(target, config, contextualErrorJsonObj) {
-    if (config['endpoint-a'] === config['endpoint-b'])
+  static validate(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
+    if (Object.values(config)[0]['endpoint-a'] === Object.values(config)[0]['endpoint-b'])
       contextualErrorJsonObj['Value inconsistency'] = 'endpoints must be different devices!';
   }
 
-  static getSiteParameters(target, config, siteNames) {
+  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+    const cfg = Object.values(config)[0];
+
     const sites = [
       {
-        'ne-id': config['endpoint-a'],
-        'ne-name': siteNames[config['endpoint-a']]
+        'ne-id': cfg['endpoint-a'],
+        'ne-name': siteNames[cfg['endpoint-a']]
       },
       {
-        'ne-id': config['endpoint-b'],
-        'ne-name': siteNames[config['endpoint-b']]
+        'ne-id': cfg['endpoint-b'],
+        'ne-name': siteNames[cfg['endpoint-b']]
       }
     ];
 

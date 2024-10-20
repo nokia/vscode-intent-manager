@@ -1378,7 +1378,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const pattern = /^([a-z][a-z0-9_-]+)_v1$/;
 
 		if (parts.length===2 && pattern.test(parts[1])) {
-			await this.newIntentTypeFromTemplate([uri]);
+			await this.newRemoteIntentType([uri]);
 		}
 		if (parts.length>3 && parts[2]==="intent-type-resources") {
 			this.pluginLogs.info(uri.toString());
@@ -2550,7 +2550,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * @param {any[]} args context used to issue command (not used yet)
 	 */
 
-	public async newIntentTypeFromTemplate(args:any[]): Promise<void> {
+	public async newRemoteIntentType(args:any[]): Promise<void> {
 		const patharg = this._getUriList(args)[0].toString();
 		const parts   = patharg.split('/').map(decodeURIComponent);
 		const pattern = /^([a-z][a-z0-9_-]+)(_v\d+)?$/;
@@ -2729,6 +2729,142 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		vscode.window.showInformationMessage("Intent-Type "+data.intent_type+" successfully created!");
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");			
+	}
+
+	/**
+	 * Creation of new a intent-type from template on the local system.
+	 * To be used for git-pipeline (recommended).
+	 * 
+	 * @param {any[]} args context used to issue command (not used yet)
+	 */
+
+	public async newLocalIntentType(args:any[]): Promise<void> {
+		this.pluginLogs.info("newLocalIntentType(", JSON.stringify(args), ")");
+		
+		if (args.length>1 && args[0] instanceof vscode.Uri) {
+			const userinput : {
+				intent_type: string|undefined,
+				author:string|undefined,
+				template:string|undefined,
+				date:string|undefined
+			} = {
+				intent_type: "default",
+				author: "NSP DevOps",
+				template: "none",
+				date: new Date().toISOString().slice(0,10)
+			};
+
+			userinput.intent_type = await vscode.window.showInputBox({
+				title: "Create intent-type | Step 1 NAME",
+				prompt: "Provide a name for the new intent-type!",
+				value: userinput.intent_type
+			});
+			if (!userinput.intent_type) return;
+
+			let rootUri = args[0];
+			if (fs.lstatSync(rootUri.fsPath).isFile())
+				rootUri = vscode.Uri.file(path.dirname(rootUri.fsPath));
+
+			const intentTypePath = vscode.Uri.joinPath(rootUri, userinput.intent_type+"_v1");
+			if (fs.existsSync(intentTypePath.fsPath)) {
+				vscode.window.showErrorMessage("Intent-type exists");
+				return;
+			}
+
+			userinput.author = await vscode.window.showInputBox({
+				title: "Create intent-type | Step 2 AUTHOR",
+				prompt: "Provide an author for the new intent",
+				value: userinput.author
+			});
+			if (!userinput.author) return;
+
+			const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
+			const items:{label:string, description:string}[] = JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
+	
+			const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
+			if (selection) userinput.template = selection.label; else return;
+
+			const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', userinput.template);
+			fs.mkdirSync(intentTypePath.fsPath);
+
+			// create folders/folders from template
+
+			const mergelist = [];
+			for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+				const srcpath = vscode.Uri.joinPath(templatePath, filename).fsPath;
+				const dstpath = vscode.Uri.joinPath(intentTypePath, filename).fsPath;
+
+				if (fs.lstatSync(srcpath).isDirectory())
+					fs.mkdirSync(dstpath);
+				else if (filename.startsWith('.') || filename.includes('/.') || filename in ["jsconfig.json"])
+					this.pluginLogs.info("skip file/folder ", filename);
+				else if (filename.startsWith('merge_'))
+					mergelist.push(filename.substring(6));
+				else {
+					this.pluginLogs.info("processing: ", filename);
+					const jinja = nunjucks.configure(path.dirname(srcpath));
+					const data = jinja.render(path.basename(srcpath), userinput);
+
+					if (filename === "jsconfig.json")
+						fs.writeFileSync(dstpath, JSON.stringify({
+							"compilerOptions": {
+								"baseUrl": "intent-type-resources/",
+								"paths": {"common/*": ["common/*"]}
+							},
+							"include": ["*.mjs", "intent-type-resources/**/*.mjs"]
+						}));
+					else if (filename === "yang-modules/[intent_type].yang")
+						fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${userinput.intent_type}.yang`).fsPath, data);
+					else
+						fs.writeFileSync(dstpath, data);
+				}
+			}
+
+			// merge common resource folders/files
+
+			const resourcePath = vscode.Uri.joinPath(intentTypePath, 'intent-type-resources');
+
+			if (!fs.existsSync(resourcePath.fsPath))
+				fs.mkdirSync(resourcePath.fsPath);
+
+			for (const folder of mergelist) {
+				this.pluginLogs.info("merging: ", folder);
+
+				const mergePath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
+				for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+					this.pluginLogs.info("filename: ", filename);
+
+					const srcpath = vscode.Uri.joinPath(mergePath, filename).fsPath;
+					const dstpath = vscode.Uri.joinPath(resourcePath, filename).fsPath;
+
+					if (fs.existsSync(dstpath)) {
+						this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
+					}
+					else if (fs.lstatSync(srcpath).isDirectory())
+						fs.mkdirSync(dstpath);
+					else if (filename.startsWith('.') || filename.includes('/.'))
+						this.pluginLogs.info("skip file/folder ", filename);
+					else {
+						this.pluginLogs.info("processing: ", filename);
+						const jinja = nunjucks.configure(path.dirname(srcpath));
+						const data = jinja.render(path.basename(srcpath), userinput);
+						fs.writeFileSync(dstpath, data);
+
+						// fs.copyFileSync(srcpath, dstpath);
+					}
+				}
+			}
+
+			// add extras
+
+			fs.writeFileSync("jsconfig.json", JSON.stringify({
+				"compilerOptions": {
+					"baseUrl": "./intent-type-resources/",
+					"paths": {"common/*": ["common/*"]}
+				},
+				"include": ["*.mjs", "intent-type-resources/**/*.mjs"]
+			}));
+		}
 	}
 
     /**

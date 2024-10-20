@@ -1,5 +1,5 @@
 module {{ intent_type }} {
-  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  namespace "urn:nokia.com:nsp:yang:im:{{ intent_type }}";
   prefix "{{ intent_type }}";
 
   organization "{{ author }}";

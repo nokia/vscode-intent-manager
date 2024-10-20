@@ -13,6 +13,14 @@
             "description": "basic intent-type applying best practices"
         },
         {
+            "label": "ICM ipInterfaceLogical",
+            "description": "abstracted base-router interface w/ port config (ICM logical)"
+        },
+        {
+            "label": "ICM ipInterfacePhysical",
+            "description": "abstracted base-router interface w/ port config (ICM physical)"
+        },
+        {
             "label": "SRX24 goldenConfiguration",
             "description": "SReXperts 2024 | device base configure (day1) | next-gen js-engine"
         },

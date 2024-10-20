@@ -1,0 +1,50 @@
+module {{ intent_type }} {
+  namespace "urn:nokia.com:nsp:yang:icm:{{ intent_type }}";
+  prefix {{ intent_type }};
+  
+  import ietf-inet-types {
+    prefix inet;
+  }
+  
+  import ietf-yang-types {
+    prefix yang;
+  }
+  
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+    leaf port-id {
+      description "Physical interface to be used to create the (logical) IP interface";
+      type string;
+    }
+
+    leaf description {
+      description "Port/Interface description";
+      type string;
+    }
+        
+    leaf ip-address {
+      description "Primary IPv4-address assigned to the interface";
+      type inet:ipv4-address;
+    }
+    
+    leaf admin-state {
+      description "Administrative state of the physical/logical interface (enable or disable)";
+      type enumeration {
+        enum enable;
+        enum disable;
+      }
+      default "enable";
+    }
+  }
+}

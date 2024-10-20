@@ -226,13 +226,29 @@ Template Updates:
 * SRX24 templates migrated to GraalJS: DeviceSecurity, GoldenConfig, IPL!nk, OAM TWL
 * Method #nspFindAC() for GraalJS applies access-control for pickers/suggest. Used for getNodes(), getAccessPorts(), getPorts(), suggestTargetDevices()
 
-## [3.2.1]
+## [3.3.0]
 
 Fixes:
 * Handle case, when intent-type name contains "_v"
-* Align way of compiling URLs
+
+Improvements:
+* Create new intent-type (from template) in local file-system (git-centric)
 * Disable meta in restconf queries for better performance/footage
+* Enjoy the new `NSP connect` vsCode extension to switch between multiple NSP systems
 
 Template Updates:
-* Disable meta in restconf queries for better performance/footage
-* Associate accounting policy for OAM TWL demo
+* Disable meta-info in inventory queries for better performance/footage
+* Associate accounting policy for OAM TWL
+* Improved exceptions and logging for FTL-related errors
+* nspFind method now supports both user-token and system-token
+* Avoid constants for intent-type name and container
+* Skip resolveSynchronize and resolveAudit based on intent-type meta labels
+* Advanced extraction of ne-id from target/input for picker/suggest
+* New method suggestDeviceModelObjects() to simplify device-model callouts
+* suggestTargetDevices renamed to suggestDevicesFromInventory
+* suggestAllTargetDevices renamed to suggestDevicesFromAllMediators
+* Two new ICM templates for abstract intenface config w/ brownfield discovery
+* CalloutHandler has been discontinued; Functionality moved to IntentHandler
+* New methods in ResourceAdmin to create IPv4 and numeric resource-pools
+* New hooks are available in IntentLogic: initialize, preAuditHook, preSyncExecute, postSyncExecute
+* Method freeResources has been removed. Please use postSyncExecute instead!

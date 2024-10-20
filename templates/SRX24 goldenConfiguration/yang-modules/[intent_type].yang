@@ -1,5 +1,5 @@
 module {{ intent_type }} {
-  namespace "http://www.nokia.com/management-solutions/{{ intent_type }}";
+  namespace "urn:nokia.com:nsp:yang:im:{{ intent_type }}";
   prefix {{ intent_type }};
 
   organization
@@ -17,38 +17,45 @@ module {{ intent_type }} {
   container {{ intent_type }} {
     container location {
       leaf name {
+        description "City, where the device is located";
         type string;
         mandatory true;
       }
     
       leaf country {
+        description "Country, where the device is located";
         type string;
         mandatory true;
       }
 
       leaf ccode {
+        description "2 letter country-code, where the device is located";
         type string;
         mandatory true;
       }
       
-      leaf gpsPosition {
+      leaf gps-position {
+        description "GPS location, where the device is located";
         type string;
         mandatory true;
       }
 
       leaf latitude {
+        description "Latitude, where the device is located";
         type string;
         mandatory true;
       }
 
       leaf longitude {
+        description "Longitude, where the device is located";
         type string;
         mandatory true;
       }
     }
     
     leaf contact {
-      type string;
+        description "Person responsible for the device";
+        type string;
     }
   }  
 }

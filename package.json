@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -111,7 +111,12 @@
         "icon": "$(play-circle)"
       },
       {
-        "command": "nokia-intent-manager.newIntentType",
+        "command": "nokia-intent-manager.newRemoteIntentType",
+        "category": "IntentManager",
+        "title": "Create intent-type"
+      },
+      {
+        "command": "nokia-intent-manager.newLocalIntentType",
         "category": "IntentManager",
         "title": "Create intent-type"
       },
@@ -181,9 +186,14 @@
           "when": "resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/.+\\.json/"
         },
         {
-          "command": "nokia-intent-manager.newIntentType",
+          "command": "nokia-intent-manager.newRemoteIntentType",
           "group": "nokia_im",
           "when": "resource =~ /^im:\\/$/"
+        },
+        {
+          "command": "nokia-intent-manager.newLocalIntentType",
+          "group": "nokia_im",
+          "when": "resourceScheme == file &&  !(resourcePath =~ /\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resourcePath =~ /\\/[a-z][a-z0-9_\\-]*_v\\d+/)"
         },
         {
           "command": "nokia-intent-manager.loglevel",

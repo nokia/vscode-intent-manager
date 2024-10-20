@@ -1,0 +1,55 @@
+{
+  "{{ intent_type }}.port-id": {
+    "displayKey": "Port Identifier",
+    "componentProps": {
+      "isPagination": true,
+      "isObject": false,
+      "paginationProps": {
+        "pageLabel": "Page"
+      }
+    },
+    "suggest": "getPorts",
+    "title": "PORT",
+    "type": "leafref",
+    "properties": [
+      {
+        "floatingFilter": true,
+        "name": "name",
+        "description": "Port Identifier",
+        "title": "PORT ID",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "description",
+        "description": "Port Description",
+        "title": "DESCRIPTION",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "port-mode",
+        "title": "MODE",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "encap-type",
+        "title": "ENCAP",
+        "type": "string"
+      },
+      {
+        "floatingFilter": true,
+        "name": "actual-rate",
+        "title": "RATE",
+        "type": "number"
+      },
+      {
+        "floatingFilter": true,
+        "name": "mtu-value",
+        "title": "MTU",
+        "type": "number"
+      }
+    ]
+  }
+}

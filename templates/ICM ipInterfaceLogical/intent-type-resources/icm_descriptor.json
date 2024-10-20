@@ -1,0 +1,7 @@
+{
+  "role": "logical",
+  "category": "router",
+  "device-scope": "mdm",
+  "select-target": "single",
+  "description": "Physical/Logic interface (GRT) with IS-IS enabled (default instance, L1/P2P)"
+}

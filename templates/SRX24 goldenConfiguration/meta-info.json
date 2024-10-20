@@ -11,7 +11,7 @@
   "target-component": [
     {
       "i18n-text": "Node",
-      "function-name": "suggestTargetDevices",
+      "function-name": "suggestDevicesFromInventory",
       "name": "neId",
       "value-type": "STRING",
       "order": 1

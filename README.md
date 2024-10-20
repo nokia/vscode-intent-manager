@@ -111,15 +111,10 @@ To connect to an NSP IM, you need to configure the following attributes in VsCod
 ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager
 ```
 
-
 * `Intent Manager: NSPIP`: IP-address or hostname of the NSP server
 * `Intent Manager: User`: NSP username to be used
 * `Intent Manager: Password`: NSP password to be used (password is hidden, using vsCode secrets)
 * `Intent Manager: Port`: Usage of port 443 is recommended
-
-
-
-
 
 ## Release Notes
 
@@ -133,6 +128,6 @@ See release changes in Changelog.
 ## Important links
 
 ### NOKIA | Network Developer Portal
-* [NSP Programmable Automation Frameworks](https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks)
+* [NSP Programmable Automation](https://network.developer.nokia.com/learn/24_8/programming)
 
 **Enjoy!**
