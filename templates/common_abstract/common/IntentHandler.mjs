@@ -1691,8 +1691,7 @@ export class IntentHandler
     }
 
     if (typeof target === "string" && target.length > 0)
-      // assumption that target is ne-id
-      return target
+      return target; // assumption that target is ne-id
 
     logger.info('ne-id not found in target/arguments');
     return undefined;
