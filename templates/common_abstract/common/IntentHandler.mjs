@@ -1742,20 +1742,21 @@ export class IntentHandler
    */  
 
   getPorts(context) {
-    const filter = "[boolean(port-details[port-type='ethernet-port'])]";
-    const options = {
-      "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
-      "fields": "name;description;port-details",
-      "limit": 1000,
-      "depth": 3,
-      "include-meta": false
-    };
-
     const neId = this.getNeId(context);
-    if (neId === undefined || neId === "")
-      logger.error("getPorts() skipped! Select ne-id first!");
-    else
+    if (typeof neId === "string" && neId.length > 0) {
+      const filter = "[boolean(port-details[port-type='ethernet-port'])]";
+      const options = {
+        "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
+        "fields": "name;description;port-details",
+        "limit": 1000,
+        "depth": 3,
+        "include-meta": false
+      };
       return this.inventoryHelper(context, options, 'name');
+    }
+    
+    logger.error("getPorts() skipped! Select ne-id first!");
+    return new HashMap();
   }
 
   /**
@@ -1766,20 +1767,21 @@ export class IntentHandler
    */
 
   getAccessPorts(context) {
-    const filter = "[boolean(port-details[port-type='ethernet-port'][port-mode='access'])]";
-    const options = {
-      "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
-      "fields": "name;description;port-details",
-      "limit": 1000,
-      "depth": 3,
-      "include-meta": false
-    };
-
     const neId = this.getNeId(context);
-    if (neId === undefined || neId === "")
-      logger.error("getAccessPorts() skipped! Select ne-id first!");
-    else
+    if (typeof neId === "string" && neId.length > 0) {
+      const filter = "[boolean(port-details[port-type='ethernet-port'][port-mode='access'])]";
+      const options = {
+        "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
+        "fields": "name;description;port-details",
+        "limit": 1000,
+        "depth": 3,
+        "include-meta": false
+      };
       return this.inventoryHelper(context, options, 'name');
+    }
+    
+    logger.error("getAccessPorts() skipped! Select ne-id first!");
+    return new HashMap();
   }  
  
   /**
