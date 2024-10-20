@@ -333,7 +333,7 @@ export class IntentHandler
    * @param {object} options Search criteria
    * @param {boolean} flatten Flatten result
    * @param {string} token Access-token of the WebUI user, starting with "Bearer "
-   * @returns success {boolean}, errmsg {string}, responses {object[]}
+   * @returns success {boolean}, errmsg {string}, response {object[]}
    *
    */
 
@@ -361,7 +361,7 @@ export class IntentHandler
       } else {
         const duration = Date.now()-startTS;
         logger.debug("IntentHandler::nspFind({}) finished within {} ms", options["xpath-filter"], duration|0);
-        return { success: false, responses: [], errmsg: "NSP mediator is disconnected." };    
+        return { success: false, response: [], errmsg: "NSP mediator is disconnected." };    
       }
 
       url = "https://restconf-gateway/restconf/operations/nsp-inventory:find";  
@@ -376,16 +376,15 @@ export class IntentHandler
 
       if (exception) {
         logger.error("Exception {} occured.", exception);
-        result = { success: false, responses: [], errmsg: "Exception "+exception+" occured."};
+        result = { success: false, response: [], errmsg: "Exception "+exception+" occured."};
       }
       else if (httpStatus >= 400) {
         // Either client error (4xx) or server error (5xx)
         logger.warn("NSP response: {} {}", httpStatus, response);
-        result = { success: false, responses: [], errmsg: response};
+        result = { success: false, response: [], errmsg: response};
       }
       else {
-        // enable for detailed debugging:
-        // logger.info("NSP response: {} {}", httpStatus, response);
+        logger.debug("NSP response: {} {}", httpStatus, response);
 
         const output = JSON.parse(response)["nsp-inventory:output"];
         const count = output["end-index"]-output["start-index"]+1;
@@ -412,9 +411,9 @@ export class IntentHandler
             return flattenedObject;
           }
 
-          result = { success: true, responses: output.data.map(object => flattenRecursive(object)) };
+          result = { success: true, response: output.data.map(object => flattenRecursive(object)) };
         } else
-          result = { success: true, responses: output.data };
+          result = { success: true, response: output.data };
       }          
     });
 
@@ -545,7 +544,7 @@ export class IntentHandler
           } else {
             // 2xx - Success
             logger.info("NSP response: {} {}", httpStatus, response);
-            const labels = JSON.parse(response)["ibn-administration:output"]["intent-type"][0]["label"];
+            const labels = JSON.parse(response)["ibn-administration:output"]["intent-type"][0].label;
 
             if (labels.includes("ApprovedMisalignments"))
               if (labels.includes("InfrastructureConfiguration")) {
@@ -602,15 +601,15 @@ export class IntentHandler
       result = { success: false, errmsg: "NSP mediator is disconnected." };
     
     const listKeys = [];
-    if (result["success"]) {
-      const attr = result["response"]["attributes"];
+    if (result.success) {
+      const attr = result.response.attributes;
       for (let i=0; i<attr.length; i++) {
-        if(attr[i]["isKey"] !== undefined) {
-          listKeys.push(attr[i]["name"]);
+        if(attr[i].isKey !== undefined) {
+          listKeys.push(attr[i].name);
         }
       }
     } else
-      logger.error("getListKeys() failed with {}", result["errmsg"]);
+      logger.error("getListKeys() failed with {}", result.errmsg);
     
     const duration = Date.now()-startTS;
     logger.debug("IntentHandler::getListKeys({}, {}) finished within {} ms", neId, listPath, duration|0);
@@ -740,13 +739,10 @@ export class IntentHandler
         "root-xpath": rootXPath,
         "intent-configuration": config
     };
+
     const resolveResponse = IntentHandler.fwkAction("/resolve-synchronize", unresolvedConfig);
     if (!resolveResponse.success)
       throw new Error("Resolve Synchronize failed with " + resolveResponse.errmsg);
-
-    // enable for detailed debugging:
-    // logger.info("desired config:  {}", JSON.stringify(config));
-    // logger.info("resolved config: {}", JSON.stringify(resolveResponse.response));
 
     const duration = Date.now()-startTS;
     logger.debug("IntentHandler::resolveSynchronize() finished within {} ms", duration|0);
@@ -793,8 +789,8 @@ export class IntentHandler
             const misAlignedObjectJson = {
                 "object-id": misAlignedObject.getObjectId(),
                 "device-name": misAlignedObject.getDeviceName(),
-                "is-configured": misAlignedObject.isConfigured(),
-                "is-undesired": misAlignedObject.isUndesired()
+                "is-undesired": misAlignedObject.isUndesired(),
+                "is-configured": misAlignedObject.isConfigured()
             };
             auditReportJson["misaligned-object"].push(misAlignedObjectJson);
         });
@@ -841,10 +837,6 @@ export class IntentHandler
     const startTS = Date.now();
     logger.debug("IntentHandler::compareConfig(neId={}, basePath={}, path={})", neId, basePath, path);
 
-    // enable for detailed debugging:
-    // logger.info("iCfg: "+JSON.stringify(iCfg));
-    // logger.info("aCfg: "+JSON.stringify(aCfg));
-    
     for (const key in iCfg) {
       if (key in aCfg) {
         if (typeof iCfg[key] !== typeof aCfg[key]) {
@@ -961,10 +953,6 @@ export class IntentHandler
   compareState(neId, aState, iState, auditReport, qPath) {
     const startTS = Date.now();
     logger.debug("IntentHandler::compareState(neId={}, qPath={})", neId, qPath);
-
-    // enable for detailed debugging:
-    // logger.info("iState: "+JSON.stringify(iState));
-    // logger.info("aState: "+JSON.stringify(iState));
 
     const siteName = neId;    
     for (const key in iState) {
@@ -1115,12 +1103,11 @@ export class IntentHandler
 
   validate(input) {
     const startTS = Date.now();
+    logger.info("IntentHandler::validate()");
 
     const target = input.getTarget();
     const intentType = input.getIntentType();
     const intentTypeVersion = input.getIntentTypeVersion();
-
-    logger.info("IntentHandler::validate()");
 
     const config = JSON.parse(input.getJsonIntentConfiguration())[0];
 
@@ -1266,7 +1253,7 @@ export class IntentHandler
             
             sitesCleanups[neId] = {};
             for (const objectName in sitesConfigs[neId]) {
-              if (sitesConfigs[neId][objectName]["operation"]==="replace") {
+              if (sitesConfigs[neId][objectName].operation === "replace") {
                 // For operation "replace" remember how to clean-up the object created (house-keeping).
                 // For cleanup we are using operation "remove", to avoid the operation from failing,
                 // if the corresponding device configuration was deleted from the network already.
@@ -1626,10 +1613,10 @@ export class IntentHandler
     if (!result.success)
       return {};
 
-    if (result.responses.length === 0)
+    if (result.response.length === 0)
       return {};
 
-    return result.responses[0];
+    return result.response[0];
   }
 
   /**************************************************************************
@@ -1656,7 +1643,7 @@ export class IntentHandler
   getNeId(context) {
     logger.info("IntentHandler::getNeId({})", context.getInputValues().toJSONString());
     const target = context.getInputValues().target;
-    const args = context.getInputValues()["arguments"];
+    const args = context.getInputValues().arguments;
 
     const aliases = ['ne-id', 'neId', 'site-id', 'siteId', 'node-id', 'nodeId', 'device-id', 'deviceId', 'site', 'node', 'device', 'endpoint'];
 
@@ -1681,7 +1668,7 @@ export class IntentHandler
 
     // Check schema-form (intent-model) hierarchy
 
-    let path = context.getInputValues()["arguments"]["__attribute"];
+    let path = context.getInputValues().arguments.__attribute;
     while (path.lastIndexOf('.') > -1) {
       path = path.substr(0, path.lastIndexOf('.'));
       let parent = args;
@@ -1693,119 +1680,108 @@ export class IntentHandler
     if (typeof target === "string" && target.length > 0)
       return target; // assumption that target is ne-id
 
-    logger.info('ne-id not found in target/arguments');
+    logger.error('ne-id not found in target/args');
     return undefined;
+  }
+
+  /**
+   * WebUI callout helper function to get the list of objects from NSP inventory.
+   * 
+   * Notes: Access-control applies! Action `nsp-inventory:find` enforces pagination!
+   * 
+   * @param {ValueProviderContext} context
+   * @param {object} options
+   * @param {string} key
+   * @param {boolean} suggest
+   * 
+   * @returns Suggestion data in Map format
+   */  
+
+  inventoryHelper(context, options, key, suggest=false) {
+    const startTS = Date.now();
+    logger.info("IntentHandler::inventoryHelper()");
+
+    const token = context.getInputValues().arguments.__token;
+    const result = IntentHandler.nspFind(options, true, token);
+
+    const rvalue = new HashMap();
+    if (result.success)
+      if (suggest)
+        result.response.forEach(entry => rvalue.put(entry[key], entry[key]));
+      else
+        result.response.forEach(entry => rvalue.put(entry[key], entry));
+
+    const duration = Date.now()-startTS;
+    logger.info("IntentHandler::inventoryHelper() finished within "+duration+" ms");
+
+    return rvalue;
   }
  
   /**
-   * WebUI callout to get the list of nodes from NSP inventory
-   * If `ne-id` is available, filter is applied to the given node only
-   * 
-   * Notes: Access-control applies! Action `nsp-inventory:find` enforces pagination,
-   * output is limited to 1000 objects.
+   * WebUI callout to get the list of nodes.
    * 
    * @param {ValueProviderContext} context
    * @returns Suggestion data in Map format
    */  
 
   getNodes(context) {
-    const startTS = Date.now();
-    logger.info("IntentHandler::getNodes()");
-
-    const args = context.getInputValues()["arguments"];
-    const token = context.getInputValues()["arguments"]["__token"];
-    const attribute = context.getInputValues()["arguments"]["__attribute"];
-    
-    let neId = args;
-    attribute.split('.').forEach( elem => neId = neId[elem] );
-    
     const options = {
       "xpath-filter": "/nsp-equipment:network/network-element",
       "fields": "ne-id;ne-name;type;version;ip-address",
       "include-meta": false
     };
 
-    if (neId)
-      options["xpath-filter"] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']";
-    
-    const result = IntentHandler.nspFind(options, true, token);
-    if (!result.success) return {};
-
-    const nodes = new HashMap();
-    result.responses.forEach(node => nodes.put(node['ne-id'], node));
-
-    const duration = Date.now()-startTS;
-    logger.info("IntentHandler::getNodes() finished within "+duration+" ms");
-
-    return nodes;  
+    return this.inventoryHelper(context, options, 'ne-id');
   }
 
   /**
-   * WebUI callout to get the list of all ETHERNET ports from NSP inventory
-   * If `ne-id` is present, filter is applied to ports of the given node only
-   * If `ne-id` and `port-id` are present, filter is applied to the given port only
-   * 
-   * Notes: Access-control applies! Action `nsp-inventory:find` enforces pagination,
-   * output is limited to 1000 objects.
+   * WebUI callout to get the list of all eth-ports.
    * 
    * @param {ValueProviderContext} context
-   * @param {string} criteria enable customized queries by providing a filter criteria
    * @returns Suggestion data in Map format
    */  
 
-  getPorts(context, criteria="boolean(port-details[port-type='ethernet-port'])") {
-    const startTS = Date.now();
-    logger.info("IntentHandler::getPorts()");
-
-    const args = context.getInputValues()["arguments"];
-    const token = context.getInputValues()["arguments"]["__token"];
-    const attribute = context.getInputValues()["arguments"]["__attribute"];
-
-    let portId = args;
-    attribute.split('.').forEach( elem => portId = portId[elem] );
-
-    const neId = this.getNeId(context);
-
+  getPorts(context) {
+    const filter = "[boolean(port-details[port-type='ethernet-port'])]";
     const options = {
-      "xpath-filter": "/nsp-equipment:network/network-element/hardware-component/port["+criteria+"]",
+      "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
       "fields": "name;description;port-details",
+      "limit": 1000,
+      "depth": 3,
       "include-meta": false
     };
 
-    if (neId) {
-      if (portId) criteria = "name='"+portId+"'";
-      options["xpath-filter"] = "/nsp-equipment:network/network-element[ne-id='"+neId+"']/hardware-component/port["+criteria+"]";
-    }
-
-    const result = IntentHandler.nspFind(options, true, token);
-    if (!result.success) return {};
-
-    const ports = new HashMap();
-    result.responses.forEach(port => ports.put(port.name, port));
-
-    const duration = Date.now()-startTS;
-    logger.info("IntentHandler::getPorts() finished within "+duration+" ms");
-
-    return ports;
+    const neId = this.getNeId(context);
+    if (neId === undefined || neId === "")
+      logger.error("getPorts() skipped! Select ne-id first!");
+    else
+      return this.inventoryHelper(context, options, 'name');
   }
 
   /**
-   * WebUI callout to get list of all ACCESS ports from NSP inventory
-   * If `ne-id` is present, filter is applied to ports of the given node only
-   * If `ne-id` and `port-id` are present, filter is applied to the given port only
-   * 
-   * Notes: Access-control applies! Action `nsp-inventory:find` enforces pagination,
-   * output is limited to 1000 objects.
+   * WebUI callout to get list of all access ports.
    * 
    * @param {ValueProviderContext} context
    * @returns Suggestion data in Map format
    */
- 
-  getAccessPorts(context) {
-    const criteria = "boolean(port-details[port-type='ethernet-port'][port-mode='access'])";
-    return this.getPorts(context, criteria);
-  }
 
+  getAccessPorts(context) {
+    const filter = "[boolean(port-details[port-type='ethernet-port'][port-mode='access'])]";
+    const options = {
+      "xpath-filter": `/nsp-equipment:network/network-element[ne-id='${neId}']/hardware-component/port${filter}`,
+      "fields": "name;description;port-details",
+      "limit": 1000,
+      "depth": 3,
+      "include-meta": false
+    };
+
+    const neId = this.getNeId(context);
+    if (neId === undefined || neId === "")
+      logger.error("getAccessPorts() skipped! Select ne-id first!");
+    else
+      return this.inventoryHelper(context, options, 'name');
+  }  
+ 
   /**
    * WebUI callout for suggest/auto-complete against device-model using MDC
    * 
@@ -1829,15 +1805,9 @@ export class IntentHandler
       const query = listPath + '?fields=' + keys.join(',') + (queryOpt ? `&${queryOpt}` : '');
 
       const result = IntentHandler.restconfGetDevice(neId, query);
-      if (result.success) {
-        const matchEntries = Object.values(result.response)[0]
-          .map(entry => keys.map(key => entry[key]).join(','));
 
-        logger.info("Found "+matchEntries.length+" entries!");
-        logger.debug(JSON.stringify(matchEntries));
-
-        matchEntries.sort().forEach(key => rvalue[key]=key);
-      }
+      if (result.success)
+        Object.values(result.response)[0].map(entry => keys.map(key => entry[key]).join(',')).forEach(key => rvalue.put(key, key));
 
       const duration = Date.now()-startTS;
       logger.info("IntentHandler::suggestDeviceModelObjects() finished within "+duration+" ms");
@@ -1859,36 +1829,13 @@ export class IntentHandler
    */  
 
   suggestDevicesFromInventory(context) {
-    const startTS = Date.now();
-    logger.info("IntentHandler::suggestDevicesFromInventory()");
-
-    const token = context.getInputValues()["arguments"]["__token"];
-        
     const options = {
       "xpath-filter": "/nsp-equipment:network/network-element",
       "fields": "ne-id;ne-name",
       "include-meta": false
     };
 
-    const rvalue = new HashMap();
-    try  {
-      const result = IntentHandler.nspFind(options, true, token);
-      if (result.success) {
-        const matchEntries = Object.values(result.response)[0].map(entry => entry['ne-id']);
-        logger.info("Found "+matchEntries.length+" devices!");
-
-        // convert output into HashMap required by WebUI framework
-        matchEntries.sort().forEach(neId => rvalue[neId]=neId);
-      }
-    }
-    catch (exception) {
-      logger.error("Exception {} occured.", exception);
-    }
-
-    const duration = Date.now()-startTS;
-    logger.info("IntentHandler::suggestDevicesFromInventory() finished within "+duration+" ms");
-
-    return rvalue;  
+    return this.inventoryHelper(context, options, 'ne-id', true);
   }
 
   /**
@@ -1903,36 +1850,20 @@ export class IntentHandler
 
   suggestDevicesFromAllMediators(context) {
     const startTS = Date.now();
-    const searchString = context.getSearchQuery();
+    logger.info("IntentHandler::suggestDevicesFromAllMediators()");
 
-    logger.info("IntentHandler::suggestDevicesFromAllMediators({})", searchString || "");
+    // get connected mediators
+    const mediators = [];
+    mds.getAllManagersOfType("REST").forEach(mediator => {
+      if (mds.getManagerByName(mediator).getConnectivityState().toString() === 'CONNECTED')
+        mediators.push(mediator);
+    });
+
+    // get managed devices from mediator(s)
+    const devices = mds.getAllManagedDevicesFrom(Arrays.asList(mediators));
 
     const rvalue = new HashMap();
-    try  {
-      // get connected mediators
-      const mediators = [];
-      mds.getAllManagersOfType("REST").forEach(mediator => {
-        if (mds.getManagerByName(mediator).getConnectivityState().toString() === 'CONNECTED')
-          mediators.push(mediator);
-      });
-
-      // get managed devices from mediator(s)
-      const devices = mds.getAllManagedDevicesFrom(Arrays.asList(mediators));
-
-      // filter result by searchString provided from WebUI
-      const filteredDevicenames = [];
-      devices.forEach(device => {
-        if (!searchString || device.getName().indexOf(searchString) !== -1)
-          filteredDevicenames.push(device.getName());
-      });
-      logger.info("Found "+filteredDevicenames.length+" devices!");
-
-      // convert output into HashMap required by WebUI framework
-      filteredDevicenames.sort().forEach(devicename => rvalue[devicename]=devicename);
-    }
-    catch (exception) {
-      logger.error("Exception {} occured.", exception);
-    }
+    devices.forEach(device => rvalue.put(device.getName(), device.getName()));
 
     const duration = Date.now()-startTS;
     logger.info("IntentHandler::suggestDevicesFromAllMediators() finished within "+duration+" ms");

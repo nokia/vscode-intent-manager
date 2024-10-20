@@ -11,7 +11,7 @@
         "value": "iso2"
       },
       {
-        "name": "location.gpsPosition",
+        "name": "location.gps-position",
         "value": "coordinates"
       },
       {
@@ -54,7 +54,7 @@
       }
     ]
   },
-  "{{ intent_type }}.location.gpsPosition": {
+  "{{ intent_type }}.location.gps-position": {
     "title": "GPS Position"
   },
   "{{ intent_type }}.location.ccode": {
