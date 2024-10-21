@@ -90,7 +90,7 @@
       }
     },
 
-    "TWAMP SESSION ${target}": {
+    "TWAMP SESSION ${sessionname}": {
       "config": {
         "target": "nokia-conf:/configure/oam-pm/session=${sessionname}",
         "operation": "replace",
