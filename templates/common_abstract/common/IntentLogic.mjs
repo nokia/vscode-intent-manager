@@ -189,19 +189,23 @@ export class IntentLogic {
 
     static getTemplateName(neId, familyTypeRelease) {
         const neType = familyTypeRelease.split(':')[0];
-    
-        switch (neType) {
-            case '7220 IXR SRLinux':
-            case '7250 IXR SRLinux':
-            case '7730 SXR SRLinux':
-                return 'mappers/SRLinux.ftl';
-            case '7750 SR':
-            case '7450 ESS':
-            case '7950 XRS':
-            case '7250 IXR':
-                return 'mappers/SR OS.ftl';
-            default:
-                return 'mappers/OpenConfig.ftl';
-        }
+
+        if (['7250 IXR', '7450 ESS', '7750 SR', '7950 XRS'].includes(neType))
+            return 'mappers/SR OS.ftl';
+
+        if (familyTypeRelease.includes('SRLinux'))
+            return 'mappers/SRLinux.ftl';
+
+        if (familyTypeRelease.includes('Ciena'))
+            return 'mappers/SAOS.ftl';
+
+        if (familyTypeRelease.includes('IOS-XR'))
+            return 'mappers/IOS-XR.ftl';
+
+        if (familyTypeRelease.includes('Juniper'))
+            return 'mappers/JunOS MX.ftl';
+
+        // default: OpenConfig
+        return 'mappers/OpenConfig.ftl';
     }
 }
