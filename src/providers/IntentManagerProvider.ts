@@ -1740,9 +1740,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		}
 
 		meta["resource"]=[];
-		for (const resource of resources) {
-			meta["resource"].push({"name": resource, "value": fs.readFileSync(vscode.Uri.joinPath(path, "intent-type-resources", resource).fsPath, {encoding: 'utf8', flag: 'r'})});
-		}
+		for (const filename of resources)
+			meta["resource"].push({"name": filename.split('\\').join('/'), "value": fs.readFileSync(vscode.Uri.joinPath(path, "intent-type-resources", filename).fsPath, {encoding: 'utf8', flag: 'r'})});
 
 		// Parameters "resourceDirectory" and "supported-hardware-types" are not supported in the
 		// RESTCONF API payload, and must be removed.

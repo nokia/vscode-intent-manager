@@ -252,3 +252,11 @@ Template Updates:
 * New methods in ResourceAdmin to create IPv4 and numeric resource-pools
 * New hooks are available in IntentLogic: initialize, preAuditHook, preSyncExecute, postSyncExecute
 * Method freeResources has been removed. Please use postSyncExecute instead!
+
+## [3.3.1]
+
+Fixes:
+* OAM template to support changing terminating nodes
+* Readme corrected
+* Update template mappings to support Juniper, Cisco and Ciena
+* Fix for upload intent-type from local system on Windows

@@ -2,7 +2,7 @@
   "name": "nokia-intent-manager",
   "displayName": "NOKIA_IM",
   "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "icon": "media/NSP_Logo.png",
   "publisher": "Nokia",
   "repository": "http://github.com/nokia/vscode-intent-manager",
