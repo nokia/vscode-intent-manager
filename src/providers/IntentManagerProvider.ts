@@ -53,6 +53,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	timeout: number;
 	fileIgnore: Array<string>;
+	fileInclude: Array<string>;
 	parallelOps: boolean;
 
 	serverLogsOffset: string;
@@ -95,6 +96,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
+		this.fileInclude = config.get("includeLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
 
 		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";
@@ -626,6 +628,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			for (const label of this.fileIgnore) {
 				// apply blacklist for label(s) provided in extension settings
 				intentTypes = intentTypes.filter((entry:any) => !entry.label.includes(label));
+			}
+			for (const label of this.fileInclude) {
+				// apply whitelist for label(s) provided in extension settings
+				intentTypes = intentTypes.filter((entry:any) => entry.label.includes(label));
 			}
 			result = intentTypes.map((entry: { name: string; version: string; }) => [entry.name+'_v'+entry.version, vscode.FileType.Directory]);
 
@@ -1466,6 +1472,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
+		this.fileInclude = config.get("includeLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
 
 		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";

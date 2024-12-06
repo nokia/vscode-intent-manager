@@ -308,6 +308,14 @@
           },
           "description": "Intent-types with these labels will be hidden."
         },
+        "intentManager.includeLabels": {
+          "type": "array",
+          "scope": "application",
+          "items": {
+            "type": "string"
+          },
+          "description": "Intent-types with these labels only will be visible."
+        },
         "intentManager.parallelOperations.enable": {
           "type": "boolean",
           "scope": "application",
