@@ -2,7 +2,7 @@
 *created by {{author}}*
 
 This is an **abstract intent-type** applying IPL!nk principles.
-It uses the next-generation JavaScript engine (GraalJS) added in NSP24.8.
+It uses the next-generation JavaScript engine (GraalJS).
 
 ## APPLY YOUR CHANGES
 Following files are considered common framework files:<br/>
@@ -11,8 +11,9 @@ Following files are considered common framework files:<br/>
   intent-type-resources
   └── common
       ├── IntentHandler.mjs
-      ├── IntentLogic.mjs
+      ├── NSP.mjs
       ├── ResourceAdmin.mjs
+      ├── WebUI.mjs
       └── patch.ftl
 ```
 

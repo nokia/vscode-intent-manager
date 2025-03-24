@@ -103,7 +103,7 @@
   },
   "{{ intent_type }}.endpoint-b.port-id": {
     "displayKey": "name",
-    "dependsOn": "endpoint-a.ne-id",
+    "dependsOn": "endpoint-b.ne-id",
     "componentProps": {
       "isPagination": true,
       "isObject": false,

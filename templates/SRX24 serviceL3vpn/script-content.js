@@ -1,6 +1,3 @@
-/* global load, resourceProvider, utils, resourceAdmin */
-/* eslint no-undef: "error" */
-
 load({script: resourceProvider.getResource('utils_callouts.js'),    name: 'callouts'});
 load({script: resourceProvider.getResource('utils_entrypoints.js'), name: 'entrypoints'});
 

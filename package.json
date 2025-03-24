@@ -1,375 +1,389 @@
 {
-  "name": "nokia-intent-manager",
-  "displayName": "NOKIA_IM",
-  "description": "NOKIA IM vsCode Developer Plugin",
-  "version": "3.3.1",
-  "icon": "media/NSP_Logo.png",
-  "publisher": "Nokia",
-  "repository": "http://github.com/nokia/vscode-intent-manager",
-  "engines": {
-    "vscode": "^1.75.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onFileSystem:im",
-    "onStartupFinished"
-  ],
-  "main": "./dist/main.js",
-  "contributes": {
-    "snippets": [
-      {
-        "language": "javascript",
-        "path": "./snippets.json"
-      }
-    ],
-    "commands": [
-      {
-        "command": "nokia-intent-manager.audit",
-        "category": "IntentManager",
-        "title": "Audit intent(s)",
-        "icon": "$(search)"
-      },
-      {
-        "command": "nokia-intent-manager.lastAuditReport",
-        "category": "IntentManager",
-        "title": "Audit report",
-        "icon": "$(search)"
-      },
-      {
-        "command": "nokia-intent-manager.sync",
-        "category": "IntentManager",
-        "title": "Synchronize intent(s)",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "nokia-intent-manager.migrate",
-        "category": "IntentManager",
-        "title": "Migrate intent(s)"
-      },
-      {
-        "command": "nokia-intent-manager.logs",
-        "category": "IntentManager",
-        "title": "Server Logs",
-        "icon": "$(debug)"
-      },
-      {
-        "command": "nokia-intent-manager.retrieveState",
-        "category": "IntentManager",
-        "title": "Retrieve Intent State",
-        "icon": "$(cloud-download)"
-      },
-      {
-        "command": "nokia-intent-manager.state",
-        "category": "IntentManager",
-        "title": "Set intent(s) state",
-        "icon": "$(symbol-property)"
-      },
-      {
-        "command": "nokia-intent-manager.openInBrowser",
-        "category": "IntentManager",
-        "title": "Open in browser",
-        "icon": "$(home)"
-      },
-      {
-        "command": "nokia-intent-manager.uploadIntentType",
-        "category": "IntentManager",
-        "title": "Upload intent-type",
-        "icon": "$(cloud-upload)"
-      },
-      {
-        "command": "nokia-intent-manager.exportIntentType",
-        "title": "Export intent-type"
-      },
-      {
-        "command": "nokia-intent-manager.uploadIntents",
-        "category": "IntentManager",
-        "title": "Upload intent(s)",
-        "icon": "$(cloud-upload)"
-      },
-      {
-        "command": "workbench.files.action.compareWithSaved",
-        "category": "IntentManager",
-        "title": "Compare changes",
-        "icon": "$(request-changes)"
-      },
-      {
-        "command": "nokia-intent-manager.newVersion",
-        "category": "IntentManager",
-        "title": "New intent-type version"
-      },
-      {
-        "command": "nokia-intent-manager.clone",
-        "category": "IntentManager",
-        "title": "Clone intent-type"
-      },
-      {
-        "command": "nokia-intent-manager.newIntent",
-        "category": "IntentManager",
-        "title": "Create intent",
-        "icon": "$(play-circle)"
-      },
-      {
-        "command": "nokia-intent-manager.newRemoteIntentType",
-        "category": "IntentManager",
-        "title": "Create intent-type"
-      },
-      {
-        "command": "nokia-intent-manager.newLocalIntentType",
-        "category": "IntentManager",
-        "title": "Create intent-type"
-      },
-      {
-        "command": "nokia-intent-manager.loglevel",
-        "category": "IntentManager",
-        "title": "Set log-level"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
-          "command": "nokia-intent-manager.uploadIntentType",
-          "group": "navigation"
-        },
-        {
-          "when": "resourceScheme == im && activeEditorIsDirty == true",
-          "command": "workbench.files.action.compareWithSaved",
-          "group": "navigation"
-        },
-        {
-          "when": "resourceScheme == im",
-          "command": "nokia-intent-manager.openInBrowser",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\//",
-          "command": "nokia-intent-manager.newIntent",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
-          "command": "nokia-intent-manager.logs",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
-          "command": "nokia-intent-manager.retrieveState",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
-          "command": "nokia-intent-manager.audit",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
-          "command": "nokia-intent-manager.sync",
-          "group": "navigation"
-        },
-        {
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
-          "command": "nokia-intent-manager.state",
-          "group": "navigation"
-        }
-      ],
-      "explorer/context": [
-        {
-          "command": "nokia-intent-manager.uploadIntentType",
-          "group": "nokia_im",
-          "when": "resource =~ /^file:.*\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.uploadIntents",
-          "group": "nokia_im",
-          "when": "resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/.+\\.json/"
-        },
-        {
-          "command": "nokia-intent-manager.newRemoteIntentType",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/$/"
-        },
-        {
-          "command": "nokia-intent-manager.newLocalIntentType",
-          "group": "nokia_im",
-          "when": "resourceScheme == file &&  !(resourcePath =~ /\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resourcePath =~ /\\/[a-z][a-z0-9_\\-]*_v\\d+/)"
-        },
-        {
-          "command": "nokia-intent-manager.loglevel",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/$/"
-        },       
-        {
-          "command": "nokia-intent-manager.newIntent",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.newVersion",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.clone",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.logs",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
-        },
-        {
-          "command": "nokia-intent-manager.retrieveState",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.audit",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.sync",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.migrate",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.state",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.lastAuditReport",
-          "group": "nokia_im",
-          "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
-        },
-        {
-          "command": "nokia-intent-manager.openInBrowser",
-          "group": "nokia_im",
-          "when": "resourceScheme == im"
-        }
-      ]
+    "name": "nokia-intent-manager",
+    "displayName": "NOKIA_IM",
+    "description": "NOKIA IM vsCode Developer Plugin",
+    "version": "4.0.0",
+    "icon": "media/NSP_Logo.png",
+    "publisher": "Nokia",
+    "repository": "http://github.com/nokia/vscode-intent-manager",
+    "engines": {
+        "vscode": "^1.75.0"
     },
-    "configuration": {
-      "title": "IntentManager",
-      "properties": {
-        "intentManager.NSPIP": {
-          "type": "string",
-          "default": "localhost",
-          "scope": "window",
-          "format": "ipv4",
-          "description": "Intent Manager hostname or IP address"
+    "categories": [
+        "Other"
+    ],
+    "extensionKind": [
+        "workspace",
+        "ui"
+    ],
+    "activationEvents": [
+        "onFileSystem:im",
+        "onStartupFinished"
+    ],
+    "main": "./dist/main.js",
+    "contributes": {
+        "snippets": [
+            {
+                "language": "javascript",
+                "path": "./snippets.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "nokia-intent-manager.audit",
+                "category": "IntentManager",
+                "title": "Audit intent(s)",
+                "icon": "$(search)"
+            },
+            {
+                "command": "nokia-intent-manager.lastAuditReport",
+                "category": "IntentManager",
+                "title": "Audit report",
+                "icon": "$(search)"
+            },
+            {
+                "command": "nokia-intent-manager.sync",
+                "category": "IntentManager",
+                "title": "Synchronize intent(s)",
+                "icon": "$(sync)"
+            },
+            {
+                "command": "nokia-intent-manager.migrate",
+                "category": "IntentManager",
+                "title": "Migrate intent(s)"
+            },
+            {
+                "command": "nokia-intent-manager.logs",
+                "category": "IntentManager",
+                "title": "Server Logs",
+                "icon": "$(debug)"
+            },
+            {
+                "command": "nokia-intent-manager.retrieveState",
+                "category": "IntentManager",
+                "title": "Retrieve Intent State",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "nokia-intent-manager.state",
+                "category": "IntentManager",
+                "title": "Set intent(s) state",
+                "icon": "$(symbol-property)"
+            },
+            {
+                "command": "nokia-intent-manager.openInBrowser",
+                "category": "IntentManager",
+                "title": "Open in browser",
+                "icon": "$(home)"
+            },
+            {
+                "command": "nokia-intent-manager.uploadIntentType",
+                "category": "IntentManager",
+                "title": "Upload intent-type",
+                "icon": "$(cloud-upload)"
+            },
+            {
+                "command": "nokia-intent-manager.exportIntentType",
+                "title": "Export intent-type"
+            },
+            {
+                "command": "nokia-intent-manager.uploadIntents",
+                "category": "IntentManager",
+                "title": "Upload intent(s)",
+                "icon": "$(cloud-upload)"
+            },
+            {
+                "command": "workbench.files.action.compareWithSaved",
+                "category": "IntentManager",
+                "title": "Compare changes",
+                "icon": "$(request-changes)"
+            },
+            {
+                "command": "nokia-intent-manager.newVersion",
+                "category": "IntentManager",
+                "title": "New intent-type version"
+            },
+            {
+                "command": "nokia-intent-manager.clone",
+                "category": "IntentManager",
+                "title": "Clone intent-type"
+            },
+            {
+                "command": "nokia-intent-manager.newIntent",
+                "category": "IntentManager",
+                "title": "Create intent",
+                "icon": "$(play-circle)"
+            },
+            {
+                "command": "nokia-intent-manager.newRemoteIntentType",
+                "category": "IntentManager",
+                "title": "Create intent-type"
+            },
+            {
+                "command": "nokia-intent-manager.newLocalIntentType",
+                "category": "IntentManager",
+                "title": "Create intent-type"
+            },
+            {
+                "command": "nokia-intent-manager.newIntentTypeICM",
+                "category": "IntentManager",
+                "title": "Generate intent-type"
+            },
+            {
+                "command": "nokia-intent-manager.loglevel",
+                "category": "IntentManager",
+                "title": "Set log-level"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "when": "resourceScheme != im && resourceFilename == meta-info.json || resourceFilename == script-content.js || resourceFilename == script-content.mjs",
+                    "command": "nokia-intent-manager.uploadIntentType",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resourceScheme == im && activeEditorIsDirty == true",
+                    "command": "workbench.files.action.compareWithSaved",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resourceScheme == im",
+                    "command": "nokia-intent-manager.openInBrowser",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\//",
+                    "command": "nokia-intent-manager.newIntent",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
+                    "command": "nokia-intent-manager.logs",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
+                    "command": "nokia-intent-manager.retrieveState",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
+                    "command": "nokia-intent-manager.audit",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
+                    "command": "nokia-intent-manager.sync",
+                    "group": "navigation"
+                },
+                {
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/",
+                    "command": "nokia-intent-manager.state",
+                    "group": "navigation"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "nokia-intent-manager.uploadIntentType",
+                    "group": "nokia_im",
+                    "when": "resourcePath =~ /\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resource =~ /\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+                },
+                {
+                    "command": "nokia-intent-manager.uploadIntents",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^file:.*\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/.+\\.json/"
+                },
+                {
+                    "command": "nokia-intent-manager.newRemoteIntentType",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/$/"
+                },
+                {
+                    "command": "nokia-intent-manager.newLocalIntentType",
+                    "group": "nokia_im",
+                    "when": "resourceScheme == file && !(resourcePath =~ /\\/intent\\-[a-z][a-z0-9_\\-]*\\-v\\d+/ || resourcePath =~ /\\/[a-z][a-z0-9_\\-]*_v\\d+/)"
+                },
+                {
+                    "command": "nokia-intent-manager.newIntentTypeICM",
+                    "group": "nokia_im",
+                    "when": "resourceScheme == file && resourceExtname == .igen"
+                },
+                {
+                    "command": "nokia-intent-manager.loglevel",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/$/"
+                },
+                {
+                    "command": "nokia-intent-manager.newIntent",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+                },
+                {
+                    "command": "nokia-intent-manager.newVersion",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+                },
+                {
+                    "command": "nokia-intent-manager.clone",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+                },
+                {
+                    "command": "nokia-intent-manager.logs",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+/"
+                },
+                {
+                    "command": "nokia-intent-manager.retrieveState",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.audit",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.sync",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.migrate",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.state",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.lastAuditReport",
+                    "group": "nokia_im",
+                    "when": "resource =~ /^im:\\/[a-z][a-z0-9_\\-]*_v\\d+\\/intents\\/[^/]+$/"
+                },
+                {
+                    "command": "nokia-intent-manager.openInBrowser",
+                    "group": "nokia_im",
+                    "when": "resourceScheme == im"
+                }
+            ]
         },
-        "intentManager.port": {
-          "type": "string",
-          "default": "443",
-          "scope": "window",
-          "enum": [
-            "443",
-            "8545",
-            "8547"
-          ],
-          "enumDescriptions": [
-            "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
-            "8545 used in older NSP releases, to be deprecated."
-          ],
-          "description": "Intent Manager port number (default: 443)"
-        },
-        "intentManager.user": {
-          "type": "string",
-          "default": "admin",
-          "scope": "window",
-          "description": "Intent Manager username (default: admin)"
-        },
-        "intentManager.password": {
-          "type": "null",
-          "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
-          "scope": "window",
-          "description": "Intent Manager password"
-        },
-        "intentManager.timeout": {
-          "type": "number",
-          "default": 90,
-          "scope": "application",
-          "description": "Timeout for API calls to Intent Manager in seconds (default: 90)"
-        },
-        "intentManager.ignoreLabels": {
-          "type": "array",
-          "scope": "application",
-          "items": {
-            "type": "string"
-          },
-          "description": "Intent-types with these labels will be hidden."
-        },
-        "intentManager.parallelOperations.enable": {
-          "type": "boolean",
-          "scope": "application",
-          "default": false,
-          "description": "Enable parallel intent operations"
-        },
-        "intentManager.serverLogsOffset": {
-          "type": "string",
-          "scope": "application",
-          "default": "10m",
-          "description": "Time window for receiving server logs. Examples: 1h, 5m (default: 10m)"
-        },
-        "intentManager.serverLogsFullStack": {
-          "type": "boolean",
-          "scope": "application",
-          "default": false,
-          "description": "Verbose Mode: include full stacktrace in logs from throwable (with java)"
-        },
-        "intentManager.logLimit": {
-          "type": "number",
-          "scope": "application",
-          "default": 5000,
-          "description": "Maximum number of logs to be received from server (default: 5000)"
-        },
-        "intentManager.queryLimit": {
-          "type": "number",
-          "scope": "application",
-          "default": 1000,
-          "description": "Maximum number of intent-types and intents to be received from server (default: 1000)"
+        "configuration": {
+            "title": "IntentManager",
+            "properties": {
+                "intentManager.NSPIP": {
+                    "type": "string",
+                    "default": "localhost",
+                    "scope": "window",
+                    "format": "ipv4",
+                    "description": "Intent Manager hostname or IP address"
+                },
+                "intentManager.port": {
+                    "type": "string",
+                    "default": "443",
+                    "scope": "window",
+                    "enum": [
+                        "443",
+                        "8545",
+                        "8547"
+                    ],
+                    "enumDescriptions": [
+                        "443 port enabled in newer releases of NSP. 8545 to be deprecated.",
+                        "8545 used in older NSP releases, to be deprecated."
+                    ],
+                    "description": "Intent Manager port number (default: 443)"
+                },
+                "intentManager.user": {
+                    "type": "string",
+                    "default": "admin",
+                    "scope": "window",
+                    "description": "Intent Manager username (default: admin)"
+                },
+                "intentManager.password": {
+                    "type": "null",
+                    "markdownDescription": "[Set Password](command:nokia-intent-manager.setPassword)",
+                    "scope": "window",
+                    "description": "Intent Manager password"
+                },
+                "intentManager.timeout": {
+                    "type": "number",
+                    "default": 90,
+                    "scope": "application",
+                    "description": "Timeout for API calls to Intent Manager in seconds (default: 90)"
+                },
+                "intentManager.ignoreLabels": {
+                    "type": "array",
+                    "scope": "application",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Intent-types with these labels will be hidden."
+                },
+                "intentManager.parallelOperations.enable": {
+                    "type": "boolean",
+                    "scope": "application",
+                    "default": false,
+                    "description": "Enable parallel intent operations"
+                },
+                "intentManager.serverLogsOffset": {
+                    "type": "string",
+                    "scope": "application",
+                    "default": "10m",
+                    "description": "Time window for receiving server logs. Examples: 1h, 5m (default: 10m)"
+                },
+                "intentManager.serverLogsFullStack": {
+                    "type": "boolean",
+                    "scope": "application",
+                    "default": false,
+                    "description": "Verbose Mode: include full stacktrace in logs from throwable (with java)"
+                },
+                "intentManager.logLimit": {
+                    "type": "number",
+                    "scope": "application",
+                    "default": 5000,
+                    "description": "Maximum number of logs to be received from server (default: 5000)"
+                },
+                "intentManager.queryLimit": {
+                    "type": "number",
+                    "scope": "application",
+                    "default": 1000,
+                    "description": "Maximum number of intent-types and intents to be received from server (default: 1000)"
+                }
+            }
         }
-      }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run esbuild -- --minify",
+        "compile": "tsc -p ./ --sourceMap",
+        "lint": "eslint \"src/**/*.ts\"",
+        "clean": "rm -rf node_modules out",
+        "watch": "tsc -watch -p ./",
+        "build": "tsc",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --loader:.node=file",
+        "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+        "esbuild": "npm run esbuild-base -- --sourcemap"
+    },
+    "devDependencies": {
+        "@types/node": "18.x",
+        "@types/vscode": "^1.75.0",
+        "@typescript-eslint/eslint-plugin": "^6.7.0",
+        "@typescript-eslint/parser": "^6.7.0",
+        "esbuild": "^0.21.5",
+        "eslint": "^8.26.0",
+        "typescript": "5.x"
+    },
+    "dependencies": {
+        "@vscode/codicons": "^0.0.36",
+        "base-64": "^1.0.0",
+        "lodash": "^4.17.21",
+        "node-fetch": "^2.7.0",
+        "npm": "^10.8.1",
+        "nunjucks": "^3.2.0",
+        "vscode-uri": "^3.0.8",
+        "vse": "^0.5.1",
+        "yaml": "^2.4.5"
     }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run esbuild -- --minify",
-    "compile": "tsc -p ./ --sourceMap",
-    "lint": "eslint \"src/**/*.ts\"",
-    "clean": "rm -rf node_modules out",
-    "watch": "tsc -watch -p ./",
-    "build": "tsc",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --loader:.node=file",
-    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-    "esbuild": "npm run esbuild-base -- --sourcemap"
-  },
-  "devDependencies": {
-    "@types/node": "18.x",
-    "@types/vscode": "^1.75.0",
-    "@typescript-eslint/eslint-plugin": "^6.7.0",
-    "@typescript-eslint/parser": "^6.7.0",
-    "esbuild": "^0.21.5",
-    "eslint": "^8.26.0",
-    "typescript": "5.x"
-  },
-  "dependencies": {
-    "@vscode/codicons": "^0.0.36",
-    "base-64": "^1.0.0",
-    "lodash": "^4.17.21",
-    "node-fetch": "^2.7.0",
-    "npm": "^10.8.1",
-    "nunjucks": "^3.2.0",
-    "vscode-uri": "^3.0.8",
-    "vse": "^0.5.1",
-    "yaml": "^2.4.5"
-  }
 }

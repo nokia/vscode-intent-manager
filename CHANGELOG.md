@@ -260,3 +260,21 @@ Fixes:
 * Readme corrected
 * Update template mappings to support Juniper, Cisco and Ciena
 * Fix for upload intent-type from local system on Windows
+
+## [4.0.0]
+
+Fixes:
+* Compatibility with older releases using non-standard ports (8547/8545)
+
+Template Updates:
+* Fix multi-key for IntentHandler::suggestDeviceModelObjects
+* Use neId picker for device target components
+* Replace `classResolver.resolveClass()` by `Java.type()` for NSP24.11 compatibility
+* New auto-complete callouts: suggestPorts, suggestLinkAggGroups
+* New picker callouts: getLinkAggGroups, getDeviceModelObjects
+* Remove approved misalignments when intent is deleted from network
+* Brownfield discovery improvements for ICM examples
+* Add release version check
+* Added IPLink flavor that is ICM-compliant
+* Added LinkAgg example
+* Added concept-study to auto-generate ICM intent-types from model

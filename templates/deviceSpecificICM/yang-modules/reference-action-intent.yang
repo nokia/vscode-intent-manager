@@ -1,0 +1,40 @@
+module reference-action-intent {
+  namespace "http://www.nokia.com/management-solutions/reference-action-intent";
+  prefix "icm-intent-action";
+
+  import webfwk-ui-metadata {
+    prefix "ui";
+  }
+
+  organization
+    "NOKIA";
+  contact
+    "NOKIA";
+  description
+    "This module defines the Action in Intent Type";
+    
+  revision "2025-01-08" {
+    description
+      "Initial revision.";
+  }
+
+  rpc get-target-data {
+    description "RPC to brownfield discover intent-model details from existing device configuration";
+
+    ui:action {
+      ui:function "getTargetData";
+    }
+
+    input {
+      leaf operational-model {
+        type string;
+      }
+    }
+
+    output {
+      leaf target-data {
+        type string;
+      }
+    }
+  }
+}

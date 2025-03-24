@@ -2,15 +2,24 @@
  * INTENT-TYPE BLUEPRINT
  *   use-case: physical/logical interface with IS-IS enabled
  * 
- * (c) 2024 by Nokia
+ * (c) 2025 by Nokia
  ********************************************************************************/
 
-import { IntentLogic }    from 'common/IntentLogic.mjs';
-import { IntentHandler }  from 'common/IntentHandler.mjs';
 import { DiscoveryLogic } from 'mappers/BrownfieldDiscovery.mjs';
+import { IntentHandler }  from 'common/IntentHandler.mjs';
+import { NSP } from 'common/NSP.mjs';
 
-class IPInterface extends (IntentLogic) {
-  static getSites(target, config) {
+class CustomIntentHandler extends IntentHandler {
+  /**************************************************************************
+   * Custom Intent Logic
+   **************************************************************************/
+
+  constructor() {
+    super();
+    NSP.checkRelease(24, 11);
+  }
+
+  getSites(target, config) {
     const neId = target.match(/ne-id='([^']+)'/);
     if (!neId)
       throw new Error('Invalid target (ObjectIdentifier must contain ne-id)!');
@@ -18,7 +27,7 @@ class IPInterface extends (IntentLogic) {
     return [neId[1]];
   }
   
-  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+  getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
     // top-level container has the details:
     const sites = Object.values(config);
 
@@ -28,12 +37,18 @@ class IPInterface extends (IntentLogic) {
 
     return sites;
   }
-}
 
-class IntentHandlerICM extends (IntentHandler) {
+  /**************************************************************************
+   * ICM RPC Callout (brownfield discovery)
+   **************************************************************************/
+
   getTargetData(input) {
     return DiscoveryLogic.discover(input);
   }
+
+  /**************************************************************************
+   * Intent WebUI Callouts
+   **************************************************************************/
   
   suggestInterfaceName(context) {
     return this.suggestDeviceModelObjects(context, 'nokia-conf:/configure/router=Base/interface', 'content=config');
@@ -41,4 +56,4 @@ class IntentHandlerICM extends (IntentHandler) {
   }
 }
 
-new IntentHandlerICM(IPInterface);
+new CustomIntentHandler();

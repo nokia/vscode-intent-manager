@@ -2,23 +2,27 @@
  * INTENT-TYPE BLUEPRINT
  *   use-case: TWAMP light session between two 7x50 routers (system-ip)
  * 
- * (c) 2024 by Nokia
+ * (c) 2025 by Nokia
  ********************************************************************************/
 
-import { IntentLogic }   from 'common/IntentLogic.mjs';
 import { IntentHandler } from 'common/IntentHandler.mjs';
+import { NSP } from 'common/NSP.mjs';
 
-class OAMConfig extends (IntentLogic) {
-  static getSites(target, config) {
+class CustomIntentHandler extends (IntentHandler) {
+  /**************************************************************************
+   * Custom Intent Logic
+   **************************************************************************/
+
+  constructor() {
+    super();
+    NSP.checkRelease(24, 11);
+  }
+
+  getSites(target, config) {
     return [Object.values(config)[0]['endpoint-a'], Object.values(config)[0]['endpoint-b']];
   }
 
-  static validate(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
-    if (Object.values(config)[0]['endpoint-a'] === Object.values(config)[0]['endpoint-b'])
-      contextualErrorJsonObj['Value inconsistency'] = 'endpoints must be different devices!';
-  }
-
-  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+  getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
     const cfg = Object.values(config)[0];
 
     const sites = [
@@ -37,6 +41,15 @@ class OAMConfig extends (IntentLogic) {
 
     return sites;
   }
+
+  /**************************************************************************
+   * Intent Hooks
+   **************************************************************************/
+
+  validateHook(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
+    if (Object.values(config)[0]['endpoint-a'] === Object.values(config)[0]['endpoint-b'])
+      contextualErrorJsonObj['Value inconsistency'] = 'endpoints must be different devices!';
+  }
 }
 
-new IntentHandler(OAMConfig);
+new CustomIntentHandler();

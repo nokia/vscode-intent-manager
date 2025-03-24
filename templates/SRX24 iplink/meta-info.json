@@ -3,10 +3,10 @@
   "version": "1",
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
+  "resourceDirectory" : "intent-type-resources",
   "label": [
-    "ApprovedMisalignments",
     "GraalJS",
-    "SReXperts2024"
+    "ApprovedMisalignments"
   ],
   "target-component": [
     {

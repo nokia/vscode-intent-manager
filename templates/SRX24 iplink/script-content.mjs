@@ -2,34 +2,32 @@
  * INTENT-TYPE BLUEPRINT
  *   use-case: inter-router IP link w/ protocols enabled
  * 
- * (c) 2024 by Nokia
+ * (c) 2025 by Nokia
  ****************************************************************************/
 
-import { IntentLogic }   from 'common/IntentLogic.mjs';
 import { IntentHandler } from 'common/IntentHandler.mjs';
 import { ResourceAdmin } from 'common/ResourceAdmin.mjs';
+import { NSP } from 'common/NSP.mjs';
 
-class IPLink extends (IntentLogic) {
-  static initialize() {
+class CustomIntentHandler extends IntentHandler {
+  /**************************************************************************
+   * Custom Intent Logic
+   **************************************************************************/
+
+  constructor() {
+    super();
+    NSP.checkRelease(24, 11);
     ResourceAdmin.createIpPool("ip-pool", "global", "used for iplink", "192.168.192.0/18", "network-link");
   }
 
-  static getSites(target, config) {
+  getSites(target, config) {
     const sites = [];
     sites.push(config['{{ intent_type }}:{{ intent_type }}']['endpoint-a']['ne-id']);
     sites.push(config['{{ intent_type }}:{{ intent_type }}']['endpoint-b']['ne-id']);
     return sites;
   }
   
-  static validate(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
-    const siteA = config['{{ intent_type }}:{{ intent_type }}']['endpoint-a']['ne-id'];
-    const siteB = config['{{ intent_type }}:{{ intent_type }}']['endpoint-b']['ne-id'];
-
-    if (siteA === siteB)
-      contextualErrorJsonObj['Value inconsistency'] = 'endpoint-a and endpoint-b must resite on different devices!';
-  }
-
-  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+  getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
     const sites = [];
     sites.push(config['{{ intent_type }}:{{ intent_type }}']['endpoint-a']);
     sites.push(config['{{ intent_type }}:{{ intent_type }}']['endpoint-b']);
@@ -51,25 +49,43 @@ class IPLink extends (IntentLogic) {
     return sites;
   }
 
-  static getGlobalParameters(intentType, intentTypeVersion, target, config) {  
+  getGlobalParameters(intentType, intentTypeVersion, target, config) {  
     // add testId; Required for SROS to do OAM-PM tests
     const global = config['{{ intent_type }}:{{ intent_type }}'];
-    global['testId'] = parseInt(target.match(/\d+/));
-    return global;
-  }
 
-  static getState(intentType, intentTypeVersion, target, config, topology) {
+    global.cid = target;
+    global.testId = parseInt(global.cid.match(/\d+/));
+
+    if (global.description)
+      global.description = `{{ intent_type }}: ${global.description}`;
+
+    return global;
+  }  
+
+  getState(intentType, intentTypeVersion, target, config, topology) {
     return {'subnet': ResourceAdmin.getSubnet('ip-pool', 'global', target)};
   }
 
-  static obtainResources(intentType, intentTypeVersion, target, config) {
-    ResourceAdmin.obtainSubnet('ip-pool', 'global', 'network-link', 31, this.INTENT_TYPE, target);
+  obtainResources(intentType, intentTypeVersion, target, config) {
+    ResourceAdmin.obtainSubnet('ip-pool', 'global', 'network-link', 31, intentType, target);
   }
 
-  static postSyncExecute(intentType, intentTypeVersion, target, config, state) {
+  /**************************************************************************
+   * Intent Hooks
+   **************************************************************************/
+
+  validateHook(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
+    const siteA = config['{{ intent_type }}:{{ intent_type }}']['endpoint-a']['ne-id'];
+    const siteB = config['{{ intent_type }}:{{ intent_type }}']['endpoint-b']['ne-id'];
+
+    if (siteA === siteB)
+      contextualErrorJsonObj['Value inconsistency'] = 'endpoint-a and endpoint-b must resite on different devices!';
+  }
+
+  postSyncHook(intentType, intentTypeVersion, target, config, state) {
     if (state === 'delete')
       ResourceAdmin.releaseSubnet('ip-pool', 'global', target);
   }
 }
 
-new IntentHandler(IPLink);
+new CustomIntentHandler();

@@ -1,14 +1,9 @@
 {
     "compilerOptions": {
-        "baseUrl": "../common_abstract/",
-        "paths": {
-            "common/*": [
-                "common/*"
-            ]
-        }
+        "baseUrl": "../common_abstract_new/"
     },
     "include": [
         "*.mjs",
-        "../common_abstract/**/*.mjs"
+        "../common_abstract_new/**/*.mjs"
     ]
 }

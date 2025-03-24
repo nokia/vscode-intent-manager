@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { ActivityStatus } from './ActivityStatus';
+
 import yaml = require('yaml');
 
 // @ts-expect-error module node-fetch does not have a declaration file
@@ -34,6 +36,99 @@ const DECORATION_MISALIGNED = { badge: '💔', tooltip: 'Intent: Misaligned', co
 
 const myStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 myStatusBarItem.command = 'nokia-intent-manager.intentStatus';
+
+interface mdcAttribute {
+	name: string;
+	help: string;
+	readonly: boolean;
+	mandatory: boolean;
+	default: string;
+	keys: string[];
+	enum: {name: string, value?: number}[];
+
+	nodetype: string;
+	type: string;
+	baseType: string;
+	leafRef: string;
+	leafRefPath: string;
+	presence: boolean;
+	isKey: boolean;	
+	typeNameSpace: string;
+
+	patterns: string[];
+	ranges: {min: number, max: number}[];
+	length: {min: number, max: number}[];
+	elementCount: {minElements: number, maxElements: number};
+
+	constraints: {
+		patterns: string[];
+		length: {min: number, max: number}[];
+		when: string[];
+		must: {xpath: string, "error-message"?: string}[];
+	};
+
+	userMustOrder: boolean;
+	units: string;
+	choice: string;
+	types: mdcAttribute[];
+}
+
+interface targetComponentType {
+	name: string,
+	order: number,
+	type: string,
+	uiname: string,
+	suggest?: string,
+	range?: string,
+	length?: string,
+	pattern?: string
+}
+
+interface icmGeneratorInput {
+	// user input (manadatory)
+	role: string,			// icm_descriptor: "physical" or "logical"
+	category: string,		// icm_descriptor: label to help categorizing the intent
+	description: string,	// icm_descriptor: intent-type description for operators
+	context: string,		// device-model subtree to cover, example: nokia-conf:/configure/qos/sap-egress
+	device: string,			// ne-id of the device used for auto-generation
+
+	// user input (optional)
+	author: string,			// intent-type author (default: NOKIA)
+	exclude: string[],		// list of children subtrees to be excluded
+	maxdepth: number,		// maximum depth to cover (deeper hierachies are excluded)
+
+	withdefaults: boolean|undefined,
+	applygroups: boolean|undefined,
+	constraints: boolean|undefined,
+	intentrefs: boolean|undefined,
+	icmstyle: boolean|undefined,
+
+	// generated from user input
+	plainContext: string,	// non-instance path (context without list-keys)
+	intent_type: string,	// derived from filename.igen
+	identifier: string,		// example: nokia-conf:sap-egress
+	module: string,			// example: nokia-conf
+	root: string,			// example: sap-egress
+
+	// fetched from NSP inventory and MDC meta
+	vendor: string|undefined,		// example: Nokia
+	family: string|undefined,		// example: 7750 SR
+	version: string|undefined,		// example: 24.10.R1
+	swversion: string|undefined,	// example: TiMOS-B-24.10.R1
+	chassis: string|undefined,		// example: 7750 SR-1
+	date: string|undefined,			// example: 2025-02-28
+
+	// generated from NSP MDC schema
+	keys: string,
+	pathRC: string,
+	pathUI: string,
+	rootInstance: Record<string, string|number|undefined>,
+	targetComponents: targetComponentType[],
+	lastIndex: number,
+	suggestMethods: {suggest: string, devicePath: string, deviceKey?: string}[],
+	suggestPaths: {viewConfigPath: string, isList: boolean, suggest: string}[],
+	encryptedPaths: string[]
+}
 
 /*
 	Class implementing FileSystemProvider for Intent Manager
@@ -262,7 +357,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (!token)
 				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 
-			if (url.startsWith('/restconf') || url.startsWith('/mdt/rest/restconf'))
+			if (url.startsWith('/restconf/data') || url.startsWith('/restconf/operations') || url.startsWith('/mdt/rest/restconf'))
 				options.headers = {
 					"Content-Type": "application/yang-data+json",
 					"Accept": "application/yang-data+json",
@@ -281,13 +376,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				url = "https://"+this.nspAddr+url;
 			else if (url.startsWith('/logviewer'))
 				url = "https://"+this.nspAddr+url;
-			else if (this.port != "8545")
+			else if (url.startsWith('/mdt/rest'))
+				// use port for intent-manager (default: 8547)
 				url = "https://"+this.nspAddr+":"+this.port+url;
-			else if (url.startsWith('/restconf'))
-				url = "https://"+this.nspAddr+":8545"+url;
 			else
-				// in case of /mdt/rest/...
-				url = "https://"+this.nspAddr+":8547"+url;
+				// use port for restconf-gateway (default: 8545)
+				url = "https://"+this.nspAddr+":8545"+url;
 		}
 
 		const startTS = Date.now();
@@ -2795,7 +2889,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 				if (fs.lstatSync(srcpath).isDirectory())
 					fs.mkdirSync(dstpath);
-				else if (filename.startsWith('.') || filename.includes('/.') || filename in ["jsconfig.json"])
+				else if (filename.startsWith('.') || filename.includes('/.'))
 					this.pluginLogs.info("skip file/folder ", filename);
 				else if (filename.startsWith('merge_'))
 					mergelist.push(filename.substring(6));
@@ -2807,10 +2901,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					if (filename === "jsconfig.json")
 						fs.writeFileSync(dstpath, JSON.stringify({
 							"compilerOptions": {
-								"baseUrl": "intent-type-resources/",
-								"paths": {"common/*": ["common/*"]}
+								"baseUrl": "./intent-type-resources"
 							},
-							"include": ["*.mjs", "intent-type-resources/**/*.mjs"]
+							"include": ["*.js", "*.mjs", "intent-type-resources/*.js", "intent-type-resources/**/*.mjs"]
 						}));
 					else if (filename === "yang-modules/[intent_type].yang")
 						fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${userinput.intent_type}.yang`).fsPath, data);
@@ -2853,23 +2946,837 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					}
 				}
 			}
+		}
+	}
+	
+	/**
+	 * Encode YANG range/length constraint using MDC schema list of min/max values provided.
+	 * Use keywords "min" and "max" instead of numbers if possible.
+	 * Works around javascript conversion errors (numbers vs bigint).
+	 * MDC uses max string-length of 0x7FFFFFFF (instead of uint64 as per rfc7950).
+	 * 
+	 * Default range min...max will not be added.
+	 * 
+	 * @param {string} baseType - YANG built-in datatype (int8, uint16, string, ...)
+ 	 * @param {{min: number, max: number}[] | undefined} ranges - An array of ranges specifying the `min` and `max` values.
+	 * @returns {string} YANG range/length constraint (or empty string)
+	 */
 
-			// add extras
+	private getRangeString(baseType: string, ranges: {min: number, max: number}[]|undefined) : string {
+		let converted: string[] = [];
 
-			fs.writeFileSync("jsconfig.json", JSON.stringify({
-				"compilerOptions": {
-					"baseUrl": "./intent-type-resources/",
-					"paths": {"common/*": ["common/*"]}
-				},
-				"include": ["*.mjs", "intent-type-resources/**/*.mjs"]
-			}));
+		if (ranges && ranges.length>0) {
+			// handle ranges for unsigned numbers:
+			if (/^uint(8|16|32|64)$/.test(baseType)) {
+				const YANG_MAX_VALUES: Record<string, bigint | number> = {uint8: 255, uint16: 65535, uint32: 4294967295, uint64: 18446744073709551615n};
+
+				converted = ranges.map(({ min, max }) => {
+					const adjustedMax = BigInt(max) < BigInt(YANG_MAX_VALUES[baseType]) ? max : "max";
+					return min === adjustedMax ? min.toString() : `${min}..${adjustedMax}`;
+				}).filter(value => value != "0..max");
+			}
+
+			// handle ranges for signed numbers:
+			else if (/^int(8|16|32|64)$/.test(baseType)) {
+				const YANG_MIN_VALUES: Record<string, bigint | number> = {int8: -128, int16: -32768, int32: -2147483648, int64: -9223372036854775808n};
+				const YANG_MAX_VALUES: Record<string, bigint | number> = {int8: 127, int16: 32767, int32: 2147483647, int64: 9223372036854775807n};
+
+				converted = ranges.map(({ min, max }) => {
+					const adjustedMin = BigInt(min) > BigInt(YANG_MIN_VALUES[baseType]) ? min : "min";
+					const adjustedMax = BigInt(max) < BigInt(YANG_MAX_VALUES[baseType]) ? max : "max";
+					return adjustedMin === adjustedMax ? adjustedMin.toString() : `${adjustedMin}..${adjustedMax}`;
+				}).filter(value => value != "min..max");
+			}
+
+			// handle ranges for floating numbers:
+			else if (baseType === "decimal64")
+				converted = ranges.map(({ min, max }) => min === max ? min.toString() : `${min}..${max}`);				
+
+			// handle length for string
+			else
+				converted = ranges.map(({ min, max }) => min === max ? min.toString() : (max >= 2147483647 ? `${min}..max` : `${min}..${max}`)).filter(value => value != "0..max");
+		}
+
+		return converted.join('|');
+	}
+
+	/**
+	 * Generate YANG constraints from MDC attribute definition.
+	 * 
+	 * @param {object} a - attribute defintion from MDC
+	 * @param {string} dataType - type to be converted
+	 * @returns {string[]} YANG constraints (line-by-line)
+	 */
+
+	private getConstraints(a: any, dataType: string) {
+		const constraints : string[] = [];
+
+		if (dataType === 'leafref')
+			constraints.push(`path "${a.leafRefPath}";`);
+
+		if (dataType === 'enumeration' && a.enum)
+			a.enum.forEach((entry: {name: string, value?: number}) => {
+				if ('value' in entry) {
+					constraints.push(`enum ${entry.name} {`);
+					constraints.push(`  value ${entry.value};`);
+					constraints.push("}");	
+				} else {
+					constraints.push(`enum ${entry.name};`);
+				}
+			});
+
+		if (dataType === 'string') {
+			const rangeString = this.getRangeString(dataType, a.length);
+
+			if (rangeString.length>0)
+				constraints.push(`length "${rangeString}";`);
+
+			if (a.patterns)
+				// restriction: error-message is not available via mdc meta
+				a.patterns.forEach((pattern: string) => constraints.push(`pattern '${pattern}';`));
+		}
+
+		if (dataType === 'decimal64')
+			constraints.push(`fraction-digits ${a.fraction};`);
+
+		if (/^(u?int(8|16|32|64)|decimal64)$/.test(dataType)) {
+			const rangeString = this.getRangeString(dataType, a.constraints?.ranges);
+			if (rangeString.length>0) constraints.push(`range "${rangeString}";`);
+		}
+
+		return constraints;
+	}
+
+	/**
+	 * Generate YANG type definitions
+	 * 
+	 * @param {Record<string, mdcAttribute>} customYangTypes - YANG type defintions captured
+	 * @returns {string[]} YANG type definitions (line-by-line)
+	 */
+
+	private typedef2yang(customYangTypes: Record<string, mdcAttribute>) {
+		const stack = [...Object.values(customYangTypes)];
+
+		while (stack.length > 0) {
+			const c = stack.pop();
+			if (c?.baseType === 'union') {
+				c.types.forEach(u => {
+					if (u.type !== u.baseType)
+						if (!(u.type in customYangTypes))
+							customYangTypes[u.type] = u;
+
+					if (u.baseType === 'union')
+						stack.push(u);
+				});
+			}
+		}
+
+		this.pluginLogs.info("typedefs for yang rendering: ", Object.keys(customYangTypes).join(', '));
+		this.pluginLogs.debug(JSON.stringify(customYangTypes));
+
+		const yang: string[] = [];
+		Object.values(customYangTypes).forEach(a => {
+			yang.push(`typedef ${a.type} {`);
+
+			const constraints = this.getConstraints(a, a.baseType);
+
+			if (a.baseType === 'union') {
+				a.types.forEach(u => {
+					let dataType = u.type;
+
+					// Use IETF types if possible
+					if (u.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-inet-types,")) dataType = `inet:${u.type}`;
+					if (u.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-yang-types,")) dataType = `yang:${u.type}`;
+
+					if (u.baseType === 'enumeration' && u.enum === undefined) {
+						constraints.push(`  // skipped: type ${u.baseType} (enumeration w/o enum entries)`);
+					} else {
+						const uConstraints = this.getConstraints(u, dataType);
+
+						if (uConstraints.length > 0) {
+							constraints.push(`  type ${dataType} {`);
+							constraints.push(...uConstraints.map(line => `    ${line}`));
+							constraints.push("  }");
+						}
+						else if (dataType === 'union') {
+							constraints.push(`  // skipped: type union; (union of native union is unsupported`);
+						}
+						else {
+							constraints.push(`  type ${dataType};`);
+						}
+					}
+				});
+			}
+
+			if (constraints.length>0) {
+				yang.push(`  type ${a.baseType} {`);
+				yang.push(...constraints.map(line => `    ${line}`));
+				yang.push("  }");
+			} else {
+				yang.push(`  type ${a.baseType};`);
+			}
+
+			if (a.units)
+				yang.push(`  units "${a.units}";`);
+
+			yang.push(`}`);
+			yang.push("");
+		});
+
+		return yang;
+	}
+
+	/**
+	 * GET model schema from NSP MDC and populate YANG snippet for the corresponding
+	 * context. Recursive implementation to resolve all children subtrees too. Model
+	 * depth and exclusion lists help to refine the scope of the model to be generated.
+	 * 
+	 * @param {object} input - user provided input data, will be enriched by this method
+	 * @param {string} subcontext - relative path for recursion
+	 * @param {string} customYangTypes - YANG type defintions captured for later rendering
+	 * @param {ActivityStatus} userActivity - activity indicator in statusbar
+	 * @returns {string[]} YANG snippet (line-by-line)
+	 * 
+	 */
+
+	private async schema2yang(
+		input: icmGeneratorInput,
+		subcontext: string,
+		customYangTypes: Record<string, mdcAttribute>,
+		userActivity: ActivityStatus
+	): Promise<string[]> {
+		const NODETYPE_TO_YANG: Record<string, string> = {property: "leaf", propertylist: "leaf-list", union: "union", group: "container", list: "list"};
+
+		const url = `/restconf/meta/api/v1/model/schema/${input.device}/${input.plainContext}${subcontext}`;
+		const response: any = await this._callNSP(url, {method: "GET"});
+		userActivity.refresh();
+
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		if (!response.ok)
+			this._raiseRestconfError("Getting device schema failed!", await response.json());
+
+		const json = await response.json();
+		
+		const yang: string[] = [];
+		const depth = subcontext.split('/').length;
+
+		if (json.help)
+			yang.push(`description "${json.help}";`);
+
+		if (depth==1 && json.isListWithKey)
+			input.keys = json.keys;
+
+		const choices: {[key: string]: string[]} = {};
+
+		yang.push("");
+		for (const a of json.attributes as mdcAttribute[]) {
+			const relpath = `${subcontext}/${a.name}`.substring(1);
+
+			// skip read-only attributes
+			if (a.readonly)
+				continue;
+
+			// skip apply-groups (SR OS)
+			if (a.leafRef && a.leafRefPath?.startsWith("nokia-conf:/configure/groups") && !input.applygroups) {
+				yang.push(`// skipped: ${a.name} (SROS apply-groups)`);
+				continue;
+			}
+
+			// handle key attributes at root-level
+			if (depth==1 && a.isKey) {
+				yang.push(`// skipped: ${a.name} (root-key)`);
+				continue;
+			}
+
+			// identityref is not yet supported (to be done)
+			if (["identityref"].includes(a.baseType)) {
+				yang.push(`// skipped: ${a.name} (identityref not yet supported)`);
+				continue;
+			}
+
+			// skip containers/lists at maxlevel
+			if (["group", "list"].includes(a.nodetype) && (depth == input.maxdepth)) {
+				yang.push(`// skipped: ${a.name} (maxdepth reached)`);
+				input.exclude.push(relpath);
+				continue;
+			}
+
+			// skip other modules (to be done)
+			if (a.name.includes(':')) {
+				yang.push(`// skipped: ${a.name} (different namespace)`);
+				input.exclude.push(relpath);
+				continue;
+			}
+
+			// apply ignore-children (exclusion list)
+			if (input.exclude.includes(relpath)) {
+				yang.push(`// skipped: ${a.name} (excluded/ignore-children)`);
+				continue;
+			}
+
+			// Encrypted Attributes (Nokia SR OS)
+			if (a.typeNameSpace === "urn:nokia.com:sros:ns:yang:sr:types-sros,encrypted-leaf")
+				input.encryptedPaths.push(`${relpath.split('/').join('.')}`);
+
+			// Encrypted Attributes (Nokia SRL)
+			if (['user-password', 'routing-password'].includes(a.type) || (a.name === 'password'))
+				input.encryptedPaths.push(`${relpath.split('/').join('.')}`);
+
+			if (a.help)
+				a.help = a.help.replace(/"/g, "'");
+
+			// Build YANG for attribute supporting complex-type (list/container)
+
+			const a_yang: string[] = [];
+			a_yang.push(`${NODETYPE_TO_YANG[a.nodetype]} ${a.name} {`);
+
+			a.constraints?.when?.forEach(whenstmt => {
+				if (whenstmt.includes('../'.repeat(depth+1)))
+					// drop dependencies outside the scope of the intent
+					a_yang.push(`  // when "${a.constraints.when[0]}";`);
+				else
+					// restriction: when/description is not available via mdc meta
+					a_yang.push(`  when "${a.constraints.when[0]}";`);
+			});
+
+			if (a.nodetype === "group" && a.presence && a.help)
+				a_yang.push(`  presence "${a.help}";`);
+
+			if (a.nodetype === "list")
+				a_yang.push(`  key "${a.keys.join(' ')}";`);
+
+			if (["group", "list"].includes(a.nodetype)) {
+				const lines = await this.schema2yang(input, `${subcontext}/${a.name}`, customYangTypes, userActivity);
+				a_yang.push(...lines.map(line => `  ${line}`));
+			}
+
+			if (["property", "propertylist"].includes(a.nodetype)) {
+				let dataType = a.type;
+
+				// Use IETF types if possible
+				if (a.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-inet-types,")) dataType = `inet:${a.type}`;
+				if (a.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-yang-types,")) dataType = `yang:${a.type}`;
+
+				if (dataType === a.type && dataType !== a.baseType && a.leafRefPath === undefined) {
+					this.pluginLogs.debug("typedef needed: ", a.type, a.baseType, JSON.stringify(a));
+					if (!(dataType in customYangTypes)) customYangTypes[dataType] = a;	
+				}
+
+				// Model references targeting the intent itself as leafref (controlled by input intentrefs)
+				// References outside the intent scope are modeled as underlying type with suggest
+				
+				if (input.intentrefs && a.leafRef && a.leafRefPath && a.leafRefPath.startsWith(input.plainContext)) {
+					if (input.plainContext.split("/").length + 1 < a.leafRefPath.split("/").length) {						
+						let aPath = `${input.plainContext}${subcontext}/${a.name}`.split('/');
+						let rPath = a.leafRefPath.split('/');
+	
+						while (aPath.length > 0 && rPath.length > 0 && aPath[0] == rPath[0]) {
+							aPath = aPath.slice(1);
+							rPath = rPath.slice(1);
+						}
+	
+						dataType = "leafref";
+						a.type = dataType;						
+						a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');	
+					}
+				}
+
+				const constraints = this.getConstraints(a, dataType);
+
+				if (a.type === 'union') {
+					a.types.forEach(u => {
+						let dataType = u.type;
+
+						// Use IETF types if possible
+						if (u.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-inet-types,")) dataType = `inet:${u.type}`;
+						if (u.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-yang-types,")) dataType = `yang:${u.type}`;
+
+						if (u.baseType === 'enumeration' && u.enum === undefined) {
+							constraints.push(`  // skipped: type ${u.baseType} (enumeration w/o enum entries)`);
+						} else {
+							if (dataType === u.type && dataType !== u.baseType && !u.leafRef) {
+								this.pluginLogs.debug("typedef needed: ", u.type, u.baseType, JSON.stringify(u));
+								if (!(dataType in customYangTypes)) customYangTypes[dataType] = u;
+							}
+
+							const uConstraints = this.getConstraints(u, dataType);
+
+							if (uConstraints.length > 0) {
+								constraints.push(`  type ${dataType} {`);
+								constraints.push(...uConstraints.map(line => `    ${line}`));
+								constraints.push("  }");
+							}
+							else if (dataType === 'union') {
+								constraints.push(`  // skipped: type union; (union of native union is unsupported`);
+							}
+							else {
+								constraints.push(`  type ${dataType};`);
+							}
+
+							// todo: add leafref picker
+						}
+					});
+				}
+	
+				if (constraints.length>0) {
+					a_yang.push(`  type ${dataType} {`);
+					a_yang.push(...constraints.map(line => `    ${line}`));
+					a_yang.push("  }");
+				} else {
+					a_yang.push(`  type ${dataType};`);
+				}
+	
+				if (a.units)
+					a_yang.push(`  units "${a.units}";`);
+
+				if (a.constraints?.must && input.constraints)
+					a.constraints.must.forEach(entry => {
+						if ("error-message" in entry) {
+							constraints.push(`  must "${entry.xpath}" {`);
+							constraints.push(`    error-message ${entry["error-message"]};`);
+							constraints.push("  }");	
+						} else {
+							constraints.push(`  must "${entry.xpath}";`);
+						}
+					});					
+		
+				if (a.default)
+					if (input.withdefaults)
+						a_yang.push(`  default "${a.default}";`);
+					else
+						a_yang.push(`  // default "${a.default}";`);
+
+				if (a.mandatory)
+					if (json.presence)
+						a_yang.push(`  // mandatory true;`);
+					else
+						a_yang.push(`  mandatory true;`);
+	
+				// status
+			}
+
+			if (["list", "propertylist"].includes(a.nodetype)) {
+				if (a.elementCount?.minElements)
+					a_yang.push(`  min-elements ${a.elementCount.minElements};`);
+
+				if (a.elementCount?.maxElements)
+					a_yang.push(`  max-elements ${a.elementCount.maxElements};`);
+
+				if (a.userMustOrder)
+					a_yang.push("  ordered-by user;");	
+			}
+
+			if (["property", "propertylist"].includes(a.nodetype)) {	
+				if (a.help)
+					a_yang.push(`  description "${a.help}";`);
+
+				if (a.leafRef && a.leafRefPath && a.type !== 'leafref') {
+					const name = a.leafRefPath.replace(/[^/]+:/g, '').split('/').slice(-3).join('-').replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
+					const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
+
+					const pathElements = a.leafRefPath.split('/').slice(0,-1);
+					const rootPathElements = input.pathUI.split('/');
+
+					for (let idx=0; idx < pathElements.length-1; idx++) {
+						if (pathElements[idx] === rootPathElements[idx]?.split('=')[0]) {
+							if (rootPathElements[idx].includes('='))
+								pathElements[idx] = rootPathElements[idx];
+						} else break;
+					}
+
+					if (!input.suggestMethods.some(entry => entry.suggest === suggest))
+						input.suggestMethods.push({
+							"suggest": suggest,
+							"devicePath":  pathElements.join('/')
+						});
+
+					if (input.icmstyle) {
+						input.suggestPaths.push({
+							"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
+							"isList": (a.nodetype === "propertylist"),
+							"suggest": suggest
+						});
+					} else {
+						input.suggestPaths.push({
+							"viewConfigPath": `${input.intent_type}.${relpath.split('/').join('.')}`,
+							"isList": (a.nodetype === "propertylist"),
+							"suggest": suggest
+						});
+					}
+				}
+	
+				// reference
+			}
+
+			a_yang.push("}");
+
+			// Check if attribute belongs to choice:
+
+			if (a.choice) {
+				choices[`${a.choice}.${a.name}`] = a_yang;
+			} else {
+				yang.push(...a_yang);
+			}
+		}
+
+		// Now let's add the choices
+
+		if (json.choice) {
+			for (const [choiceKey, choiceValue] of Object.entries(json.choice) as [string, { cases: Record<string, string[]> }][]) {
+				yang.push(`choice ${choiceKey} {`);
+				for (const [caseKey, caseEntries] of Object.entries(choiceValue.cases)) {
+					yang.push(`  case ${caseKey} {`);
+					yang.push(...caseEntries.flatMap(attribute =>
+						(choices[`${choiceKey}.${caseKey}.${attribute}`] || []).map(line => `    ${line}`)
+					));
+					yang.push("  }");
+				}
+				yang.push("}");
+			}
+		}
+
+		return yang;
+	}
+
+	/**
+	 * GET model schema step-by-step from / to the user provided context.
+	 * Used to determine target paraeters from lists with constraints and
+	 * suggest callouts. Recursive implementation.
+	 * 
+	 * @param {object} input - user provided input data, will be enriched by this method
+	 * @param {ActivityStatus} userActivity - activity indicator in statusbar
+	 */
+
+	private async getPathKeys(input: icmGeneratorInput, userActivity: ActivityStatus): Promise<void> {
+		const index = input.pathUI.split('/').length+1;
+		const context  = input.context.split('/').slice(0, index).join('/');
+		const plainctx = input.plainContext.split('/').slice(0, index).join('/');
+		const pathElement = input.context.split('/')[index-1];
+
+		if (index==2) {
+			input.pathUI = context;
+			input.pathRC = context;
+		} else {
+			input.pathUI += `/${pathElement}`;
+			input.pathRC += `/${pathElement}`;
+		}
+
+		const url     = `/restconf/meta/api/v1/model/schema/${input.device}/${plainctx}`;
+		const response: any = await this._callNSP(url, {method: "GET"});
+		userActivity.refresh();
+
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		if (!response.ok)
+			this._raiseRestconfError("Getting device schema failed!", await response.json());
+
+		const data = await response.json();
+		
+		if (data.isList) {
+			if (index === input.context.split('/').length)
+				input.rootInstance = {};
+
+			const keyAttributes = (data.attributes as mdcAttribute[]).filter(entry => entry.isKey);
+
+			const pathUI : string[] = [];
+			const pathRC : string[] = [];
+
+			if (pathElement.includes('=')) {
+				if (index === input.context.split('/').length) {
+					const values = pathElement.split('=')[1].split(',');
+					keyAttributes.forEach(a => {
+						if (/^(u?int(8|16|32|64)|decimal64)$/.test(a.baseType))
+							input.rootInstance[a.name] = values.shift();
+						else 
+							input.rootInstance[a.name] = `"${values.shift()}"`;
+					});
+				}
+			} else {
+				keyAttributes.forEach(a => {
+					input.lastIndex += 1;
+					this.pluginLogs.info("key attribute", JSON.stringify(a));
+					const name = `${data.yangname}-${a.name}`.toLowerCase().replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
+					const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('');
+
+					this.pluginLogs.info("info", name, suggest);
+
+					const targetComponent : targetComponentType = {
+						name: name,
+						uiname: name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '),
+						type: "STRING",
+						order: input.lastIndex,
+						suggest: suggest,
+						range: undefined,
+						length: undefined,
+						pattern: undefined
+					};
+
+					if (a.baseType === 'string') {
+						targetComponent.type = "STRING";
+						targetComponent.length = this.getRangeString(a.baseType, a.length);
+
+						if (a.patterns && a.patterns.length===1) {
+							const pattern = a.patterns[0].replace(/\\/g, "\\\\");
+							if (pattern.length < 255) targetComponent.pattern = pattern;
+						}							
+					}
+
+					if (/^(u?int(8|16|32|64)|decimal64)$/.test(a.baseType)) {
+						targetComponent.type = "NUMBER";
+						targetComponent.range = this.getRangeString(a.baseType, a.ranges);
+					}
+
+					input.targetComponents.push(targetComponent);
+
+					if (!input.suggestMethods.some(entry => entry.suggest === suggest))
+						input.suggestMethods.push({
+							"suggest": suggest,
+							"devicePath":  input.pathUI,
+							"deviceKey": a.name
+						});
+
+					input.suggestPaths.push({
+						"viewConfigPath": `_target.${name}`,
+						"isList": false,
+						"suggest": suggest
+					});
+
+					pathUI.push(`\${encodeURIComponent(target['${name}'])}`);
+					pathRC.push(`\${encodeURIComponent(items[${input.lastIndex}])}`);
+
+					if (index === input.context.split('/').length)
+						if (/^(u?int(8|16|32|64)|decimal64)$/.test(a.baseType))
+							input.rootInstance[a.name] = `Number(items[${input.lastIndex}])`;
+						else
+							input.rootInstance[a.name] = `items[${input.lastIndex}]`;
+											
+				});
+
+				input.pathUI += `=${pathUI.join(',')}`;
+				input.pathRC += `=${pathRC.join(',')}`;
+			}
+		}
+
+		if (index < input.context.split('/').length) {
+			await this.getPathKeys(input, userActivity);
+		}
+
+		if (input.targetComponents.length === 0) {
+			const dummyTarget : targetComponentType = {
+				name: input.root,
+				uiname: input.root.split(/[-_]/).map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '),
+				type: "STRING",
+				order: 2,
+				pattern: "^singleton$"
+			};
+			input.targetComponents.push(dummyTarget);
+		}
+	}
+
+	/**
+	 * Retrieves information about the discovered device from NSP
+	 *
+	 * @param {object} input user provided input data, will be enriched by this method
+	 * @param {ActivityStatus} userActivity - activity indicator in statusbar
+	 */
+
+	private async getNeInfo(input: icmGeneratorInput, userActivity: ActivityStatus): Promise<void> {
+		const url = `/restconf/data/nsp-ne-control:ne-control/discovered-ne=${encodeURI(input.device)}`;
+
+		const response: any = await this._callNSP(url, {method: "GET"});
+		userActivity.refresh();
+
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		if (!response.ok)
+			this._raiseRestconfError("Getting device info failed!", await response.json());
+
+		const json = await response.json();
+
+		input.vendor    = json['nsp-ne-control:discovered-ne'][0]['ne-vendor'];         // example: Nokia
+		input.family    = json['nsp-ne-control:discovered-ne'][0]['ne-family'];         // example: 7750 SR
+		input.version   = json['nsp-ne-control:discovered-ne'][0]['version'];           // example: 24.10.R1
+		input.swversion = json['nsp-ne-control:discovered-ne'][0]['software-version'];  // example: TiMOS-B-24.10.R1
+		input.chassis   = json['nsp-ne-control:discovered-ne'][0]['ne-chassis-type'];   // example: 7750 SR-1
+	}
+
+	/**
+	 * Creation of new a device-specific intent-type on the local system.
+	 * To be used for git-pipeline (recommended).
+	 * 
+	 * Open items (WIP)
+	 *  - [SRL/MV] Support extra-long patterns for target parameters (more than 255 chars)
+	 *  - [SRL/MV] Preserve prefixes (multiple yang-files)
+	 *  - [SRL/MV] Support for identity-ref
+	 * 
+	 * Candidates for future improvement
+	 *  - Drop unknown paths during brownfield discovery (for future compatibility)
+	 *  - Error-handling: show generator errors as dialogue to user (broken input, ...)
+	 *  - Port picker using NSP inventory (instead of port suggest from device model)
+	 *  - Support for device-families (suppress unsupported attributes?)
+	 *  - Combined approach for approved-misalignments and ignore-children (powered by device-store)
+	 *  - Working with git: overwrite existing or create new version
+	 * 
+	 * @param {any[]} args - context used to issue command (not used yet)
+	 */
+
+	public async newIntentTypeICM(args:any[]): Promise<void> {
+		this.pluginLogs.info("newIntentTypeICM(", JSON.stringify(args), ")");
+
+		if (args.length>1 && args[0] instanceof vscode.Uri) {
+			const fileUri = args[0];
+			if (fs.lstatSync(fileUri.fsPath).isFile()) {
+				// Read *.igen file
+				const pathUri = vscode.Uri.file(path.dirname(fileUri.fsPath));
+				const input: icmGeneratorInput = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(args[0]).fsPath, {encoding:'utf8', flag:'r'}));
+
+				// Normalize context and plain context
+				// - remove leading slash if it occurs
+				// - top namespace must be followed by ":/"
+
+				input.context = input.context.replace(/^\/?([a-zA-Z_][a-zA-Z0-9_.-]*):\/?/, "$1:/");
+				input.plainContext = input.context.replace(/=[^/]+/g, '');
+
+				// Convert xpath to subtree root identifier
+				// Example: nokia-conf:/configure/port => nokia-conf:port
+		
+				const parts = input.plainContext.split('/');
+				input.module = parts.filter(e => e.includes(':')).reverse()[0].split(':')[0];
+				input.root   = parts[parts.length-1].split(':').reverse()[0];
+				input.identifier = `${input.module}:${input.root}`;
+
+				// Initialize remaining variables
+
+				if (!input.intent_type)
+					input.intent_type = path.basename(fileUri.fsPath, '.igen');
+
+				if (!input.date)
+					input.date = new Date().toISOString().slice(0,10);
+
+				if (!input.author)
+					input.author = "NOKIA";
+
+				if (!input.exclude)
+					input.exclude = [];
+
+				if (!input.maxdepth)
+					input.maxdepth = -1;
+
+				input.lastIndex = 1;
+				input.targetComponents = [];
+				input.suggestPaths = [];
+				input.suggestMethods = [];
+				input.encryptedPaths = [];
+
+				input.pathRC = '';
+				input.pathUI = '';
+
+				const intentTypePath = vscode.Uri.joinPath(pathUri, `${input.intent_type}_v1`);
+				if (fs.existsSync(intentTypePath.fsPath)) {
+					vscode.window.showErrorMessage("Intent-type exists");
+					return;
+				}
+
+				const userActivity = new ActivityStatus(`Create "${input.intent_type}"`, 9);
+
+				try {
+					await this.getNeInfo(input, userActivity);
+
+					// get path keys of context and add index
+
+
+					await this.getPathKeys(input, userActivity);
+
+					// get yang-body and update input
+
+					const customTypes = {};
+					const yang = await this.schema2yang(input, "", customTypes, userActivity);
+					const ydef = this.typedef2yang(customTypes);
+
+					// log input for troubleshooting:
+
+					this.pluginLogs.info('data for intent-type rendering: ', input);
+
+					// create files/folders from template
+
+					const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'deviceSpecificICM');
+					fs.mkdirSync(intentTypePath.fsPath);
+
+					for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+						const srcpath = vscode.Uri.joinPath(templatePath, filename).fsPath;
+						const dstpath = vscode.Uri.joinPath(intentTypePath, filename).fsPath;
+
+						if (fs.lstatSync(srcpath).isDirectory())
+							fs.mkdirSync(dstpath);
+						else if (filename.startsWith('.') || filename.includes('/.'))
+							this.pluginLogs.info("skip file/folder ", filename);
+						else {
+							this.pluginLogs.info("processing: ", filename);
+							const jinja = nunjucks.configure(path.dirname(srcpath));
+							const data = jinja.render(path.basename(srcpath), input);
+
+							fs.writeFileSync(dstpath, data);
+						}
+					}
+
+					// create YANG model
+
+					const yangcontent = [];
+					yangcontent.push(`module ${input.intent_type} {`);
+					yangcontent.push(`  namespace "urn:nokia.com:nsp:yang:icm:${input.intent_type}";`);
+					yangcontent.push(`  prefix "${input.intent_type}";`);
+					yangcontent.push("");
+					yangcontent.push("  import ietf-inet-types {");
+					yangcontent.push("	  prefix inet;");
+					yangcontent.push("  }");
+					yangcontent.push("");
+					yangcontent.push("  import ietf-yang-types {");
+					yangcontent.push("	  prefix yang;");
+					yangcontent.push("  }");
+					yangcontent.push("");
+					yangcontent.push("  organization");
+					yangcontent.push(`	  "${input.author}";`);
+					yangcontent.push("  contact");
+					yangcontent.push(`	  "${input.author}";`);
+					yangcontent.push("  description");
+					yangcontent.push(`	  "";`);
+					yangcontent.push("");
+					yangcontent.push(`  revision "${input.date}" {`);
+					yangcontent.push("	  description");
+					yangcontent.push(`	    "Initial revision.";`);
+					yangcontent.push("  }");
+					yangcontent.push("");
+					yangcontent.push(...ydef.map(line => `  ${line}`));
+					yangcontent.push("");
+					yangcontent.push(`  container ${input.intent_type} {`);
+					if (input.icmstyle) {
+						yangcontent.push(`    container ${input.root} {`);
+						yangcontent.push(...yang.map(line => `      ${line}`));
+						yangcontent.push("    }");
+					} else {
+						yangcontent.push(...yang.map(line => `    ${line}`));
+					}
+					yangcontent.push("  }");
+					yangcontent.push("}");
+
+					fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${input.intent_type}.yang`).fsPath, yangcontent.join('\n'));
+					userActivity.done();
+				} catch (e) {
+					userActivity.failed();
+					throw e;
+				} finally {
+					// sleep 3sec and dispose
+					await new Promise(resolve => setTimeout(resolve, 3000));					
+					userActivity.dispose();
+				}
+			}
 		}
 	}
 
     /**
      * Export intent-type to file-system (as ZIP)
 	 * 
-	 * @param {any[]} args options required to export
      * @param {string} folder - Export path.
      * @param {string} intent_type - Name of the intent-type (string).
      * @param {string} intent_type_version - Version of the intent-type (string).

@@ -1,0 +1,65 @@
+{
+  "intent-type": "{{ intent_type }}",
+  "version": "1",
+  "author": "{{ author }}",
+  "mapping-engine": "js-scripted-graal",
+  "resourceDirectory" : "intent-type-resources",  
+  "label": [
+{%- if labels %}
+{%- for label in labels %}
+    "{{ label }}",
+{%- endfor %}
+{%- endif %}
+    "InfrastructureConfiguration"
+  ],
+  "target-component": [
+    {
+      "name": "templatename",
+      "order": 1,
+      "value-type": "STRING",
+      "i18n-text": "Template"
+    },
+    {
+      "name": "objectidentifier",
+      "order": 2,
+      "value-type": "STRING",
+      "i18n-text": "Target Device"
+    }
+{%- for item in targetComponents %}
+    ,{
+      "name": "{{ item.name }}",
+      "order": {{ item.order+1 }},
+      "value-type": "{{ item.type }}",
+{%- if item.range %}
+      "range": "{{ item.range | safe }}",
+{%- endif %}
+{%- if item.length %}
+      "length": "{{ item.length | safe }}",
+{%- endif %}
+{%- if item.pattern %}
+      "pattern": "{{ item.pattern | safe }}",
+{%- endif %}
+{%- if item.suggest %}
+      "function-name": "{{ item.suggest }}",
+{%- endif %}
+      "i18n-text": "{{ item.uiname }}"
+    }
+{%- endfor %}
+  ],
+  "supports-network-state-suspend": false,
+  "return-config-as-json": true,
+  "lifecycle-state": "released",
+  "priority": 50,
+  "build": "-",
+  "composite": false,
+  "supports-health": "never",
+  "notify-intent-instance-events": false,
+  "live-state-retrieval": false,
+  "supports-asynchronous-operations": false,
+  "targetted-device": [
+    {
+      "function": "getTargettedDevices",
+      "index": 0
+    }
+  ]
+}

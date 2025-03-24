@@ -1,0 +1,11 @@
+{
+  "role": "logical",
+  "category": "IPLink",
+  "device-scope": "mdm",
+  "description": "IPL!nk concept study using ICM",
+  "targets": [
+    {
+      "NSP": "NSP"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "baseUrl": "./intent-type-resources"
+    },
+    "include": [
+        "script-content.mjs",
+        "intent-type-resources/**/*.mjs",
+        "intent-type-resources/**/*.js",
+    ]
+}

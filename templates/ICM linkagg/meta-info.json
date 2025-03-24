@@ -1,0 +1,46 @@
+{
+  "intent-type": "{{ intent_type }}",
+  "version": "1",
+  "author": "{{ author }}",
+  "mapping-engine": "js-scripted-graal",
+  "label": [
+    "InfrastructureConfiguration"
+  ],
+  "target-component": [
+    {
+      "i18n-text": "TemplateName",
+      "name": "templatename",
+      "value-type": "STRING",
+      "order": "1"
+    },
+    {
+        "i18n-text": "ObjectIdentifier",
+        "name": "objectidentifier",
+        "value-type": "STRING",
+        "order": "2"
+    },
+    {
+        "i18n-text": "LAG-ID",
+        "name": "lagId",
+        "range": "1..800",
+        "value-type": "NUMBER",
+        "order": "3"
+    }
+  ],
+  "supports-network-state-suspend": true,
+  "return-config-as-json": true,
+  "lifecycle-state": "released",
+  "priority": 50,
+  "build": "-",
+  "composite": false,
+  "supports-health": "never",
+  "notify-intent-instance-events": false,
+  "live-state-retrieval": true,
+  "supports-asynchronous-operations": false,
+  "targetted-device": [
+    {
+      "function": "getTargettedDevices",
+      "index": 0
+    }
+  ]
+}

@@ -2,21 +2,18 @@
  * BROWNFIELD DISCOVERY LOGIC
  *   use-case: physical/logical interface with IS-IS enabled
  * 
- * (c) 2024 by Nokia
+ * (c) 2025 by Nokia
  ********************************************************************************/
 
-/* global mds, logger */
-/* eslint no-undef: "error" */
-
-import { IntentHandler } from 'common/IntentHandler.mjs';
+import { NSP } from 'common/NSP.mjs';
 
 export class DiscoveryLogic {
     static discoverFromSROS(neId, portId, config) {
         logger.info("DiscoveryLogic::discoverFromSROS({}, {})", neId, portId);
 
-        const result = IntentHandler.restconfGetDevice(neId, "nokia-conf:/configure/router=Base?content=config");
+        const result = NSP.restconfGetDevice(neId, "nokia-conf:/configure/router=Base/interface");
         if (result.success) {
-          const interfaces = result.response["nokia-conf:router"][0].interface.filter(entry => entry.port == portId );
+          const interfaces = result.response["nokia-conf:interface"].filter(entry => entry.port == portId );
           if (interfaces.length > 0) {
             config['if-name']     = interfaces[0]["interface-name"];
             config.description    = interfaces[0].description;
@@ -29,7 +26,7 @@ export class DiscoveryLogic {
     static discoverFromSRL(neId, portId, config) {
         logger.info("DiscoveryLogic::discoverFromSRL({}, {})", neId, portId);
 
-        const result = IntentHandler.restconfGetDevice(neId, `srl_nokia-interfaces:/interface=${encodeURIComponent(portId)}?content=config`);
+        const result = NSP.restconfGetDevice(neId, `srl_nokia-interfaces:/interface=${encodeURIComponent(portId)}?content=config`);
         if (result.success) {
             const ifentry = result.response["srl_nokia-interfaces:interface"][0];
             config['if-name']     = undefined;
@@ -50,25 +47,17 @@ export class DiscoveryLogic {
         const portId = target.split("#")[2];
     
         const neInfo = mds.getAllInfoFromDevices(neId);
-        const neType = neInfo.get(0).getFamilyTypeRelease().split(':')[0];
-    
-        switch (neType) {
-            case '7220 IXR SRLinux':
-            case '7250 IXR SRLinux':
-            case '7730 SXR SRLinux':
-                this.discoverFromSRL(neId, portId, config);
-                break;
-            case '7750 SR':
-            case '7450 ESS':
-            case '7950 XRS':
-            case '7250 IXR':
-                this.discoverFromSROS(neId, portId, config);
-                break;
+        const familyTypeRelease = neInfo.get(0).getFamilyTypeRelease();
+        const neType = familyTypeRelease.split(':')[0];
 
-            default:
-                logger.warn("NO DISCOVERY HELPER FOR NE-ID {} NE-TYPE {}", neId, neType);
+        if (["7250 IXR", "7450 ESS", "7750 SR", "7950 XRS"].includes(neType)) {
+            this.discoverFromSROS(neId, portId, config);
+        } else if (familyTypeRelease.includes("SRLinux")) {
+            this.discoverFromSRL(neId, portId, config);
+        } else {
+            logger.warn("NO DISCOVERY HELPER FOR NE-ID {} NE-TYPE {}", neId, neType);
         }
-    
+
         logger.info("discovered config: {}", JSON.stringify(config));
 
         return '<target-data xmlns="http://www.nokia.com/management-solutions/reference-action-intent">'+JSON.stringify(config)+'</target-data>';

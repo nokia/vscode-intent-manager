@@ -2,16 +2,13 @@
  * INTENT-TYPE BLUEPRINT
  *   use-case: base device configuration (day1)
  * 
- * (c) 2024 by Nokia
+ * (c) 2025 by Nokia
  ********************************************************************************/
 
-/* global classResolver, logger, resourceProvider */
-/* eslint no-undef: "error" */
-
-import { IntentLogic }   from 'common/IntentLogic.mjs';
 import { IntentHandler } from 'common/IntentHandler.mjs';
+import { NSP } from 'common/NSP.mjs';
 
-const HashMap = classResolver.resolveClass('java.util.HashMap');
+const HashMap = Java.type('java.util.HashMap');
 
 const iso2_to_idd = {
   'AF': 93, 'AL': 355, 'DZ': 213, 'AS': 1, 'AD': 376, 'AO': 244, 'AI': 1,
@@ -49,8 +46,37 @@ const iso2_to_idd = {
   'ZW': 263
 };
 
-class DeviceConfig extends (IntentLogic) {  
-  static validate(intentType, InterTypeVersion, target, config, contextualErrorJsonObj) {
+class CustomIntentHandler extends IntentHandler {
+  /**************************************************************************
+   * Custom Intent Logic
+   **************************************************************************/
+
+  constructor() {
+    super();
+    NSP.checkRelease(24, 11);
+  }
+
+  getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
+    let sites = Object.values(config); // top-level container has the details
+  
+    sites[0]['ne-id'] = target;
+    sites[0]['ne-name'] = siteNames[target];
+    sites[0]['countryCode'] = iso2_to_idd[sites[0].location.ccode];
+
+    if (target.indexOf(':') > 0)
+      sites[0]['nodeId'] = parseInt(target.split(':')[3]); // extract nodeId from IPv6 address '10{country-code}::cafe:{node-id}'
+    else
+      sites[0]['nodeId'] = parseInt(target.split('.')[3]); // extract nodeId from IPv4 address '10.{country-code}.0.{node-id}'
+  
+    logger.info('site information: '+JSON.stringify(sites[0], null, '  '));    
+    return sites;
+  }
+
+  /**************************************************************************
+   * Intent Hooks
+   **************************************************************************/
+
+  validateHook(intentType, InterTypeVersion, target, config, contextualErrorJsonObj) {
     const cfg = Object.values(config)[0]; // top-level container has the details
     const countryCodeFromISO2 = iso2_to_idd[cfg.location.ccode].toString();
 
@@ -69,33 +95,9 @@ class DeviceConfig extends (IntentLogic) {
     }
   }
 
-  static getSiteParameters(intentType, intentTypeVersion, target, config, siteNames) {
-    let sites = Object.values(config); // top-level container has the details
-  
-    sites[0]['ne-id'] = target;
-    sites[0]['ne-name'] = siteNames[target];
-    sites[0]['countryCode'] = iso2_to_idd[sites[0].location.ccode];
-
-    if (target.indexOf(':') > 0)
-      sites[0]['nodeId'] = parseInt(target.split(':')[3]); // extract nodeId from IPv6 address '10{country-code}::cafe:{node-id}'
-    else
-      sites[0]['nodeId'] = parseInt(target.split('.')[3]); // extract nodeId from IPv4 address '10.{country-code}.0.{node-id}'
-  
-    logger.info('site information: '+JSON.stringify(sites[0], null, '  '));    
-    return sites;
-  }
-}
-
-/**
- * Customize IntentHandler by adding getCities()
- * callout for viewConfig to pick city from list.
- * Avoids to enter geo-coordinates and country
- */
-
-class CustomIntentHandler extends (IntentHandler) {
-  constructor(intentLogic) {
-    super(intentLogic);
-  }
+  /**************************************************************************
+   * Intent WebUI Callouts
+   **************************************************************************/
 
   getCities(context) {
     const data = JSON.parse(resourceProvider.getResource('cities.json'));
@@ -107,4 +109,4 @@ class CustomIntentHandler extends (IntentHandler) {
   }
 }
 
-new CustomIntentHandler(DeviceConfig);
+new CustomIntentHandler();

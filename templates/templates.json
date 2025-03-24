@@ -21,6 +21,14 @@
             "description": "abstracted base-router interface w/ port config (ICM physical)"
         },
         {
+            "label": "ICM iplink",
+            "description": "ipl!nk (abstraction and assurance) for ICM (logical)"
+        },
+        {
+            "label": "ICM linkagg",
+            "description": "Link Aggregation Group with physical interfaces for ICM (logical)"
+        },
+        {
             "label": "SRX24 goldenConfiguration",
             "description": "SReXperts 2024 | device base configure (day1) | next-gen js-engine"
         },
@@ -29,8 +37,12 @@
             "description": "SReXperts 2024 | ipl!nk (abstraction and assurance) | next-gen js-engine"
         },
         {
+            "label": "SRX24 linkagg",
+            "description": "SReXperts 2024 | Link Aggregation Group with physical interfaces | next-gen js-engine"
+        },
+        {
             "label": "SRX24 oamTwampLight",
-            "description": "SReXperts 2024 | latency measurement using TWAMP/light | next-gen js-enginel"
+            "description": "SReXperts 2024 | latency measurement using TWAMP/light | next-gen js-engine"
         },
         {
             "label": "SRX24 deviceSecurity",
@@ -43,6 +55,10 @@
         {
             "label": "SRX24 serviceEvpnEline",
             "description": "SReXperts 2024 | abstract EVWS service | research/study, experimental"
+        },
+        {
+            "label": "basic",
+            "description": "NSP Intent Design Tutorial | 01 Getting Started"
         }
     ]
 }

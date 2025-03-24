@@ -17,19 +17,6 @@
             }
         }
     },
-    "ETHCFM LEVEL 7": {
-        "config": {
-            "target": "srl_nokia-oam:/oam/srl_nokia-ethcfm:ethcfm/domain=level7",
-            "operation": "replace",
-            "value": {
-                "srl_nokia-oam:domain": {
-                    "domain-id": "level7",
-                    "domain-format": "none",
-                    "level": 7
-                }
-            }
-        }
-    },
     "DEFAULT NETWORK INSTANCE": {
         "config": {
             "target": "srl_nokia-network-instance:/network-instance=default",

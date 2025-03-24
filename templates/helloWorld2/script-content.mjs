@@ -1,17 +1,16 @@
 /* global Java, logger, mds, utilityService */
-/* global classResolver */
 /* eslint no-undef: "error" */
 
 const INTENT_TYPE_NAME  = "{{ intent_type }}";
 const INTENT_ROOT = "{{ intent_type }}:{{ intent_type }}";
 
-let ValidateResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.ValidateResult");
-let SynchronizeResult = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.SynchronizeResult");
-let AuditReport = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.AuditReport");
-let MisAlignedObject = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedObject");
-let MisAlignedAttribute = classResolver.resolveClass("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedAttribute");
+let ValidateResult = Java.type("com.nokia.fnms.controller.ibn.intenttype.spi.ValidateResult");
+let SynchronizeResult = Java.type("com.nokia.fnms.controller.ibn.intenttype.spi.SynchronizeResult");
+let AuditReport = Java.type("com.nokia.fnms.controller.ibn.intenttype.spi.AuditReport");
+let MisAlignedObject = Java.type("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedObject");
+let MisAlignedAttribute = Java.type("com.nokia.fnms.controller.ibn.intenttype.spi.MisAlignedAttribute");
 
-let HashMap = classResolver.resolveClass("java.util.HashMap");
+let HashMap = Java.type("java.util.HashMap");
 let Arrays = Java.type("java.util.Arrays");
 
 export class IntentTypeHandler {
