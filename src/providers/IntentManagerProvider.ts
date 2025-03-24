@@ -148,6 +148,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	timeout: number;
 	fileIgnore: Array<string>;
+	fileInclude: Array<string>;
 	parallelOps: boolean;
 
 	serverLogsOffset: string;
@@ -190,6 +191,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
+		this.fileInclude = config.get("includeLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
 
 		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";
@@ -716,11 +718,17 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				vscode.window.showWarningMessage("NSP has more than "+this.queryLimit+" intent-types. Loading the first "+this.queryLimit+" intent-types only.");
 			}
 
+			// If `includeLabels` was provided, apply whitelist (default: complete list)
 			let intentTypes = json["ibn-administration:output"]["intent-type"];
-			for (const label of this.fileIgnore) {
-				// apply blacklist for label(s) provided in extension settings
-				intentTypes = intentTypes.filter((entry:any) => !entry.label.includes(label));
-			}
+			if (this.fileInclude.length > 0)
+				intentTypes = intentTypes.filter((entry: any) =>
+					this.fileInclude.some(label => entry.label.includes(label)));
+			
+			// If `ignoreLabels` was provided, apply blacklist (default: don't filter)
+			if (this.fileIgnore.length > 0)
+				intentTypes = intentTypes.filter((entry: any) =>
+					!this.fileIgnore.some(label => entry.label.includes(label)));
+
 			result = intentTypes.map((entry: { name: string; version: string; }) => [entry.name+'_v'+entry.version, vscode.FileType.Directory]);
 
 			// Create missing intentType entries in cache
@@ -1560,6 +1568,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
+		this.fileInclude = config.get("includeLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
 
 		this.serverLogsOffset = config.get("serverLogsOffset") ?? "10m";
