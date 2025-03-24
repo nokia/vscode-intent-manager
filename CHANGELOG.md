@@ -277,4 +277,7 @@ Template Updates:
 * Add release version check
 * Added IPLink flavor that is ICM-compliant
 * Added LinkAgg example
+
+Improvements:
 * Added concept-study to auto-generate ICM intent-types from model
+* Support for `includeLabels` in addition to `ignoreLabels` (combined blacklist/whitelist)
