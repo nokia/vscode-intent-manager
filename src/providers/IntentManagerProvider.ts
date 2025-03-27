@@ -122,6 +122,7 @@ interface icmGeneratorInput {
 	keys: string,
 	pathRC: string,
 	pathUI: string,
+	listkeys: Record<string, string[]>,
 	rootInstance: Record<string, string|number|undefined>,
 	targetComponents: targetComponentType[],
 	lastIndex: number,
@@ -3252,8 +3253,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			if (a.nodetype === "group" && a.presence && a.help)
 				a_yang.push(`  presence "${a.help}";`);
 
-			if (a.nodetype === "list")
+			if (a.nodetype === "list") {
 				a_yang.push(`  key "${a.keys.join(' ')}";`);
+
+				if (input.icmstyle)
+					input.listkeys[`${input.root}.${relpath.split('/').join('.')}`] = a.keys;
+				else
+					input.listkeys[`${relpath.split('/').join('.')}`] = a.keys;
+			}
 
 			if (["group", "list"].includes(a.nodetype)) {
 				const lines = await this.schema2yang(input, `${subcontext}/${a.name}`, customYangTypes, userActivity);
@@ -3677,6 +3684,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				input.suggestPaths = [];
 				input.suggestMethods = [];
 				input.encryptedPaths = [];
+
+				input.listkeys = {};
 
 				input.pathRC = '';
 				input.pathUI = '';
