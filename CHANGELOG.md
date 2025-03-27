@@ -281,3 +281,10 @@ Template Updates:
 Improvements:
 * Added concept-study to auto-generate ICM intent-types from model
 * Support for `includeLabels` in addition to `ignoreLabels` (combined blacklist/whitelist)
+
+## [4.0.1]
+
+Fixes:
+* ICM auto-generated intent-types now supports leafref targetting intent-model itself.
+  Backend-based implementation. Option `intentrefs` has been removed.
+  

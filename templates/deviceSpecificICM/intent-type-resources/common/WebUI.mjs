@@ -350,14 +350,14 @@ export class WebUI
     while (root.containsKey('__parent')) 
       root = root.__parent;
 
-    const entries = listPath.split('.')
-      .reduce((subtree, pathelement) =>
-        subtree.flatMap(obj => (obj && obj.containsKey(pathelement) ? obj[pathelement] : [])), [root]
-      )
-      .sort();
+    const pathelements = listPath.split('.');
+    const key = pathelements.pop();
+
+    const entries = pathelements.reduce((subtree, pathelement) =>
+        subtree.flatMap(obj => (obj && obj.containsKey(pathelement) ? obj[pathelement] : [])), [root]);
 
     const rvalue = new HashMap;
-    entries.forEach(entry => rvalue.put(entry, entry));
+    entries.forEach(entry => rvalue.put(entry[key], entry));
 
     const duration = Date.now()-startTS;
     logger.info("WebUI::getFormObjects() finished within {} ms", duration|0);

@@ -68,10 +68,15 @@ class IntentHandler extends (IntentHandlerBase) {
 {% for entry in suggestMethods %}
   {{ entry.suggest }}(context) {
     const target = this.getTarget(context);
+{%- if entry.devicePath %}
 {%- if entry.deviceKey %}
     return this.getDeviceModelObjects(context, `{{ entry.devicePath | safe }}`, "{{ entry.deviceKey }}");
 {%- else %}
     return this.getDeviceModelObjects(context, `{{ entry.devicePath | safe }}`);
+{%- endif %}
+{%- endif %}
+{%- if entry.formPath %}
+    return this.getFormObjects(context, "{{ entry.formPath | safe }}");
 {%- endif %}
   }
 {% endfor %}

@@ -100,7 +100,6 @@ interface icmGeneratorInput {
 	withdefaults: boolean|undefined,
 	applygroups: boolean|undefined,
 	constraints: boolean|undefined,
-	intentrefs: boolean|undefined,
 	icmstyle: boolean|undefined,
 
 	// generated from user input
@@ -126,8 +125,8 @@ interface icmGeneratorInput {
 	rootInstance: Record<string, string|number|undefined>,
 	targetComponents: targetComponentType[],
 	lastIndex: number,
-	suggestMethods: {suggest: string, devicePath: string, deviceKey?: string}[],
-	suggestPaths: {viewConfigPath: string, isList: boolean, suggest: string}[],
+	suggestMethods: {suggest: string, devicePath?: string, formPath?: string, deviceKey?: string}[],
+	suggestPaths: {viewConfigPath: string, isList: boolean, dataType?: string, suggest: string}[],
 	encryptedPaths: string[]
 }
 
@@ -3279,10 +3278,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					if (!(dataType in customYangTypes)) customYangTypes[dataType] = a;	
 				}
 
-				// Model references targeting the intent itself as leafref (controlled by input intentrefs)
+				// Model references targeting the intent itself as leafref
 				// References outside the intent scope are modeled as underlying type with suggest
 				
-				if (input.intentrefs && a.leafRef && a.leafRefPath && a.leafRefPath.startsWith(input.plainContext)) {
+				if (a.leafRef && a.leafRefPath && a.leafRefPath.startsWith(input.plainContext)) {
 					if (input.plainContext.split("/").length + 1 < a.leafRefPath.split("/").length) {						
 						let aPath = `${input.plainContext}${subcontext}/${a.name}`.split('/');
 						let rPath = a.leafRefPath.split('/');
@@ -3291,10 +3290,36 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							aPath = aPath.slice(1);
 							rPath = rPath.slice(1);
 						}
-	
+
+						const name = a.leafRefPath.replace(/[^/]+:/g, '').split('/').slice(-3).join('-').replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
+						const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
+
+						if (!input.suggestMethods.some(entry => entry.suggest === suggest)) {
+							const formpath = a.leafRefPath.split('/').slice(input.plainContext.split('/').length).join('.');
+							if (input.icmstyle)
+								input.suggestMethods.push({"suggest": suggest, "formPath": `${input.root}.${formpath}`});
+							else
+								input.suggestMethods.push({"suggest": suggest, "formPath": formpath});
+						}
+
+						if (input.icmstyle)
+							input.suggestPaths.push({
+								"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
+								"isList": (a.nodetype === "propertylist"),
+								"dataType": dataType,
+								"suggest": suggest
+							});
+						else
+							input.suggestPaths.push({
+								"viewConfigPath": `${input.intent_type}.${relpath.split('/').join('.')}`,
+								"isList": (a.nodetype === "propertylist"),
+								"dataType": dataType,
+								"suggest": suggest
+							});
+
 						dataType = "leafref";
 						a.type = dataType;						
-						a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');	
+						a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');
 					}
 				}
 
@@ -3391,21 +3416,22 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const name = a.leafRefPath.replace(/[^/]+:/g, '').split('/').slice(-3).join('-').replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
 					const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
 
-					const pathElements = a.leafRefPath.split('/').slice(0,-1);
-					const rootPathElements = input.pathUI.split('/');
+					if (!input.suggestMethods.some(entry => entry.suggest === suggest)) {
+						const pathElements = a.leafRefPath.split('/').slice(0,-1);
+						const rootPathElements = input.pathUI.split('/');
 
-					for (let idx=0; idx < pathElements.length-1; idx++) {
-						if (pathElements[idx] === rootPathElements[idx]?.split('=')[0]) {
-							if (rootPathElements[idx].includes('='))
-								pathElements[idx] = rootPathElements[idx];
-						} else break;
-					}
+						for (let idx=0; idx < pathElements.length-1; idx++) {
+							if (pathElements[idx] === rootPathElements[idx]?.split('=')[0]) {
+								if (rootPathElements[idx].includes('='))
+									pathElements[idx] = rootPathElements[idx];
+							} else break;
+						}
 
-					if (!input.suggestMethods.some(entry => entry.suggest === suggest))
 						input.suggestMethods.push({
 							"suggest": suggest,
 							"devicePath":  pathElements.join('/')
 						});
+					}
 
 					if (input.icmstyle) {
 						input.suggestPaths.push({
