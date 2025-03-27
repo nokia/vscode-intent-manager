@@ -334,20 +334,17 @@ export class WebUI
   }
 
   /**
-   * WebUI callout to extract list entries (keys) from nested config form data.
+   * WebUI callout to extract entries from nested config form data.
    *
    * @param {ValueProviderContext} context
-   * @param {string} listPath - Path to the target list (dot-separated)
-   * @param {string|string[]} keys - Keys to extract from each list entry
+   * @param {string} listPath - Path to the target (dot-separated)
    * @returns {HashMap} A HashMap containing extracted keys of the list entries found
    * 
    */
 
-  getFormObjects(context, listPath, keys) {
+  getFormObjects(context, listPath) {
     const startTS = Date.now();
-    if (typeof keys === "string") keys = [keys];
-
-    logger.info("WebUI::getFormObjects({} {})", listPath, keys);
+    logger.info("WebUI::getFormObjects(formdata: {}, path: {})", context.getInputValues().toJSONString(), listPath);
 
     let root = context.getInputValues().arguments;
     while (root.containsKey('__parent')) 
@@ -357,8 +354,6 @@ export class WebUI
       .reduce((subtree, pathelement) =>
         subtree.flatMap(obj => (obj && obj.containsKey(pathelement) ? obj[pathelement] : [])), [root]
       )
-      .flat()
-      .map(entry => keys.map(key => entry.containsKey(key) ? entry[key] : '').join(','))
       .sort();
 
     const rvalue = new HashMap;
