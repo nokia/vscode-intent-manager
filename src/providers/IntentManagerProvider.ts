@@ -3280,46 +3280,49 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 				// Model references targeting the intent itself as leafref
 				// References outside the intent scope are modeled as underlying type with suggest
+				// Considering input.exclude to determine, if the leafref target is "in scope"
 				
 				if (a.leafRef && a.leafRefPath && a.leafRefPath.startsWith(input.plainContext)) {
-					if (input.plainContext.split("/").length + 1 < a.leafRefPath.split("/").length) {						
-						let aPath = `${input.plainContext}${subcontext}/${a.name}`.split('/');
-						let rPath = a.leafRefPath.split('/');
-	
-						while (aPath.length > 0 && rPath.length > 0 && aPath[0] == rPath[0]) {
-							aPath = aPath.slice(1);
-							rPath = rPath.slice(1);
-						}
+					if (input.plainContext.split("/").length + 1 < a.leafRefPath.split("/").length) {
+						if (!input.exclude.some(entry => a.leafRefPath.startsWith(`${input.plainContext}/${entry}`))) {
+							let aPath = `${input.plainContext}${subcontext}/${a.name}`.split('/');
+							let rPath = a.leafRefPath.split('/');
+		
+							while (aPath.length > 0 && rPath.length > 0 && aPath[0] == rPath[0]) {
+								aPath = aPath.slice(1);
+								rPath = rPath.slice(1);
+							}
 
-						const name = a.leafRefPath.replace(/[^/]+:/g, '').split('/').slice(-3).join('-').replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
-						const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
+							const name = a.leafRefPath.replace(/[^/]+:/g, '').split('/').slice(-3).join('-').replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
+							const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
 
-						if (!input.suggestMethods.some(entry => entry.suggest === suggest)) {
-							const formpath = a.leafRefPath.split('/').slice(input.plainContext.split('/').length).join('.');
+							if (!input.suggestMethods.some(entry => entry.suggest === suggest)) {
+								const formpath = a.leafRefPath.split('/').slice(input.plainContext.split('/').length).join('.');
+								if (input.icmstyle)
+									input.suggestMethods.push({"suggest": suggest, "formPath": `${input.root}.${formpath}`});
+								else
+									input.suggestMethods.push({"suggest": suggest, "formPath": formpath});
+							}
+
 							if (input.icmstyle)
-								input.suggestMethods.push({"suggest": suggest, "formPath": `${input.root}.${formpath}`});
+								input.suggestPaths.push({
+									"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
+									"isList": (a.nodetype === "propertylist"),
+									"dataType": dataType,
+									"suggest": suggest
+								});
 							else
-								input.suggestMethods.push({"suggest": suggest, "formPath": formpath});
+								input.suggestPaths.push({
+									"viewConfigPath": `${input.intent_type}.${relpath.split('/').join('.')}`,
+									"isList": (a.nodetype === "propertylist"),
+									"dataType": dataType,
+									"suggest": suggest
+								});
+
+							dataType = "leafref";
+							a.type = dataType;						
+							a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');
 						}
-
-						if (input.icmstyle)
-							input.suggestPaths.push({
-								"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
-								"isList": (a.nodetype === "propertylist"),
-								"dataType": dataType,
-								"suggest": suggest
-							});
-						else
-							input.suggestPaths.push({
-								"viewConfigPath": `${input.intent_type}.${relpath.split('/').join('.')}`,
-								"isList": (a.nodetype === "propertylist"),
-								"dataType": dataType,
-								"suggest": suggest
-							});
-
-						dataType = "leafref";
-						a.type = dataType;						
-						a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');
 					}
 				}
 
@@ -3677,7 +3680,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				// - remove leading slash if it occurs
 				// - top namespace must be followed by ":/"
 
-				input.context = input.context.replace(/^\/?([a-zA-Z_][a-zA-Z0-9_.-]*):\/?/, "$1:/");
+				input.context = input.context.replace(/^\/+|\/+$/g, "").replace(/^([a-zA-Z_][a-zA-Z0-9_.-]*):\/*/, "$1:/");
 				input.plainContext = input.context.replace(/=[^/]+/g, '');
 
 				// Convert xpath to subtree root identifier
