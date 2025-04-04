@@ -364,4 +364,12 @@ export class WebUI
 
     return rvalue;
   }
+
+  /**
+   * WebUI callout to return the single entry "single"
+   */
+
+  suggestSingle(context) {
+    return new HashMap({"single": "single"});
+  }
 }

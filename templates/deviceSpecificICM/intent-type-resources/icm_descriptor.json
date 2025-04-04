@@ -1,8 +1,1 @@
-{
-  "role": "{{ role }}",
-  "category": "{{ category }}",
-  "description": "{{ description }}",
-  "device-scope": "mdm",
-  "labels": null,
-  "target-labels": null
-}
+{{ icmDescriptor | dump | safe }}

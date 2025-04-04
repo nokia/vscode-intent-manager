@@ -287,9 +287,16 @@ Improvements:
 Fixes:
 * ICM auto-generated intent-types now supports leafref targetting intent-model itself.
   Backend-based implementation. Option `intentrefs` has been removed.
-  
+
 ## [4.0.2]
 
 Fixes:
 * Take exclusions into account to decide, if the leafref is targetting the intent-model
 * itself. If leafref-target is excluded, use device suggest (not form suggest).
+
+## [4.0.3]
+
+Fixes:
+* Support passwords in case of icmstyle
+* Suggest for single target added
+* Enable control for all icm_descriptor values

@@ -84,23 +84,46 @@ interface targetComponentType {
 	pattern?: string
 }
 
+interface icmDescriptorType	// icm_descriptor
+{
+	// mandatory fields
+	category: string,				// used for logical grouping
+	role: string,					// "physical" or "logical"
+	"device-scope"?: string,		// "mdm", "classic", "mdm-and-classic", "srl", "wavence", "third-party", or "all"
+
+	// optional fields
+	description?: string,						// description for human operators
+	"select-template"?: string,					// "multiple" or "single"
+	"select-target"?: string,					// "multiple" or "single"
+	"target-xpath"?: string,						// used to fetch list of list of targets during creation
+	"targets"?: string,							// key-value pair to adjust target parameters (different from role target)
+	"target-labels"?: string,					// contains NE type, product, version
+	labels?: string,								// comma separated values
+	isPayloadWithMandatoryAttribute?: boolean	// relates to brownfield discovery
+}
+
 interface icmGeneratorInput {
-	// user input (manadatory)
+	// user input (old)
 	role: string,			// icm_descriptor: "physical" or "logical"
 	category: string,		// icm_descriptor: label to help categorizing the intent
-	description: string,	// icm_descriptor: intent-type description for operators
+	description?: string,	// icm_descriptor: intent-type description for operators
+
+	// user input (mandatory)
 	context: string,		// device-model subtree to cover, example: nokia-conf:/configure/qos/sap-egress
 	device: string,			// ne-id of the device used for auto-generation
+	icmDescriptor: icmDescriptorType,
 
 	// user input (optional)
-	author: string,			// intent-type author (default: NOKIA)
+	author: string,		// intent-type author (default: NOKIA)
 	exclude: string[],		// list of children subtrees to be excluded
 	maxdepth: number,		// maximum depth to cover (deeper hierachies are excluded)
+	labels: string[],		// labels
+	date?: string,			// example: 2025-02-28
 
-	withdefaults: boolean|undefined,
-	applygroups: boolean|undefined,
-	constraints: boolean|undefined,
-	icmstyle: boolean|undefined,
+	withdefaults?: boolean,
+	applygroups?: boolean,
+	constraints?: boolean,
+	icmstyle?: boolean,
 
 	// generated from user input
 	plainContext: string,	// non-instance path (context without list-keys)
@@ -110,12 +133,11 @@ interface icmGeneratorInput {
 	root: string,			// example: sap-egress
 
 	// fetched from NSP inventory and MDC meta
-	vendor: string|undefined,		// example: Nokia
-	family: string|undefined,		// example: 7750 SR
-	version: string|undefined,		// example: 24.10.R1
-	swversion: string|undefined,	// example: TiMOS-B-24.10.R1
-	chassis: string|undefined,		// example: 7750 SR-1
-	date: string|undefined,			// example: 2025-02-28
+	vendor?: string,		// example: Nokia
+	family?: string,		// example: 7750 SR
+	version?: string,		// example: 24.10.R1
+	swversion?: string,		// example: TiMOS-B-24.10.R1
+	chassis?: string,		// example: 7750 SR-1
 
 	// generated from NSP MDC schema
 	keys: string,
@@ -125,7 +147,7 @@ interface icmGeneratorInput {
 	rootInstance: Record<string, string|number|undefined>,
 	targetComponents: targetComponentType[],
 	lastIndex: number,
-	suggestMethods: {suggest: string, devicePath?: string, formPath?: string, deviceKey?: string}[],
+	suggestMethods: {suggest: string, devicePath?: string, formPath?: string, devicePathBF?: string, deviceKeyBF?: string}[],
 	suggestPaths: {viewConfigPath: string, isList: boolean, dataType?: string, suggest: string}[],
 	encryptedPaths: string[]
 }
@@ -142,9 +164,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	nspAddr: string;
 	username: string;
-	password: string|undefined;
+	password?: string;
 	port: string;
-	authToken: any|undefined;
+	authToken?: any;
 
 	timeout: number;
 	fileIgnore: Array<string>;
@@ -156,8 +178,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	logLimit: number;
 	queryLimit: number;
 
-	nspVersion: string | undefined;
-	osdVersion: string | undefined;
+	nspVersion?: string;
+	osdVersion?: string;
 	secretStorage: vscode.SecretStorage;
 
 	serverLogs: vscode.OutputChannel;
@@ -2662,10 +2684,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			intent_type_name = parts[1].replace(/_v\d+$/, "");
 
 		const data:{
-			intent_type: string|undefined,
-			author:string|undefined,
-			template:string|undefined,
-			date:string|undefined
+			intent_type?: string,
+			author?: string,
+			template?: string,
+			date?: string
 		} = {
 			intent_type: intent_type_name,
 			author: "NSP DevOps",
@@ -2845,10 +2867,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		
 		if (args.length>1 && args[0] instanceof vscode.Uri) {
 			const userinput : {
-				intent_type: string|undefined,
-				author:string|undefined,
-				template:string|undefined,
-				date:string|undefined
+				intent_type?: string,
+				author?: string,
+				template?: string,
+				date?: string
 			} = {
 				intent_type: "default",
 				author: "NSP DevOps",
@@ -2971,7 +2993,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * @returns {string} YANG range/length constraint (or empty string)
 	 */
 
-	private getRangeString(baseType: string, ranges: {min: number, max: number}[]|undefined) : string {
+	private getRangeString(baseType: string, ranges?: {min: number, max: number}[]) : string {
 		let converted: string[] = [];
 
 		if (ranges && ranges.length>0) {
@@ -3080,8 +3102,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 		}
 
-		this.pluginLogs.info("typedefs for yang rendering: ", Object.keys(customYangTypes).join(', '));
-		this.pluginLogs.debug(JSON.stringify(customYangTypes));
+		this.pluginLogs.info("typedefs for yang rendering:", Object.keys(customYangTypes).join(', '));
 
 		const yang: string[] = [];
 		Object.values(customYangTypes).forEach(a => {
@@ -3224,13 +3245,15 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				continue;
 			}
 
-			// Encrypted Attributes (Nokia SR OS)
-			if (a.typeNameSpace === "urn:nokia.com:sros:ns:yang:sr:types-sros,encrypted-leaf")
-				input.encryptedPaths.push(`${relpath.split('/').join('.')}`);
-
-			// Encrypted Attributes (Nokia SRL)
-			if (['user-password', 'routing-password'].includes(a.type) || (a.name === 'password'))
-				input.encryptedPaths.push(`${relpath.split('/').join('.')}`);
+			// Encrypted Attributes (Nokia SR OS, Nokia SRL)
+			if ((a.typeNameSpace === "urn:nokia.com:sros:ns:yang:sr:types-sros,encrypted-leaf") ||
+				['user-password', 'routing-password'].includes(a.type) ||
+				(a.name === 'password')
+			)
+				if (input.icmstyle)
+					input.encryptedPaths.push(`${input.root}.${relpath.split('/').join('.')}`);
+				else
+					input.encryptedPaths.push(`${relpath.split('/').join('.')}`);
 
 			if (a.help)
 				a.help = a.help.replace(/"/g, "'");
@@ -3274,7 +3297,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				if (a.typeNameSpace?.startsWith("urn:ietf:params:xml:ns:yang:ietf-yang-types,")) dataType = `yang:${a.type}`;
 
 				if (dataType === a.type && dataType !== a.baseType && a.leafRefPath === undefined) {
-					this.pluginLogs.debug("typedef needed: ", a.type, a.baseType, JSON.stringify(a));
+					this.pluginLogs.debug("typedef needed:", a.type, a.baseType, JSON.stringify(a));
 					if (!(dataType in customYangTypes)) customYangTypes[dataType] = a;	
 				}
 
@@ -3340,7 +3363,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							constraints.push(`  // skipped: type ${u.baseType} (enumeration w/o enum entries)`);
 						} else {
 							if (dataType === u.type && dataType !== u.baseType && !u.leafRef) {
-								this.pluginLogs.debug("typedef needed: ", u.type, u.baseType, JSON.stringify(u));
+								this.pluginLogs.debug("typedef needed:", u.type, u.baseType, JSON.stringify(u));
 								if (!(dataType in customYangTypes)) customYangTypes[dataType] = u;
 							}
 
@@ -3540,11 +3563,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			} else {
 				keyAttributes.forEach(a => {
 					input.lastIndex += 1;
-					this.pluginLogs.info("key attribute", JSON.stringify(a));
 					const name = `${data.yangname}-${a.name}`.toLowerCase().replace(/(\b\w+\b)(-\1)+/g, '$1'); // kebap-case
 					const suggest = "suggest"+name.split(/[-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 
-					this.pluginLogs.info("info", name, suggest);
+					this.pluginLogs.info("key attribute:", name, suggest, JSON.stringify(a));
 
 					const targetComponent : targetComponentType = {
 						name: name,
@@ -3574,12 +3596,30 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					input.targetComponents.push(targetComponent);
 
-					if (!input.suggestMethods.some(entry => entry.suggest === suggest))
+					if (a.leafRef && a.leafRefPath) {
+						const pathElements = a.leafRefPath.split('/').slice(0,-1);
+						const rootPathElements = input.pathUI.split('/');
+
+						for (let idx=0; idx < pathElements.length-1; idx++) {
+							if (pathElements[idx] === rootPathElements[idx]?.split('=')[0]) {
+								if (rootPathElements[idx].includes('='))
+									pathElements[idx] = rootPathElements[idx];
+							} else break;
+						}
+
 						input.suggestMethods.push({
 							"suggest": suggest,
-							"devicePath":  input.pathUI,
-							"deviceKey": a.name
+							"devicePath":  pathElements.join('/'),
+							"devicePathBF":  input.pathUI,
+							"deviceKeyBF": a.name
 						});
+					} else {
+						input.suggestMethods.push({
+							"suggest": suggest,
+							"devicePathBF":  input.pathUI,
+							"deviceKeyBF": a.name
+						});
+					}
 
 					input.suggestPaths.push({
 						"viewConfigPath": `_target.${name}`,
@@ -3609,11 +3649,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		if (input.targetComponents.length === 0) {
 			const dummyTarget : targetComponentType = {
-				name: input.root,
-				uiname: input.root.split(/[-_]/).map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '),
+				name: "identifier",
+				uiname: "Identifier",
 				type: "STRING",
 				order: 2,
-				pattern: "^singleton$"
+				pattern: "^single$",
+				suggest: "suggestSingle",
 			};
 			input.targetComponents.push(dummyTarget);
 		}
@@ -3675,6 +3716,17 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				// Read *.igen file
 				const pathUri = vscode.Uri.file(path.dirname(fileUri.fsPath));
 				const input: icmGeneratorInput = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(args[0]).fsPath, {encoding:'utf8', flag:'r'}));
+
+				// use icmDescriptor
+
+				if (!input.icmDescriptor)
+					input.icmDescriptor = {category: input.category, role: input.role};
+
+				if (!input.icmDescriptor['device-scope'])
+					input.icmDescriptor['device-scope'] = "mdm";
+
+				if (input.description && !input.icmDescriptor.description)
+					input.icmDescriptor.description = input.description;
 
 				// Normalize context and plain context
 				// - remove leading slash if it occurs

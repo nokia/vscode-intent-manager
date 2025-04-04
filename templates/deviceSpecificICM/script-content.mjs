@@ -68,10 +68,19 @@ class IntentHandler extends (IntentHandlerBase) {
 {% for entry in suggestMethods %}
   {{ entry.suggest }}(context) {
     const target = this.getTarget(context);
+{%- if entry.devicePathBF %}
 {%- if entry.devicePath %}
-{%- if entry.deviceKey %}
-    return this.getDeviceModelObjects(context, `{{ entry.devicePath | safe }}`, "{{ entry.deviceKey }}");
+    if (context.getInputValues().containsKey("action")) {
+      if (context.getInputValues().action === "associate") {
+        return this.getDeviceModelObjects(context, `{{ entry.devicePathBF | safe }}`, "{{ entry.deviceKeyBF }}");
+      }
+    }
+    return this.getDeviceModelObjects(context, `{{ entry.devicePath | safe }}`);
 {%- else %}
+    return this.getDeviceModelObjects(context, `{{ entry.devicePathBF | safe }}`, "{{ entry.deviceKeyBF }}");
+{%- endif %}
+{%- else %}
+{%- if entry.devicePath %}
     return this.getDeviceModelObjects(context, `{{ entry.devicePath | safe }}`);
 {%- endif %}
 {%- endif %}
