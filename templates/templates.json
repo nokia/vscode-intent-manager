@@ -2,7 +2,7 @@
     "templates": [
         {
             "label": "helloWorld",
-            "description": "basic intent-type"
+            "description": "basic intent-type using classic js-engine"
         },
         {
             "label": "helloWorld2",
@@ -22,39 +22,39 @@
         },
         {
             "label": "ICM iplink",
-            "description": "ipl!nk (abstraction and assurance) for ICM (logical)"
+            "description": "ipl!nk, abstraction and assurance (ICM logical)"
         },
         {
             "label": "ICM linkagg",
-            "description": "Link Aggregation Group with physical interfaces for ICM (logical)"
+            "description": "Link Aggregation Group with physical interfaces (ICM logical)"
         },
         {
-            "label": "SRX24 goldenConfiguration",
-            "description": "SReXperts 2024 | device base configure (day1) | next-gen js-engine"
+            "label": "SRX goldenConfiguration",
+            "description": "SReXperts | device base configure (day1)"
         },
         {
-            "label": "SRX24 iplink",
-            "description": "SReXperts 2024 | ipl!nk (abstraction and assurance) | next-gen js-engine"
+            "label": "SRX iplink",
+            "description": "SReXperts | ipl!nk (abstraction and assurance)"
         },
         {
-            "label": "SRX24 linkagg",
-            "description": "SReXperts 2024 | Link Aggregation Group with physical interfaces | next-gen js-engine"
+            "label": "SRX linkagg",
+            "description": "SReXperts | Link Aggregation Group with physical interfaces"
         },
         {
-            "label": "SRX24 oamTwampLight",
-            "description": "SReXperts 2024 | latency measurement using TWAMP/light | next-gen js-engine"
+            "label": "SRX oamTwampLight",
+            "description": "SReXperts | latency measurement using TWAMP/light"
         },
         {
-            "label": "SRX24 deviceSecurity",
-            "description": "SReXperts 2024 | device security | next-gen js-engine"
+            "label": "SRX deviceSecurity",
+            "description": "SReXperts | device security"
         },
         {
-            "label": "SRX24 serviceL3vpn",
-            "description": "SReXperts 2024 | abstract l3vpn service | research/study, experimental"
+            "label": "SRX serviceL3vpn",
+            "description": "SReXperts | abstract l3vpn service | classic js-engine"
         },
         {
-            "label": "SRX24 serviceEvpnEline",
-            "description": "SReXperts 2024 | abstract EVWS service | research/study, experimental"
+            "label": "SRX serviceEvpnEline",
+            "description": "SReXperts | abstract EVWS service | classic js-engine"
         },
         {
             "label": "basic",

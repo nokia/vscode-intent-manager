@@ -300,3 +300,8 @@ Fixes:
 * Support passwords in case of icmstyle
 * Suggest for single target added
 * Enable control for all icm_descriptor values
+
+## [4.0.4]
+
+Template Updates:
+* Cleanup for SReXperts 2025 events
