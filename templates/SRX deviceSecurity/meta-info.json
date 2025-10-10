@@ -11,7 +11,7 @@
   "target-component": [
     {
       "i18n-text": "Node",
-      "name": "neId",
+      "name": "neName",
       "value-type": "STRING",
       "order": 1
     }

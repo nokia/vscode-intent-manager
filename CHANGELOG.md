@@ -305,3 +305,8 @@ Fixes:
 
 Template Updates:
 * Cleanup for SReXperts 2025 events
+
+## [4.0.5]
+
+Template Updates:
+* Use ne-name (instead of ne-id) as target for deviceSecurity template
