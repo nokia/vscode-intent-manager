@@ -2,7 +2,7 @@
     "name": "nokia-intent-manager",
     "displayName": "NOKIA_IM",
     "description": "NOKIA IM vsCode Developer Plugin",
-    "version": "4.0.5",
+    "version": "4.0.6",
     "icon": "media/NSP_Logo.png",
     "publisher": "Nokia",
     "repository": "http://github.com/nokia/vscode-intent-manager",
@@ -276,7 +276,6 @@
             "properties": {
                 "intentManager.NSPIP": {
                     "type": "string",
-                    "default": "localhost",
                     "scope": "window",
                     "format": "ipv4",
                     "description": "Intent Manager hostname or IP address"
@@ -298,9 +297,8 @@
                 },
                 "intentManager.user": {
                     "type": "string",
-                    "default": "admin",
                     "scope": "window",
-                    "description": "Intent Manager username (default: admin)"
+                    "description": "Intent Manager username"
                 },
                 "intentManager.password": {
                     "type": "null",

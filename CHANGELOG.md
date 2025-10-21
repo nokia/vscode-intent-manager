@@ -310,3 +310,12 @@ Template Updates:
 
 Template Updates:
 * Use ne-name (instead of ne-id) as target for deviceSecurity template
+
+Improvements:
+* Added GitHub workflow to create VSIX files for every new release and store under Assets.
+
+## [4.0.6]
+
+Improvements:
+* Added new environment variables `NSP_SERVER`, `NSP_USER`, and `NSP_PASSWORD` to simplify
+  automatic installation/deployments of code-server for SReXperts events.

@@ -211,6 +211,9 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const config = vscode.workspace.getConfiguration('intentManager');
 		this.secretStorage = context.secrets;
 
+		this.serverLogs = vscode.window.createOutputChannel('NSP Server (remote logs)', 'log');
+		this.pluginLogs = vscode.window.createOutputChannel('NSP Client (plugin logs)', {log: true});
+
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
 		this.fileInclude = config.get("includeLabels") ?? [];
@@ -221,8 +224,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.logLimit = config.get("logLimit") ?? 5000;
 		this.queryLimit = config.get("queryLimit") ?? 1000;
 
-		this.nspAddr = config.get("NSPIP") ?? "";
-		this.username = config.get("user") ?? "admin";
+		this.nspAddr = this._getNspServer();
+		this.username = this._getNspUser();
 		this.port = config.get("port") ?? "443";
 
 		this.extensionPath = context.extensionPath;
@@ -232,9 +235,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		this.nspVersion = undefined;
 		this.osdVersion = undefined;
-
-		this.serverLogs = vscode.window.createOutputChannel('NSP Server (remote logs)', 'log');
-		this.pluginLogs = vscode.window.createOutputChannel('NSP Client (plugin logs)', {log: true});
 
 		this.authToken = undefined;
 
@@ -263,6 +263,34 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	// --- SECTION: PRIVATE METHODS -----------------------------------------
 
 	/**
+	 * Returns the NSP server from extension settings or environment.
+	 */
+
+	private _getNspServer(): string {
+		const config = vscode.workspace.getConfiguration('intentManager');
+		const rvalue:string = config.get<string | undefined>("NSPIP")?.trim() || process.env['NSP_SERVER'] || "nsp.srexperts.net";
+		return rvalue;
+	}
+
+	/**
+	 * Returns the NSP username from extension settings or environment.
+	 */
+
+	private _getNspUser(): string {
+		const config = vscode.workspace.getConfiguration('intentManager');
+		const rvalue:string = config.get<string | undefined>("user")?.trim() || process.env['NSP_USER'] || "admin";
+		return rvalue;
+	}
+
+	/**
+	 * Returns the NSP password from extension settings or secret storage.
+	 */
+
+	private async _getNspPassword(): Promise<string> {
+		return (await this.secretStorage.get("nsp_im_password")) ?? process.env.NSP_PASSWORD ?? "";
+	}
+
+	/**
 	 * Retrieves auth-token from NSP. Implementation uses promises to ensure that only
 	 * one token is used at any given moment of time. The token will automatically be
 	 * revoked after 10min.
@@ -278,7 +306,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
         }
 
-		this.password = await this.secretStorage.get("nsp_im_password");
+		this.password = await this._getNspPassword();
 
         if (this.password && !this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
@@ -1598,10 +1626,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.logLimit = config.get("logLimit") ?? 5000;
 		this.queryLimit = config.get("queryLimit") ?? 1000;
 
-		const nsp:string = config.get("NSPIP") ?? "";
-		const user:string = config.get("user") ?? "admin";
+		const nsp = this._getNspServer();
+		const user = this._getNspUser();
 		const port:string = config.get("port") ?? "443";
-		const pass = await this.secretStorage.get("nsp_im_password");
+		const pass = await this._getNspPassword();
 
 		if (nsp !== this.nspAddr || user !== this.username || port !== this.port || pass !== this.password) {
 			this.pluginLogs.warn("Disconnecting from NSP", this.nspAddr);

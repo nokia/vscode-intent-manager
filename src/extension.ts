@@ -37,8 +37,17 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	vscode.commands.registerCommand('nokia-intent-manager.setPassword', async (password: string|undefined) => {
 		if (password === undefined)
-			password = await vscode.window.showInputBox({password: true, title: "Password"});
-		if (password !== undefined)
+			password = await vscode.window.showInputBox({password: true, ignoreFocusOut: true, title: "Password"});
+
+		if (password === undefined)
+			// User closed dialogue (aborted)
+			return;
+
+		if (password.trim() === "")
+			// Empty password -> delete stored password
+			secretStorage.delete("nsp_im_password");
+		else
+			// New password -> store it
 			secretStorage.store("nsp_im_password", password);
 	});
 
@@ -80,11 +89,16 @@ export function activate(context: vscode.ExtensionContext) {
 		} else sbar.hide();
 	}
 
-	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
-		if (e.affectsConfiguration('intentManager')) {
-			imProvider.updateSettings(); // config has changed
-		}
-	}));
+	const subscriptions = [
+		vscode.workspace.onDidChangeConfiguration((e) => {
+			if (e.affectsConfiguration("intentManager")) imProvider.updateSettings();
+		}),
+		context.secrets.onDidChange((e) => {
+			if (e.key === "nsp_im_password") imProvider.updateSettings();
+		})
+	];
+
+	context.subscriptions.push(...subscriptions);
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.updateStatusBar', async () => updateStatusBarItem()));
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateStatusBarItem));
