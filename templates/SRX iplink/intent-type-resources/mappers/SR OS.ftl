@@ -17,7 +17,8 @@
                         "encap-type": "null",
                         "mtu": 9000,                  
                         "down-when-looped": {
-                            "admin-state": "enable"
+                            "admin-state": "enable",
+                            "tunneling": false
                         },
                         "lldp": {
                             "dest-mac": [
