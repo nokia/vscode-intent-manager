@@ -130,6 +130,11 @@
                 "title": "Generate intent-type"
             },
             {
+                "command": "nokia-intent-manager.newFixedIntentType",
+                "category": "IntentManager",
+                "title": "Generate intent-type"
+            },
+            {
                 "command": "nokia-intent-manager.loglevel",
                 "category": "IntentManager",
                 "title": "Set log-level"
@@ -208,6 +213,11 @@
                     "command": "nokia-intent-manager.newIntentTypeICM",
                     "group": "nokia_im",
                     "when": "resourceScheme == file && resourceExtname == .igen"
+                },
+                {
+                    "command": "nokia-intent-manager.newFixedIntentType",
+                    "group": "nokia_im",
+                    "when": "resourceScheme == file && resourceExtname == .ifxgen"
                 },
                 {
                     "command": "nokia-intent-manager.loglevel",
