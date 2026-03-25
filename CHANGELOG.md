@@ -319,3 +319,15 @@ Improvements:
 Improvements:
 * Added new environment variables `NSP_SERVER`, `NSP_USER`, and `NSP_PASSWORD` to simplify
   automatic installation/deployments of code-server for SReXperts events.
+
+## [Unreleased]
+
+Planned as a minor release (likely `4.1.0`), subject to repository maintainer release strategy.
+
+Template Updates:
+* Added support for generating fixed templates from reference-device configuration subtrees using `*.ifxgen` generator definitions.
+* Fixed-template workflow supports versioned regeneration and controlled rollout with native Intent Manager operations and IBN policies.
+
+Experimental / Limitations:
+* Fixed-template generation and the generated intent-types are experimental and not officially supported by Nokia.
+* Generated intent-types are compatible with the native Intent Engine (Intent Manager API/UI), but not with intent-based value-add applications such as IBSF and ICM.
