@@ -319,3 +319,9 @@ Improvements:
 Improvements:
 * Added new environment variables `NSP_SERVER`, `NSP_USER`, and `NSP_PASSWORD` to simplify
   automatic installation/deployments of code-server for SReXperts events.
+
+## [4.0.7]
+
+Template Updates:
+* Template fixes for newer SR OS releases.
+* Set geo-location for SR Linux templates.

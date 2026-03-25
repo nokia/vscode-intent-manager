@@ -11,7 +11,11 @@
                     },
                     "srl_nokia-system-info:information": {
                         "contact": "${site.contact}",
-                        "location": "${site.location.gps\-position} (${site.location.name}, ${site.location.country})"
+                        "location": "${site.location.name} (${site.location.country})",
+                        "coordinates": {
+                            "latitude": "${site.location.latitude}",
+                            "longitude": "${site.location.longitude}"
+                        }
                     }
                 }
             }
