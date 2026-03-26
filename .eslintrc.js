@@ -17,6 +17,10 @@ module.exports = {
 		'@typescript-eslint/explicit-module-boundary-types': 0,
 		'@typescript-eslint/no-non-null-assertion': 0,
 		'no-inner-declarations': 0,
-		'@typescript-eslint/no-namespace': 0
+		'@typescript-eslint/no-namespace': 0,
+		// TypeScript `import x = require('y')` is the correct CJS import pattern
+		// when esModuleInterop is disabled (module: commonjs). This is not a raw
+		// JS require() call and should not be flagged.
+		'@typescript-eslint/no-require-imports': 0
 	}
 };
