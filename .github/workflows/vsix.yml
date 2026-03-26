@@ -31,21 +31,31 @@ jobs:
         run: npm run compile
 
       - name: Package extension
-        run: npx vsce package
-
-      - name: Publish extension
-        id: publish_extension
-        continue-on-error: true
-        env:
-          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
-        run: npx vsce publish --pat "$VSCE_TOKEN"
-
-      - name: Prepare artifacts
-        if: ${{ always() }}
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           PACKAGE_FILE="${PACKAGE_NAME}-${PACKAGE_VERSION}.vsix"
+          npx vsce package --out "$PACKAGE_FILE"
+          echo "PACKAGE_FILE=$PACKAGE_FILE" >> "$GITHUB_ENV"
+
+      - name: Publish extension
+        id: publish_extension
+        env:
+          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+        run: |
+          if [ -z "$VSCE_TOKEN" ]; then
+            echo "publish_failed=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::VSCE_TOKEN secret is missing. Skipping publish and continuing with artifacts."
+          elif ! npx vsce publish --packagePath "$PACKAGE_FILE" --pat "$VSCE_TOKEN"; then
+            echo "publish_failed=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::VSIX publish failed. This is often token-related (missing VSCE_TOKEN secret, invalid/expired token, or insufficient token permissions). Build artifacts will still be generated and uploaded."
+          else
+            echo "publish_failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare artifacts
+        if: ${{ always() }}
+        run: |
           if [ ! -f "$PACKAGE_FILE" ]; then
             echo "VSIX package $PACKAGE_FILE not found" >&2
             exit 1
@@ -75,5 +85,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Warn if publish failed
-        if: ${{ always() && steps.publish_extension.outcome == 'failure' }}
-        run: echo "::warning::VSIX publish failed. This is often token-related (missing VSCE_TOKEN secret, invalid/expired token, or insufficient token permissions). Build artifacts were still generated and uploaded."
+        if: ${{ always() && steps.publish_extension.outputs.publish_failed == 'true' }}
+        run: echo "::warning::Publish step did not complete successfully; artifacts were still generated and uploaded."
