@@ -336,3 +336,8 @@ Added:
 * As the reference design evolves, rerun generator to produce a new intent-type version
 * New definition can be rolled out per instance or as bulk operation (using IBN policies)
 * The new generator and the generated intent-types are experimental and not officially supported by Nokia. Generated intent-types are compatible with Intent Manager API/UI, but not with intent-based value-add applications such as IBSF and ICM.
+
+## [4.1.3]
+
+Fixes:
+* For abstract intents provide `familyTypeRelease` as input for `getTemplateName()`.

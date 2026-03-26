@@ -60,7 +60,7 @@ function validate(input) {
       } else {
         const neType = neFamilyTypeRelease.split(':')[0];
         const neVersion = neFamilyTypeRelease.split(':')[1];
-        const templateName = getTemplateName(site['ne-id'], neType);
+        const templateName = getTemplateName(site['ne-id'], neFamilyTypeRelease);
         try {
           resourceProvider.getResource(templateName);
         } catch (e) {
@@ -136,7 +136,7 @@ function synchronize(input) {
         sitesConfigs[neId] = {};
       
       const global = getGlobal(target, config);
-      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neFamilyTypeRelease));
       const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'sync'}));
         
       for (const objectName in objects) {
@@ -370,7 +370,7 @@ function audit(input) {
       const neVersion = neFamilyTypeRelease.split(':')[1];
 
       const global = getGlobal(target, config);
-      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neFamilyTypeRelease));
       const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'audit'}));
 
       for (const objectName in objects) {
@@ -490,7 +490,7 @@ function getStateAttributes(input) {
       const neVersion = neFamilyTypeRelease.split(':')[1];
     
       const global = getGlobal(target, config);
-      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neType));
+      const siteTemplate = resourceProvider.getResource(getTemplateName(neId, neFamilyTypeRelease));
       const objects = JSON.parse(utilityService.processTemplate(siteTemplate, {'target': target, 'site': site, 'global': global, 'neVersion': neVersion, 'mode': 'state'}));
       
       for (const objectName in objects) {

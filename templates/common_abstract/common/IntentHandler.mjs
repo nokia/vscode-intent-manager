@@ -861,7 +861,7 @@ export class IntentHandler extends WebUI
     const neType = neFamilyTypeRelease.split(":")[0];
     const neVersion = neFamilyTypeRelease.split(":")[1];
 
-    const templateName = this.getTemplateName(neId, neType);
+    const templateName = this.getTemplateName(neId, neFamilyTypeRelease);
 
     let template;
     try {
@@ -952,7 +952,7 @@ export class IntentHandler extends WebUI
           contextualErrorJsonObj["Family/Type/Release unkown"] = neId;
         } else {
           const neType = neFamilyTypeRelease.split(":")[0];
-          const templateName = this.getTemplateName(neId, neType);
+          const templateName = this.getTemplateName(neId, neFamilyTypeRelease);
           try {
             resourceProvider.getResource(templateName);
           } catch {
