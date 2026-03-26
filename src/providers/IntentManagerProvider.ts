@@ -4016,7 +4016,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					input.template = "mappers/OpenConfig.ftl";
 
 
-				let mapping: Record<string, any> = {};
+				const mapping: Record<string, any> = {};
 
 				for (const key of Object.keys(input.contexts)) {
 					const ctx = input.contexts[key];
@@ -4038,7 +4038,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					const json = await response.json();
 
-				    // strip down json received based on exclusion rules
+					// strip down json received based on exclusion rules
 
 					if (ctx.exclude && ctx.exclude.length > 0) {
 						const removePath = (node: any, parts: string[]): void => {
