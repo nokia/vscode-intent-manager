@@ -1,0 +1,41 @@
+{
+  "intent-type": "{{ intent_type }}",
+  "version": {{ intent_type_version }},
+  "author": "{{ author }}",
+  "mapping-engine": "js-scripted-graal",
+  "label": [
+    "ApprovedMisalignments",
+    "Fixed"
+  ],
+  "target-component": [
+    {
+      "i18n-text": "Node",
+      "name": "neId",
+      "value-type": "STRING",
+      "order": 1
+    }
+  ],
+{% if intent_type_version > 1 %}
+  "migration-support": [
+  {% for v in range(1, intent_type_version) %}
+    { "supported-version": {{ v }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+  ],
+{% endif %}
+  "supports-network-state-suspend": true,
+  "return-config-as-json": true,
+  "lifecycle-state": "released",
+  "priority": 50,
+  "build": "-",
+  "composite": false,
+  "supports-health": "never",
+  "notify-intent-instance-events": false,
+  "live-state-retrieval": true,
+  "supports-asynchronous-operations": false,
+  "targetted-device": [
+    {
+      "function": "getTargettedDevices",
+      "index": 0
+    }
+  ]
+}

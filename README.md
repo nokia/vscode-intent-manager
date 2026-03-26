@@ -31,14 +31,61 @@ The vsCode extension for NSP Intent Manager allows the user to:
 * Multi-target operations (sync, audit, set-state, logging)
 * Deletion of intent-types including intents (confirmation dialogue)
 
-This project is community-driven. This means that support is best-effort coming from the community
-(i.e. anyone with access to the code extension) and contributions from the community are welcome at any time.
+### Fixed Templates (Experimental)
 
-As such, this tool has not been scale tested and it is meant to help in the developer journey with a
-limited number of intent-types and instances, but it is not designed to work in a production network setup.
+The extension provides an experimental fixed-template generator intended for model-driven devices such as Nokia SR OS and SR Linux. This capability mimics NFMP PolicyManager-like operations while using the native NSP Intent Manager (IBN engine).
 
-Extensive logging is available for all communication between this vsCode plugin and NSP IM.
-Check "OUTPUT" for more details.
+Unlike product intent-types that expose control over all device-level attributes, fixed templates are generated for specific deployment patterns. The design favors quick onboarding and operational efficiency, with intentionally limited post-generation flexibility.
+
+High-level workflow:
+* Capture selected configuration subtrees from a reference device to generate a fixed intent-type.
+* Use a JSON generator definition file named `intenttypename.ifxgen`.
+* Deploy the generated configuration to other devices and use audit/sync for drift management.
+* Update captured subtrees as needed and regenerate to create a new intent-type version.
+* Control rollout of new versions via standard Intent Manager operations and IBN policies.
+
+Generator definition example (`intenttypename.ifxgen`):
+
+```json
+{
+    "description": "Golden Configuration for Nokia SR OS devices (MD MODE)",
+    "device": "1034::cafe:1",
+    "contexts": {
+        "sap-ingress 100": {
+            "path": "/nokia-conf:/configure/qos/sap-ingress=100",
+            "exclude": ["description"]
+        },
+        "sap-ingress 200": {
+            "path": "/nokia-conf:/configure/qos/sap-ingress=200"
+        },
+        "sap-ingress 300": {
+            "path": "/nokia-conf:/configure/qos/sap-ingress=300"
+        },
+        "services": {
+            "path": "/nokia-conf:/configure/service"
+        }
+    }
+}
+```
+
+Advanced use-cases:
+* Add parameters to the intent-model and templatize captured configuration (FTL/JSON).
+* Reuse or combine FTL/JSON templates across different NOS variants for multi-vendor use-cases.
+
+> [!IMPORTANT]
+> Fixed-template generation is experimental. The generator and generated intent-types are not officially supported by Nokia.
+>
+> Generated intent-types work with the native Intent Engine (Intent Manager API/UI), but they are not compatible with intent-based applications such as IBSF and ICM. As a result, value-add application features are not available for those generated intent-types.
+
+## Community Support and Contributions
+
+This project is community-driven, and support is best-effort. Please raise GitHub issues for bugs, feature ideas, documentation gaps, and usability feedback so improvements can be tracked transparently.
+
+Contributions are highly encouraged. Pull requests that fix bugs, improve stability, add features, enhance templates, or refine documentation are welcome.
+
+The extension has not been scale tested for large production deployments and is primarily intended to support the developer journey with a limited number of intent-types and instances.
+
+Extensive logging is available for communication between this vsCode plugin and NSP IM. Check "OUTPUT" for troubleshooting details when reporting issues.
 
 ## Build VSIX
 

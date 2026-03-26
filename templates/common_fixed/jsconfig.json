@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "baseUrl": "../common_abstract/"
+    },
+    "include": [
+        "*.mjs",
+        "../common_abstract/**/*.mjs"
+    ]
+}

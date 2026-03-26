@@ -152,6 +152,36 @@ interface icmGeneratorInput {
 	encryptedPaths: string[]
 }
 
+interface contextEntry {
+    path: string;        // identity path of object/subtree
+    exclude?: string[];  // subtree paths to exclude
+}
+
+interface icmFixedGeneratorInput {
+	// user input (mandatory)
+	contexts: Record<string, contextEntry>;   // configuration objects
+	device: string,			// ne-id of the device used for auto-generation
+
+	// user input (optional)
+	author: string,			// intent-type author (default: NOKIA)
+	labels: string[],		// labels
+	date?: string,			// example: 2025-02-28
+
+	// generated from user input
+	intent_type: string,	// derived from filename.ifxgen
+	intent_type_version: number,
+
+	// fetched from NSP inventory and MDC meta
+	vendor?: string,		// example: Nokia
+	family?: string,		// example: 7750 SR
+	version?: string,		// example: 24.10.R1
+	swversion?: string,		// example: TiMOS-B-24.10.R1
+	chassis?: string,		// example: 7750 SR-1
+
+	template?:string		// example: SR OS.ftl
+}
+
+
 /*
 	Class implementing FileSystemProvider for Intent Manager
 */
@@ -3716,7 +3746,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	}
 
 	/**
-	 * Creation of new a device-specific intent-type on the local system.
+	 * Creation of a new device-specific intent-type on the local system.
 	 * To be used for git-pipeline (recommended).
 	 * 
 	 * Open items (WIP)
@@ -3897,6 +3927,239 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					await new Promise(resolve => setTimeout(resolve, 3000));					
 					userActivity.dispose();
 				}
+			}
+		}
+	}
+
+	/**
+	 * Creation of a new fixed intent-type on the local system.
+	 * To be used for git-pipeline (recommended). 
+	 * 
+	 */
+
+	public async newFixedIntentType(args:any[]): Promise<void> {
+		this.pluginLogs.info("newFixedIntentType(", JSON.stringify(args), ")");
+
+		if (args.length>1 && args[0] instanceof vscode.Uri) {
+			const fileUri = args[0];
+			if (fs.lstatSync(fileUri.fsPath).isFile()) {
+				// Read *.ifxgen file
+				const pathUri = vscode.Uri.file(path.dirname(fileUri.fsPath));
+				const input: icmFixedGeneratorInput = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(args[0]).fsPath, {encoding:'utf8', flag:'r'}));
+
+				// Initialize remaining variables
+
+				if (!input.intent_type)
+					input.intent_type = path.basename(fileUri.fsPath, '.ifxgen');
+
+				if (!input.date)
+					input.date = new Date().toISOString().slice(0,10);
+
+				if (!input.author)
+					input.author = "NOKIA";
+
+				// determine intent-type version
+
+				input.intent_type_version = 1;
+
+				for (const entry of fs.readdirSync(pathUri.fsPath, { withFileTypes: true })) {
+					if (!entry.isDirectory()) continue;
+
+					const match = entry.name.match(new RegExp(`^${input.intent_type}_v(\\d+)$`));
+					if (match) {
+						const version = parseInt(match[1], 10);
+						if (input.intent_type_version <= version) {
+							input.intent_type_version = version + 1;
+						}
+					}
+				}
+
+				const intentTypePath = vscode.Uri.joinPath(pathUri, `${input.intent_type}_v${input.intent_type_version}`);
+
+				let url = `/restconf/data/nsp-ne-control:ne-control/discovered-ne=${encodeURI(input.device)}`;
+				let response: any = await this._callNSP(url, {method: "GET"});
+				if (!response)
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				if (!response.ok)
+					this._raiseRestconfError("Getting device info failed!", await response.json());
+
+				let json = await response.json();
+				input.vendor    = json['nsp-ne-control:discovered-ne'][0]['ne-vendor'];         // example: Nokia
+				input.family    = json['nsp-ne-control:discovered-ne'][0]['ne-family'];         // example: 7750 SR
+				input.version   = json['nsp-ne-control:discovered-ne'][0]['version'];           // example: 24.10.R1
+				input.swversion = json['nsp-ne-control:discovered-ne'][0]['software-version'];  // example: TiMOS-B-24.10.R1
+				input.chassis   = json['nsp-ne-control:discovered-ne'][0]['ne-chassis-type'];   // example: 7750 SR-1
+
+				url = `/restconf/data/manager-directory-service:manager-directory/manager-info=MDC/device=${encodeURI(input.device)}`;
+				response = await this._callNSP(url, {method: "GET"});
+				if (!response)
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				if (!response.ok)
+					this._raiseRestconfError("Getting mediator info failed!", await response.json());
+
+				json = await response.json();
+				const familyTypeRelease = json["manager-directory-service:device"]["family-type-release"];
+				const neType = familyTypeRelease.split(":")[0];
+
+				if (["7250 IXR", "7450 ESS", "7750 SR", "7950 XRS"].includes(neType))
+					input.template = "mappers/SR OS.ftl";
+				else if (familyTypeRelease.includes("SRLinux"))
+					input.template = "mappers/SRLinux.ftl";
+				else if (familyTypeRelease.includes("Ciena"))
+					input.template = "mappers/SAOS.ftl";
+				else if (familyTypeRelease.includes("IOS-XR"))
+					input.template = "mappers/IOS-XR.ftl";
+				else if (familyTypeRelease.includes("Juniper"))
+					input.template = "mappers/JunOS MX.ftl";
+				else
+					// default: OpenConfig
+					input.template = "mappers/OpenConfig.ftl";
+
+
+				let mapping: Record<string, any> = {};
+
+				for (const key of Object.keys(input.contexts)) {
+					const ctx = input.contexts[key];
+
+					const path = ctx.path
+						.replace(/^\/+/, "")                 // strip leading slash
+						.replace(/^([^:]+):\/?/, "$1:/");    // ensure prefix namespace:/
+
+					const url =
+						`/restconf/data/network-device-mgr:network-devices/` +
+						`network-device=${input.device}/root/${path}?content=config`;
+
+					const response: any = await this._callNSP(url, { method: "GET" });
+					if (!response)
+						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+
+					if (!response.ok)
+						throw vscode.FileSystemError.Unavailable("Get NE Configuration Failed");
+
+					const json = await response.json();
+
+				    // strip down json received based on exclusion rules
+
+					if (ctx.exclude && ctx.exclude.length > 0) {
+						const removePath = (node: any, parts: string[]): void => {
+							if (!node || parts.length === 0) return;
+							const [head, ...rest] = parts;
+							if (Array.isArray(node)) {
+								for (const item of node) {
+									removePath(item, parts);
+								}
+							} else if (typeof node === "object") {
+								if (rest.length === 0) {
+									// Final key → delete it
+									delete node[head];
+								} else if (node[head] !== undefined) {
+									removePath(node[head], rest);
+								}
+							}
+						};
+
+						let cfg: any = Object.values(json)[0];  // could be object or array
+
+						if (Array.isArray(cfg)) {
+							cfg = cfg.length > 0 ? cfg[0] : {};
+						}
+
+						for (const rule of ctx.exclude) {
+							removePath(cfg, rule.split("/"));
+						}
+
+						mapping[key] = {
+							config: {
+								target: path,
+								operation: "replace",
+								value: json,
+								ignoreChildren: ctx.exclude
+							}
+						};
+					} else {
+						mapping[key] = {
+							config: {
+								target: path,
+								operation: "replace",
+								value: json
+							}
+						};
+					}
+				}
+
+				const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_fixed');
+				fs.mkdirSync(intentTypePath.fsPath);
+
+				// copy files and templatize
+
+				const mergelist = [];
+				for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+					const srcpath = vscode.Uri.joinPath(templatePath, filename).fsPath;
+					const dstpath = vscode.Uri.joinPath(intentTypePath, filename).fsPath;
+
+					if (fs.lstatSync(srcpath).isDirectory())
+						fs.mkdirSync(dstpath);
+					else if (filename.startsWith('.') || filename.includes('/.'))
+						this.pluginLogs.info("skip file/folder ", filename);
+					else if (filename.startsWith('merge_'))
+						mergelist.push(filename.substring(6));
+					else {
+						this.pluginLogs.info("processing: ", filename);
+						const jinja = nunjucks.configure(path.dirname(srcpath));
+						const data = jinja.render(path.basename(srcpath), input);
+
+						if (filename === "jsconfig.json")
+							fs.writeFileSync(dstpath, JSON.stringify({
+								"compilerOptions": {
+									"baseUrl": "./intent-type-resources"
+								},
+								"include": ["*.js", "*.mjs", "intent-type-resources/*.js", "intent-type-resources/**/*.mjs"]
+							}));
+						else if (filename === "yang-modules/[intent_type].yang")
+							fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${input.intent_type}.yang`).fsPath, data);
+						else
+							fs.writeFileSync(dstpath, data);
+					}
+				}
+
+				// merge common resource folders/files
+
+				const resourcePath = vscode.Uri.joinPath(intentTypePath, 'intent-type-resources');
+
+				if (!fs.existsSync(resourcePath.fsPath))
+					fs.mkdirSync(resourcePath.fsPath);
+
+				for (const folder of mergelist) {
+					this.pluginLogs.info("merging: ", folder);
+
+					const mergePath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
+					for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
+						this.pluginLogs.info("filename: ", filename);
+
+						const srcpath = vscode.Uri.joinPath(mergePath, filename).fsPath;
+						const dstpath = vscode.Uri.joinPath(resourcePath, filename).fsPath;
+
+						if (fs.existsSync(dstpath)) {
+							this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
+						}
+						else if (fs.lstatSync(srcpath).isDirectory())
+							fs.mkdirSync(dstpath);
+						else if (filename.startsWith('.') || filename.includes('/.'))
+							this.pluginLogs.info("skip file/folder ", filename);
+						else {
+							this.pluginLogs.info("processing: ", filename);
+							const jinja = nunjucks.configure(path.dirname(srcpath));
+							const data = jinja.render(path.basename(srcpath), input);
+							fs.writeFileSync(dstpath, data);
+
+							// fs.copyFileSync(srcpath, dstpath);
+						}
+					}
+				}
+
+				// write mapper
+
+				fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `intent-type-resources/${input.template}`).fsPath, JSON.stringify(mapping, null, 4));
 			}
 		}
 	}

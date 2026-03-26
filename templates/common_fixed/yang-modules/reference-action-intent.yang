@@ -1,0 +1,34 @@
+module reference-action-intent {
+  namespace "http://www.nokia.com/management-solutions/reference-action-intent";
+  prefix "icm-intent-action";
+
+  import webfwk-ui-metadata {
+    prefix "ui";
+  }
+
+  organization
+    "NOKIA";
+  contact
+    "NOKIA";
+  description
+    "This module defines the Action in Intent Type";
+    
+  revision "2025-11-11" {
+    description
+      "Initial revision.";
+  }
+
+  rpc get-config {
+    description "RPC to return the intended configuration for the network device";
+
+    ui:action {
+      ui:function "getConfig";
+    }
+
+    output {
+      leaf config {
+        type string;
+      }
+    }
+  }
+}

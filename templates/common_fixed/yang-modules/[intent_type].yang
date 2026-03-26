@@ -1,0 +1,28 @@
+module {{ intent_type }} {
+  namespace "urn:nokia.com:nsp:yang:im:{{ intent_type }}";
+  prefix {{ intent_type }};
+  
+  organization
+    "{{ author }}";
+  contact
+    "{{ author }}";
+  description
+    "";
+
+  revision "{{ date }}" {
+    description
+      "Initial revision.";
+  }
+
+  container {{ intent_type }} {
+    description
+      "Intent-type does not have any additional parameters";
+  }
+
+  container {{ intent_type }}-state {
+    config false;
+    leaf configuration {
+      type string;
+    }
+  }  
+}

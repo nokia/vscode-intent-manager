@@ -34,6 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newLocalIntentType', async (...args) => imProvider.newLocalIntentType(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newRemoteIntentType', async (...args) => imProvider.newRemoteIntentType(args)));
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newIntentTypeICM', async (...args) => imProvider.newIntentTypeICM(args)));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-intent-manager.newFixedIntentType', async (...args) => imProvider.newFixedIntentType(args)));
 	
 	vscode.commands.registerCommand('nokia-intent-manager.setPassword', async (password: string|undefined) => {
 		if (password === undefined)
