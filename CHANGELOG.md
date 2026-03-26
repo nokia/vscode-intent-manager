@@ -322,18 +322,17 @@ Improvements:
 
 ## [4.0.7]
 
-Template Updates:
-* Template fixes for newer SR OS releases.
-* Set geo-location for SR Linux templates.
+Fixes:
+* Update IPL templates for SR OS 25.10+ compatibility.
 
-## [Unreleased]
+Improvements:
+* Set geo-location for SR Linux "day1" config.
 
-Planned as a minor release (likely `4.1.0`), subject to repository maintainer release strategy.
+## [4.1.0]
 
-Template Updates:
-* Added support for generating fixed templates from reference-device configuration subtrees using `*.ifxgen` generator definitions.
-* Fixed-template workflow supports versioned regeneration and controlled rollout with native Intent Manager operations and IBN policies.
-
-Experimental / Limitations:
-* Fixed-template generation and the generated intent-types are experimental and not officially supported by Nokia.
-* Generated intent-types are compatible with the native Intent Engine (Intent Manager API/UI), but not with intent-based value-add applications such as IBSF and ICM.
+Added:
+* Generating fixed intent-types from reference nodes
+* Subtrees to capture are defined using `*.ifxgen` generator definitions (JSON format)
+* As the reference design evolves, rerun generator to produce a new intent-type version
+* New definition can be rolled out per instance or as bulk operation (using IBN policies)
+* The new generator and the generated intent-types are experimental and not officially supported by Nokia. Generated intent-types are compatible with Intent Manager API/UI, but not with intent-based value-add applications such as IBSF and ICM.
