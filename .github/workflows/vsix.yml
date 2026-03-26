@@ -12,12 +12,12 @@ jobs:
       contents: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
         run: |
@@ -31,14 +31,17 @@ jobs:
         run: npm run compile
 
       - name: Package extension
-        run: npx @vscode/vsce package
+        run: npx vsce package
 
       - name: Publish extension
+        id: publish_extension
+        continue-on-error: true
         env:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
-        run: npx @vscode/vsce publish --pat "$VSCE_TOKEN"
+        run: npx vsce publish --pat "$VSCE_TOKEN"
 
       - name: Prepare artifacts
+        if: ${{ always() }}
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
@@ -53,6 +56,7 @@ jobs:
           echo "LATEST_FILE=$LATEST_FILE" >> "$GITHUB_ENV"
 
       - name: Upload workflow artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: vscode-netconf-vsix
@@ -61,6 +65,7 @@ jobs:
             ${{ env.LATEST_FILE }}
 
       - name: Attach VSIX to release
+        if: ${{ always() }}
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -68,3 +73,7 @@ jobs:
             ${{ env.LATEST_FILE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Warn if publish failed
+        if: ${{ always() && steps.publish_extension.outcome == 'failure' }}
+        run: echo "::warning::VSIX publish failed. This is often token-related (missing VSCE_TOKEN secret, invalid/expired token, or insufficient token permissions). Build artifacts were still generated and uploaded."
