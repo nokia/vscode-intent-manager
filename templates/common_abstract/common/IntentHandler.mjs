@@ -906,6 +906,29 @@ export class IntentHandler extends WebUI
     }
   }
 
+  /**
+   * Delete the corresponding path from configuration data (JSON).
+   * 
+   * @param {object} data configuration to cleanup
+   * @param {string} path subtree/leaf to be deleted
+   * @param {string} separator
+   */
+
+  deletePath(data, path, separator = '.') {
+    const [key, ...remains] = path.split(separator);
+    if (data !== null && key in data) {
+      if (remains.length > 0) {
+        if (Array.isArray(data[key]))
+          // list hit => iterate entries
+          data[key].forEach(listEntry => this.deletePath(listEntry, remains.join(separator), separator));
+        else if (typeof data[key] === 'object')
+          // dict hit => follow the path
+          this.deletePath(data[key], remains.join(separator), separator);
+      } else 
+        delete data[key]; // delete property
+    }
+  }
+  
   /**************************************************************************
    * Public methods of IntentHandler
    *
