@@ -1388,6 +1388,7 @@ export class IntentHandler extends WebUI
     return `${lines.join("\n")}\n`;
   }
 
+  /**
    * Delete the corresponding path from configuration data (JSON).
    * 
    * @param {object} data configuration to cleanup
