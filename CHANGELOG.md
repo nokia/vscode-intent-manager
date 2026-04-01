@@ -341,3 +341,10 @@ Added:
 
 Fixes:
 * For abstract intents provide `familyTypeRelease` as input for `getTemplateName()`.
+
+## [4.2.0]
+
+Added:
+* Improve fixed intent-type template
+* Improve preview function in MD-CLI format
+* Adding helper deletePath() to allow skipping passwords and hash-values from audits 
