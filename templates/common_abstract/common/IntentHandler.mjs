@@ -1,7 +1,7 @@
 /******************************************************************************
  * ABSTRACT INTENT-HANDLER IMPLEMENTATION
  *
- * (c) 2025 by Nokia
+ * (c) 2026 by Nokia
  ******************************************************************************/
 
 import { NSP } from "common/NSP.mjs";
@@ -904,6 +904,488 @@ export class IntentHandler extends WebUI
 
       throw new Error(`Deploy-template '${templateName}' issue for node ${this.deviceCache[neId]} (ne-id: ${neId}): JSON Error`);
     }
+  }
+
+  /**
+   * Convert Config to MDCLI format.
+   * 
+   * @param {string} neId Device identifier
+   * @param {object} data JSON data to convert
+   * @param {number} indentSize number of spaces to indent
+   * @returns {string} MDCLI formatted string
+   */
+
+  getMdCli(neId, data, indentSize = 4) {
+    const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+    const stripPrefix = (k) => {
+      const idx = String(k).indexOf(":");
+      return idx >= 0 ? String(k).slice(idx + 1) : String(k);
+    };
+    const formatScalar = (value) => {
+      if (value === null) return "";
+      if (typeof value === "boolean") return value ? "true" : "false";
+      if (typeof value === "number") return String(value);
+      return `"${String(value).replace(/"/g, '\\"')}"`;
+    };
+    const parseTargetPath = (target) => {
+      if (typeof target !== "string" || target.trim() === "") return [];
+      const [, pathOnly = target] = target.split(":/", 2);
+      return pathOnly
+        .split("/")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((segment) => {
+          const eqIdx = segment.indexOf("=");
+          if (eqIdx < 0) return { name: stripPrefix(segment), keyValues: [] };
+          return {
+            name: stripPrefix(segment.slice(0, eqIdx).trim()),
+            keyValues: segment
+              .slice(eqIdx + 1)
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          };
+        });
+    };
+
+    const lines = [];
+    const indent = (n) => " ".repeat(n * indentSize);
+    const emit = (line) => lines.push(line);
+
+    let targetPrefix = "";
+    const withTargetPrefix = (pathStr) => (targetPrefix ? `${targetPrefix}:/${pathStr}` : pathStr);
+
+    const renderObject = (obj, depth, pathParts) => {
+      for (const rawKey of Object.keys(obj)) {
+        const key = stripPrefix(rawKey);
+        const value = obj[rawKey];
+        const childPath = [...pathParts, key];
+        const childPathStr = childPath.join("/");
+
+        if (value === null) {
+          emit(`${indent(depth)}${key}`);
+          continue;
+        }
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          emit(`${indent(depth)}${key} ${formatScalar(value)}`);
+          continue;
+        }
+        if (Array.isArray(value)) {
+          if (value.length === 0) continue;
+
+          const allScalarOrNull = value.every(
+            (v) => v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+          );
+          const allObjects = value.every((v) => isPlainObject(v));
+
+          if (allScalarOrNull) {
+            if (value.every((v) => v !== null)) {
+              emit(`${indent(depth)}${key} [${value.map((v) => formatScalar(v)).join(" ")}]`);
+            } else {
+              for (const item of value) {
+                emit(`${indent(depth)}${item === null ? key : `${key} ${formatScalar(item)}`}`);
+              }
+            }
+            continue;
+          }
+
+          if (allObjects) {
+            const keyFields = this.getListKeys(neId, withTargetPrefix(childPathStr));
+            const keyFieldSet = new Set(keyFields);
+            for (const item of value) {
+              const keyTokens = [];
+              for (let idx = 0; idx < keyFields.length; idx += 1) {
+                const field = keyFields[idx];
+                if (!(field in item)) continue;
+                const keyValue = formatScalar(item[field]);
+                keyTokens.push(idx === 0 ? keyValue : `${field} ${keyValue}`);
+              }
+
+              emit(`${indent(depth)}${keyTokens.length ? `${key} ${keyTokens.join(" ")}` : key} {`);
+              const body = {};
+              for (const k of Object.keys(item)) {
+                if (!keyFieldSet.has(k)) body[k] = item[k];
+              }
+              renderObject(body, depth + 1, childPath);
+              emit(`${indent(depth)}}`);
+            }
+            continue;
+          }
+
+          for (const item of value) {
+            if (isPlainObject(item)) {
+              emit(`${indent(depth)}${key} {`);
+              renderObject(item, depth + 1, childPath);
+              emit(`${indent(depth)}}`);
+            } else {
+              emit(`${indent(depth)}${item === null ? key : `${key} ${formatScalar(item)}`}`);
+            }
+          }
+          continue;
+        }
+
+        if (isPlainObject(value)) {
+          emit(`${indent(depth)}${key} {`);
+          renderObject(value, depth + 1, childPath);
+          emit(`${indent(depth)}}`);
+        }
+      }
+    };
+
+    if (!isPlainObject(data)) throw new Error("Root element value must be an object");
+
+    const envelopes = [];
+    const collectEnvelopes = (node) => {
+      if (!isPlainObject(node)) return;
+      if (
+        Object.prototype.hasOwnProperty.call(node, "target") &&
+        Object.prototype.hasOwnProperty.call(node, "value") &&
+        Object.prototype.hasOwnProperty.call(node, "operation")
+      ) {
+        envelopes.push(node);
+        return;
+      }
+      for (const key of Object.keys(node)) {
+        collectEnvelopes(node[key]);
+      }
+    };
+    collectEnvelopes(data);
+    if (envelopes.length === 0) {
+      throw new Error("Expected input object with target, operation, and value");
+    }
+
+    let openHeads = [];
+    let openPathParts = [];
+
+    for (const envelope of envelopes) {
+      if (!isPlainObject(envelope) || typeof envelope.target !== "string") {
+        throw new Error("Expected input object with target, operation, and value");
+      }
+      [targetPrefix] = envelope.target.split(":/", 1);
+
+      const targetSegments = parseTargetPath(envelope.target);
+      const targetHeads = [];
+      const targetPathParts = [];
+      let lastTargetKeyFields = null;
+
+      for (let depth = 0; depth < targetSegments.length; depth += 1) {
+        const segment = targetSegments[depth];
+        const segmentPath = [...targetPathParts, segment.name].join("/");
+        if (segment.keyValues.length === 0) {
+          targetHeads.push(segment.name);
+        } else {
+          const keyFields = this.getListKeys(neId, withTargetPrefix(segmentPath));
+          if (depth === targetSegments.length - 1) {
+            lastTargetKeyFields = keyFields;
+          }
+          const keyTokens = segment.keyValues.map((value, idx) =>
+            idx === 0 ? formatScalar(value) : `${keyFields[idx] || `key-${idx + 1}`} ${formatScalar(value)}`
+          );
+          targetHeads.push(`${segment.name} ${keyTokens.join(" ")}`);
+        }
+        targetPathParts.push(segment.name);
+      }
+
+      let commonDepth = 0;
+      while (
+        commonDepth < openHeads.length &&
+        commonDepth < targetHeads.length &&
+        openHeads[commonDepth] === targetHeads[commonDepth]
+      ) {
+        commonDepth += 1;
+      }
+
+      for (let depth = openHeads.length - 1; depth >= commonDepth; depth -= 1) {
+        emit(`${indent(depth)}}`);
+      }
+      openHeads = openHeads.slice(0, commonDepth);
+      openPathParts = openPathParts.slice(0, commonDepth);
+
+      for (let depth = commonDepth; depth < targetHeads.length; depth += 1) {
+        emit(`${indent(depth)}${targetHeads[depth]} {`);
+      }
+      openHeads = targetHeads;
+      openPathParts = targetPathParts;
+
+      let rootObject = envelope.value;
+      const lastSegment = targetSegments[targetSegments.length - 1];
+      if (lastSegment && isPlainObject(rootObject) && Object.keys(rootObject).length === 1) {
+        const [onlyKey] = Object.keys(rootObject);
+        if (stripPrefix(onlyKey) === lastSegment.name) {
+          const wrapped = rootObject[onlyKey];
+          if (isPlainObject(wrapped)) {
+            rootObject = wrapped;
+          } else if (
+            lastSegment.keyValues.length > 0 &&
+            Array.isArray(wrapped) &&
+            wrapped.length === 1 &&
+            isPlainObject(wrapped[0])
+          ) {
+            rootObject = wrapped[0];
+          }
+        }
+      }
+
+      if (!isPlainObject(rootObject)) throw new Error("Envelope value must be an object");
+      if (lastSegment && lastSegment.keyValues.length > 0 && Array.isArray(lastTargetKeyFields)) {
+        const keyFieldSet = new Set(lastTargetKeyFields);
+        const filteredRoot = {};
+        for (const k of Object.keys(rootObject)) {
+          if (!keyFieldSet.has(stripPrefix(k))) {
+            filteredRoot[k] = rootObject[k];
+          }
+        }
+        rootObject = filteredRoot;
+      }
+
+      renderObject(rootObject, targetHeads.length, openPathParts);
+    }
+
+    for (let depth = openHeads.length - 1; depth >= 0; depth -= 1) {
+      emit(`${indent(depth)}}`);
+    }
+    return `${lines.join("\n")}\n`;
+  }
+
+  /**
+   * Convert Config to MDCLI format.
+   * 
+   * @param {string} neId Device identifier
+   * @param {object} data JSON data to convert
+   * @param {number} indentSize number of spaces to indent
+   * @returns {string} MDCLI formatted string
+   */
+
+  getMdCli(neId, data, indentSize = 4) {
+    const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+    const stripPrefix = (k) => {
+      const idx = String(k).indexOf(":");
+      return idx >= 0 ? String(k).slice(idx + 1) : String(k);
+    };
+    const formatScalar = (value) => {
+      if (value === null) return "";
+      if (typeof value === "boolean") return value ? "true" : "false";
+      if (typeof value === "number") return String(value);
+      return `"${String(value).replace(/"/g, '\\"')}"`;
+    };
+    const parseTargetPath = (target) => {
+      if (typeof target !== "string" || target.trim() === "") return [];
+      const [, pathOnly = target] = target.split(":/", 2);
+      return pathOnly
+        .split("/")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((segment) => {
+          const eqIdx = segment.indexOf("=");
+          if (eqIdx < 0) return { name: stripPrefix(segment), keyValues: [] };
+          return {
+            name: stripPrefix(segment.slice(0, eqIdx).trim()),
+            keyValues: segment
+              .slice(eqIdx + 1)
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          };
+        });
+    };
+
+    const lines = [];
+    const indent = (n) => " ".repeat(n * indentSize);
+    const emit = (line) => lines.push(line);
+
+    let targetPrefix = "";
+    const withTargetPrefix = (pathStr) => (targetPrefix ? `${targetPrefix}:/${pathStr}` : pathStr);
+
+    const renderObject = (obj, depth, pathParts) => {
+      for (const rawKey of Object.keys(obj)) {
+        const key = stripPrefix(rawKey);
+        const value = obj[rawKey];
+        const childPath = [...pathParts, key];
+        const childPathStr = childPath.join("/");
+
+        if (value === null) {
+          emit(`${indent(depth)}${key}`);
+          continue;
+        }
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          emit(`${indent(depth)}${key} ${formatScalar(value)}`);
+          continue;
+        }
+        if (Array.isArray(value)) {
+          if (value.length === 0) continue;
+
+          const allScalarOrNull = value.every(
+            (v) => v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+          );
+          const allObjects = value.every((v) => isPlainObject(v));
+
+          if (allScalarOrNull) {
+            if (value.every((v) => v !== null)) {
+              emit(`${indent(depth)}${key} [${value.map((v) => formatScalar(v)).join(" ")}]`);
+            } else {
+              for (const item of value) {
+                emit(`${indent(depth)}${item === null ? key : `${key} ${formatScalar(item)}`}`);
+              }
+            }
+            continue;
+          }
+
+          if (allObjects) {
+            const keyFields = this.getListKeys(neId, withTargetPrefix(childPathStr));
+            const keyFieldSet = new Set(keyFields);
+            for (const item of value) {
+              const keyTokens = [];
+              for (let idx = 0; idx < keyFields.length; idx += 1) {
+                const field = keyFields[idx];
+                if (!(field in item)) continue;
+                const keyValue = formatScalar(item[field]);
+                keyTokens.push(idx === 0 ? keyValue : `${field} ${keyValue}`);
+              }
+
+              emit(`${indent(depth)}${keyTokens.length ? `${key} ${keyTokens.join(" ")}` : key} {`);
+              const body = {};
+              for (const k of Object.keys(item)) {
+                if (!keyFieldSet.has(k)) body[k] = item[k];
+              }
+              renderObject(body, depth + 1, childPath);
+              emit(`${indent(depth)}}`);
+            }
+            continue;
+          }
+
+          for (const item of value) {
+            if (isPlainObject(item)) {
+              emit(`${indent(depth)}${key} {`);
+              renderObject(item, depth + 1, childPath);
+              emit(`${indent(depth)}}`);
+            } else {
+              emit(`${indent(depth)}${item === null ? key : `${key} ${formatScalar(item)}`}`);
+            }
+          }
+          continue;
+        }
+
+        if (isPlainObject(value)) {
+          emit(`${indent(depth)}${key} {`);
+          renderObject(value, depth + 1, childPath);
+          emit(`${indent(depth)}}`);
+        }
+      }
+    };
+
+    if (!isPlainObject(data)) throw new Error("Root element value must be an object");
+
+    const envelopes = [];
+    const collectEnvelopes = (node) => {
+      if (!isPlainObject(node)) return;
+      if (
+        Object.prototype.hasOwnProperty.call(node, "target") &&
+        Object.prototype.hasOwnProperty.call(node, "value") &&
+        Object.prototype.hasOwnProperty.call(node, "operation")
+      ) {
+        envelopes.push(node);
+        return;
+      }
+      for (const key of Object.keys(node)) {
+        collectEnvelopes(node[key]);
+      }
+    };
+    collectEnvelopes(data);
+    if (envelopes.length === 0) {
+      throw new Error("Expected input object with target, operation, and value");
+    }
+
+    let openHeads = [];
+    let openPathParts = [];
+
+    for (const envelope of envelopes) {
+      if (!isPlainObject(envelope) || typeof envelope.target !== "string") {
+        throw new Error("Expected input object with target, operation, and value");
+      }
+      [targetPrefix] = envelope.target.split(":/", 1);
+
+      const targetSegments = parseTargetPath(envelope.target);
+      const targetHeads = [];
+      const targetPathParts = [];
+      let lastTargetKeyFields = null;
+
+      for (let depth = 0; depth < targetSegments.length; depth += 1) {
+        const segment = targetSegments[depth];
+        const segmentPath = [...targetPathParts, segment.name].join("/");
+        if (segment.keyValues.length === 0) {
+          targetHeads.push(segment.name);
+        } else {
+          const keyFields = this.getListKeys(neId, withTargetPrefix(segmentPath));
+          if (depth === targetSegments.length - 1) {
+            lastTargetKeyFields = keyFields;
+          }
+          const keyTokens = segment.keyValues.map((value, idx) =>
+            idx === 0 ? formatScalar(value) : `${keyFields[idx] || `key-${idx + 1}`} ${formatScalar(value)}`
+          );
+          targetHeads.push(`${segment.name} ${keyTokens.join(" ")}`);
+        }
+        targetPathParts.push(segment.name);
+      }
+
+      let commonDepth = 0;
+      while (
+        commonDepth < openHeads.length &&
+        commonDepth < targetHeads.length &&
+        openHeads[commonDepth] === targetHeads[commonDepth]
+      ) {
+        commonDepth += 1;
+      }
+
+      for (let depth = openHeads.length - 1; depth >= commonDepth; depth -= 1) {
+        emit(`${indent(depth)}}`);
+      }
+      openHeads = openHeads.slice(0, commonDepth);
+      openPathParts = openPathParts.slice(0, commonDepth);
+
+      for (let depth = commonDepth; depth < targetHeads.length; depth += 1) {
+        emit(`${indent(depth)}${targetHeads[depth]} {`);
+      }
+      openHeads = targetHeads;
+      openPathParts = targetPathParts;
+
+      let rootObject = envelope.value;
+      const lastSegment = targetSegments[targetSegments.length - 1];
+      if (lastSegment && isPlainObject(rootObject) && Object.keys(rootObject).length === 1) {
+        const [onlyKey] = Object.keys(rootObject);
+        if (stripPrefix(onlyKey) === lastSegment.name) {
+          const wrapped = rootObject[onlyKey];
+          if (isPlainObject(wrapped)) {
+            rootObject = wrapped;
+          } else if (
+            lastSegment.keyValues.length > 0 &&
+            Array.isArray(wrapped) &&
+            wrapped.length === 1 &&
+            isPlainObject(wrapped[0])
+          ) {
+            rootObject = wrapped[0];
+          }
+        }
+      }
+
+      if (!isPlainObject(rootObject)) throw new Error("Envelope value must be an object");
+      if (lastSegment && lastSegment.keyValues.length > 0 && Array.isArray(lastTargetKeyFields)) {
+        const keyFieldSet = new Set(lastTargetKeyFields);
+        const filteredRoot = {};
+        for (const k of Object.keys(rootObject)) {
+          if (!keyFieldSet.has(stripPrefix(k))) {
+            filteredRoot[k] = rootObject[k];
+          }
+        }
+        rootObject = filteredRoot;
+      }
+
+      renderObject(rootObject, targetHeads.length, openPathParts);
+    }
+
+    for (let depth = openHeads.length - 1; depth >= 0; depth -= 1) {
+      emit(`${indent(depth)}}`);
+    }
+    return `${lines.join("\n")}\n`;
   }
 
   /**************************************************************************
