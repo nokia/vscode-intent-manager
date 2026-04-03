@@ -166,8 +166,8 @@ export class IntentHandlerBase extends WebUI
    */
 
   getNeIdFromTarget(target) {
-    const match = target.match(/ne-id='([^']+)'/);
-    return match ? match[1] : target.split('#')[1];
+    const match = target.match(/ne-id=\x27([^\x27]+)\x27/);
+    return match ? match[1] : target.split("#")[1];
   }
 
   /**
@@ -231,7 +231,7 @@ export class IntentHandlerBase extends WebUI
       return false;
 
     // split addr from prefix-len and validate prefix-len, if present
-    const [addr, prefix] = value.split('/');
+    const [addr, prefix] = value.split("/");
     if (prefix && (!/^\d{1,3}$/.test(prefix) || parseInt(prefix, 10) > 128))
       return false;
 
@@ -282,7 +282,7 @@ export class IntentHandlerBase extends WebUI
     }
 
     // Remove leading zeros from all parts
-    addr = addr.toLowerCase().split(":").map(part => part.replace(/^0+/, '') || '0').join(":");
+    addr = addr.toLowerCase().split(":").map(part => part.replace(/^0+/, "") || "0").join(":");
 
     // Identify the longest zero sequence for "::" compression
     const zeroSequences = addr.match(/(^|:)(0:)+(0$)?/g);
@@ -302,7 +302,7 @@ export class IntentHandlerBase extends WebUI
 
   assertEqual(actual, expected, message) {
     if (actual !== expected) {
-        throw new Error(`❌ Unit Testing Failed: ${message} | Expected: '${expected}', Got: '${actual}'`);
+        throw new Error(`❌ Unit Testing Failed: ${message} | Expected: "${expected}", Got: "${actual}"`);
     } else {
         logger.info(`✅ Passed: ${message}`);
     }
@@ -347,14 +347,102 @@ export class IntentHandlerBase extends WebUI
   
   getListKeys(neId, listPath) {
      // remove instance identifiers from path:
-    const path = listPath.replace(/=[^/]+/g, '');
+    const path = listPath.replace(/=[^/]+/g, "");
 
     if (!(path in this.mdcKeys)) {
       this.mdcKeys[path] = NSP.mdcListKeys(neId, path);
-      logger.info('list-key cache updated: {}', JSON.stringify(this.mdcKeys));
+      logger.info("list-key cache updated: {}", JSON.stringify(this.mdcKeys));
     }
 
     return this.mdcKeys[path];
+  }
+
+  /**
+   * Unwrap JSON body for intent audits and synchronize operations (merge / replace).
+   * Used for both:
+   *   - intended config (iCfg) — RESTCONF YANG-Patch `replace` request body
+   *   - actual config (aCfg) — RESTCONF `GET` data response body
+   *
+   * The return value is the config root used by recursive `compareConfig` or ignoreChildren merge.
+   *
+   * @param {object} body Single RESTCONF resource object (one module-qualified root key).
+   * @returns {*} Unwrapped root value (typically an object; containers skip step 2).
+   */
+  unwrapRestconfBody(body) {
+    // **Step 1:** Peel the outer wrapper: the last path segment appears once as the sole
+    // top-level property name (module-qualified root). Its value is the subtree for the target.
+    //
+    // Example: {"nokia-conf:port": [{"port-id": "1/1/1", ...}]} → [{"port-id": "1/1/1", ...}]
+
+    const config = Object.values(body)[0];
+
+    // **Step 2:** RFC 8040 / RFC 8072 JSON: a single list instance is a one-element array.
+    // Unwrap to the entry object for audits and merge. Empty array → {}.
+    //
+    // Example: [{"port-id": "1/1/1", ...}] → {"port-id": "1/1/1", ...}
+
+    if (Array.isArray(config)) {
+      if (config.length > 0)
+        return config[0];
+      else
+        return {};
+    }
+    return config;
+  }
+
+  /**
+   * Returns if the relativePath belongs to any ignored children. Used as audit helper to avoid
+   * reporting additional subtrees/attributes that are part of pre-approved misalignments.
+   *
+   * `neId` / `basePath` are currently unused. Added for future enhancements to properly support
+   * instance paths, while method needs to figure out list-keys correctly.
+   *
+   * Paths to ignore are taken from `this.ignoreChildren` (prefix match on `relativePath`).
+   *
+   * @param {string} neId              (reserved for future use)
+   * @param {string} basePath          (reserved for future use)
+   * @param {string} relativePath
+   * @returns {boolean}
+   */
+  isPreApproved(neId, basePath, relativePath) {
+    return this.ignoreChildren.some(path => relativePath.startsWith(path));
+  }
+
+  /**
+   * Merges subtrees from `actualConfig` (GET response) into `desiredConfig` (in-place mutation), to
+   * preserve nodal configuration for pre-approved misalignments (`this.ignoreChildren`).
+   *
+   * `neId` / `deviceModelPath` are currently unused. Added for future enhancements to properly support
+   * instance paths, while method needs to figure out list-keys correctly.
+   *
+   * Unwraps both envelopes, copies paths segment-by-segment (same as 4.2.1).
+   *
+   * @param {string} neId              (reserved for future use)
+   * @param {string} deviceModelPath   (reserved for future use)
+   * @param {object} desiredConfig     RESTCONF envelope for the intent (replace payload)
+   * @param {object} actualConfig      Configuration response payload (RESTCONF GET)
+   */
+  mergePreservedSubtrees(neId, deviceModelPath, desiredConfig, actualConfig) {
+    const aCfg = this.unwrapRestconfBody(actualConfig);
+    const iCfg = this.unwrapRestconfBody(desiredConfig);
+    this.ignoreChildren.forEach(path => {
+      const keys = path.split("/");
+      let source = aCfg;
+      let target = iCfg;
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (key in source)
+          if (i < keys.length - 1) {
+            if (!(key in target))
+              target[key] = {};
+            source = source[key];
+            target = target[key];
+          } else {
+            target[key] = source[key];
+          }
+        else break;
+      }
+    });
   }
 
   /**
@@ -368,7 +456,7 @@ export class IntentHandlerBase extends WebUI
    * @param {string} obj object reference used for report
    * @param {string} path used to build up relative path (recursive)
    */
-
+  
   compareConfig(neId, basePath, aCfg, iCfg, auditReport, obj, path) {
     const startTS = Date.now();
     logger.debug("IntentHandler::compareConfig(neId={}, basePath={}, path={})", neId, basePath, path);
@@ -443,33 +531,21 @@ export class IntentHandlerBase extends WebUI
 
     for (const key in aCfg) {
       if (!(key in iCfg)) {
-        // Possibility to exclude children (pre-approved misalignments) that match the list provided.
-        // Current Restrictions:
-        //  (1) Intent config (icfg) must not contain attributes that match the ignored children 
-        //  (2) Intent config (icfg) must contain the direct parents of the ignored children
+        const relativePath = path + key;        
+        if (!this.isPreApproved(neId, basePath, relativePath)) {
 
-        let found = "";
-        const aKey = path+key;
-        for (const idx in this.ignoreChildren) {
-          if (aKey.startsWith(this.ignoreChildren[idx])) {
-            found = this.ignoreChildren[idx];
-            break;
-          }
-        }
-
-        if (!found) {
           if (aCfg[key] instanceof Object) {
             // mismatch: undesired list/container
 
             const aVal = JSON.stringify(aCfg[key]);
             if ((aVal === "{}") || (aVal === "[]") || (aVal === "[null]"))
-              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+aKey, null, aVal, obj));
+              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+relativePath, null, aVal, obj));
             else
               // undesired object: is-configured=true, is-undesired=default(true)
-              auditReport.addMisAlignedObject(new MisAlignedObject("/"+basePath+"/"+aKey, true, neId, true));
+              auditReport.addMisAlignedObject(new MisAlignedObject("/"+basePath+"/"+relativePath, true, neId, true));
           } else {
             // mismatch: additional leaf
-            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+aKey, null, aCfg[key].toString(), obj));
+            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+relativePath, null, aCfg[key].toString(), obj));
           }
         }
       }
@@ -494,14 +570,14 @@ export class IntentHandlerBase extends WebUI
     // handle YANG lists, leaf-lists
     if (Array.isArray(cfg)) {
       const cleanedArray = cfg.map(v => this.cleanupConfig(v));
-      return cleanedArray.every(v => v === null) ? cleanedArray : cleanedArray.filter(v => typeof v !== 'object' || Object.entries(v).length > 0);      
+      return cleanedArray.every(v => v === null) ? cleanedArray : cleanedArray.filter(v => typeof v !== "object" || Object.entries(v).length > 0);      
     }
 
     // handle YANG containers
-    if (cfg && typeof cfg === 'object')
+    if (cfg && typeof cfg === "object")
       return Object.fromEntries(Object.entries(cfg)
         .map(([k, v]) => [k, this.cleanupConfig(v)])
-        .filter(([_, v]) => typeof v !== 'object' || Object.entries(v).length > 0)
+        .filter(([_, v]) => typeof v !== "object" || Object.entries(v).length > 0)
       );
 
     // handle YANG leafs (primitive types)
@@ -510,23 +586,23 @@ export class IntentHandlerBase extends WebUI
 
   /**
    * Delete the corresponding path from configuration data (JSON).
-   * 
+   *
    * @param {object} data configuration to cleanup
    * @param {string} path subtree/leaf to be deleted
    * @param {string} separator
    */
-
-  deletePath(data, path, separator = '.') {
+  
+  deletePath(data, path, separator = ".") {
     const [key, ...remains] = path.split(separator);
     if (data !== null && key in data) {
       if (remains.length > 0) {
         if (Array.isArray(data[key]))
           // list hit => iterate entries
           data[key].forEach(listEntry => this.deletePath(listEntry, remains.join(separator), separator));
-        else if (typeof data[key] === 'object')
-          // dict hit => follow the path
+        else if (typeof data[key] === "object")
+          // dict hit => follow the path (recurse)         
           this.deletePath(data[key], remains.join(separator), separator);
-      } else 
+      } else
         delete data[key]; // delete property
     }
   }
@@ -629,43 +705,7 @@ export class IntentHandlerBase extends WebUI
         if (this.ignoreChildren.length > 0) {
           const result = NSP.mdcGET(neId, deviceModelPath+"?content=config");
           if (result.success) {
-            // Extract content from envelope
-            // example: {"nokia-conf:port": [{"port-id": "1/1/1", ...}]} becomes [{"port-id": "1/1/1", ...}]
-            let aCfg = Object.values(result.response)[0]; // actual config
-            let iCfg = Object.values(desiredConfig)[0]; // intended config
-
-            // YANG list-entries are encoded as single-entry array (rfc8040, rfc8072)
-            // Extract this single entry from the list
-            // example: [{"port-id": "1/1/1", ...}] becomes {"port-id": "1/1/1", ...}
-
-            if (Array.isArray(aCfg)) {
-              if (aCfg.length > 0) aCfg = aCfg[0]; else aCfg = {};
-            }
-
-            if (Array.isArray(iCfg)) {
-              if (iCfg.length > 0) iCfg = iCfg[0]; else iCfg = {};
-            }
-
-            this.ignoreChildren.forEach(path => {
-              const keys = path.split('/');
-              let source = aCfg;
-              let target = iCfg;
-          
-              for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-          
-                if (key in source)
-                  if (i < keys.length - 1) {
-                    if (!(key in target))
-                      target[key] = {};
-                    source = source[key];
-                    target = target[key];
-                  } else {
-                    target[key] = source[key];
-                  }
-                else break; // Stop processing this path
-              }
-            });
+            this.mergePreservedSubtrees(neId, deviceModelPath, desiredConfig, result.response);
           }
           else if (result.errmsg === "Not Found") {
             logger.info("Merge pre-approved misalignments skipped. Object not configured on device.");
@@ -762,25 +802,11 @@ export class IntentHandlerBase extends WebUI
     const result = NSP.mdcGET(neId, deviceModelPath+"?content=config");
     if (result.success) {
       if (state === "active") {
-        // Extract content from envelope
-        // example: {"nokia-conf:port": [{"port-id": "1/1/1", ...}]} becomes [{"port-id": "1/1/1", ...}]
-        let aCfg = Object.values(result.response)[0]; // actual config
-        let iCfg = Object.values(desiredConfig)[0]; // intended config
+        let aCfg = this.unwrapRestconfBody(result.response);
+        let iCfg = this.unwrapRestconfBody(desiredConfig);
 
-        // YANG list-entries are encoded as single-entry array (rfc8040, rfc8072)
-        // Extract this single entry from the list
-        // example: [{"port-id": "1/1/1", ...}] becomes {"port-id": "1/1/1", ...}
-
-        if (Array.isArray(aCfg)) {
-          if (aCfg.length > 0) aCfg = aCfg[0]; else aCfg = {};
-        }
-
-        if (Array.isArray(iCfg)) {
-          if (iCfg.length > 0) iCfg = iCfg[0]; else iCfg = {};
-        }
-  
         this.preAuditHook(neId, deviceModelPath, aCfg, iCfg);
-        this.compareConfig(neId, deviceModelPath, aCfg, iCfg, auditReport, neId, '');
+        this.compareConfig(neId, deviceModelPath, aCfg, iCfg, auditReport, neId, "");
       } else {
         // undesired objects: is-configured=true, is-undesired=true
         auditReport.addMisAlignedObject(new MisAlignedObject("/"+deviceModelPath, true, neId, true));
@@ -824,7 +850,7 @@ export class IntentHandlerBase extends WebUI
 
     logger.info("IntentHandler::getStateAttributes() in state {}", state);
 
-    const stateXML = '<state-report xmlns="http://www.nokia.com/management-solutions/ibn" />';
+    const stateXML = "<state-report xmlns=\"http://www.nokia.com/management-solutions/ibn\" />";
     
     const duration = Date.now()-startTS;
     logger.info("IntentHandler::getStateAttributes() finished within {} ms", duration|0);
@@ -869,7 +895,7 @@ export class IntentHandlerBase extends WebUI
       }
 
       if (this.ignoreChildren.length > 0) {
-        this.ignoreChildren.forEach(path => this.deletePath(config, path, '/'));
+        this.ignoreChildren.forEach(path => this.deletePath(config, path, "/"));
         config = this.cleanupConfig(config);
       }
 
