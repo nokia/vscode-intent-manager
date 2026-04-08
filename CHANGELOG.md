@@ -349,7 +349,7 @@ Added:
 * Improve preview function in MD-CLI format
 * Adding helper deletePath() to allow skipping passwords and hash-values from audits
 
-## [4.2.2]
+## [4.2.3]
 
 Template Improvement (Developer Experience):
 * Abstract/Fixed intent-types: FTL JSON parse diagnostics for extra-long rendered output using multi-arg `logger.error` with at most 10_000 char fragments
@@ -360,8 +360,6 @@ Template Refactoring:
 * Added `unwrapRestconfBody()` for common RESTCONF envelope handling
 * Added `mergePreservedSubtrees()` keeping existing behavior for merging actual config subtrees based on pre-approved misalignments aka ignoreChildren
 * Added `isPreApproved()` keeping existing behavior to ignore additional subtrees in the actual config during audits based on pre-approved misalignments aka ignoreChildren
-
-## [4.2.3]
 
 Fix:
 * Change needed for compatibility w/ upcoming NSP release 26.4:
