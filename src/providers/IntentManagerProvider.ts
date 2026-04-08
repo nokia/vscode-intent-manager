@@ -1017,7 +1017,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					meta["intent-type"] = intent_type;
 					meta["version"] = intent_type_version;
-					const forCleanup = ["default-version", "skip-device-connectivity-check", "support-aggregated-request",	"resource",	"name",	"date",	"module", "script-content"];
+					const forCleanup = ["default-version", "skip-device-connectivity-check", "support-aggregated-request",	"resource",	"name",	"date",	"module", "script-content", "default-release"];
 					for (const parameter of forCleanup) delete meta[parameter];
 					
 					return Buffer.from(JSON.stringify(meta, null, '  '));
@@ -1330,7 +1330,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							}
 						}
 
-						const forCleanup = ["default-version"];
+						const forCleanup = ["default-version", "default-release"];
 						for (const parameter of forCleanup) delete data[parameter];		
 					}
 
@@ -1531,7 +1531,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					resource.name = newname;
 				}
 
-			const forCleanup = ["default-version"];
+			const forCleanup = ["default-version", "default-release"];
 			for (const parameter of forCleanup) delete this.intentTypes[intent_type_folder].data[parameter];
 			
 			const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;

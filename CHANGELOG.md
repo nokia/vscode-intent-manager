@@ -360,3 +360,9 @@ Template Refactoring:
 * Added `unwrapRestconfBody()` for common RESTCONF envelope handling
 * Added `mergePreservedSubtrees()` keeping existing behavior for merging actual config subtrees based on pre-approved misalignments aka ignoreChildren
 * Added `isPreApproved()` keeping existing behavior to ignore additional subtrees in the actual config during audits based on pre-approved misalignments aka ignoreChildren
+
+## [4.2.3]
+
+Fix:
+* Change needed for compatibility w/ upcoming NSP release 26.4:
+* New property `default-release` requires special handling aligned with `default-version`.
