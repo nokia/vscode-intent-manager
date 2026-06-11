@@ -64,6 +64,51 @@ export class IntentHandlerBase extends WebUI
     throw new Error("getDeviceModelPath() must be implemented by IntentHandler");
   }
 
+  getModuleRefs() {
+    return {};
+  }
+
+  /**
+   * YANG module name prefixes used to strip {@code prefix:value} from device (actual) leaf
+   * values when comparing to intent during audit. Filled by the ICM generator from identityref
+   * QName keys (same keys used to emit typedef enumerations), not from {@link getModuleRefs}.
+   * @returns {string[]}
+   */
+  getAuditModulePrefixes() {
+    return [];
+  }
+
+  /**
+   * Strip the first matching MDC module prefix from a leaf string (longest prefix wins).
+   * @param {string} value
+   * @returns {string}
+   */
+  stripMdcModulePrefixFromLeafString(value) {
+    if (typeof value !== "string" || !value.includes(":"))
+      return value;
+    if (this.isIPv6(value))
+      return value;
+    let prefixes;
+    try {
+      prefixes = this.getAuditModulePrefixes();
+    } catch (e) {
+      return value;
+    }
+    if (!Array.isArray(prefixes) || prefixes.length === 0)
+      return value;
+    for (const prefix of prefixes) {
+      if (typeof prefix !== "string" || prefix.length === 0)
+        continue;
+      const head = prefix + ":";
+      if (value.startsWith(head))
+        return value.slice(head.length);
+    }
+    return value;
+  }
+
+  getActionKeys() {
+    return [];
+  }
   /**
    * Construct the RESTCONF complient body for the desired configuration
    * to be pushed by the intent using MDC RESTCONF.
@@ -97,7 +142,142 @@ export class IntentHandlerBase extends WebUI
    */
 
   validateHook(intentType, intentTypeVersion, target, config, contextualErrorJsonObj) {
-  }    
+  }
+
+  /**************************************************************************
+   * Intent config deviation stripping (resource: custom/intent-deviations.json)
+   **************************************************************************/
+
+  /**
+   * Remove attributes from intent config that are not supported for this NE
+   * family/type/version per deviation rules.
+   *
+   * @param {object} intentConfig
+   * @param {string} neId
+   * @returns {object}
+   */
+  removeIntentConfig(intentConfig, neId) {
+    var deviationData = undefined;
+    try {
+      deviationData = this.deviationData();
+    } catch (err) {
+      return intentConfig;
+    }
+    logger.info("Removing deviations from config: " + intentConfig);
+    var neFamily = this.getNeFamilyRelease(neId);
+    logger.info("NE family : " + neFamily);
+    var neType = this.getNeType(neFamily);
+    var chassisType = this.getChassisType(neFamily);
+    var neVersion = this.getNeVersion(neFamily);
+    logger.info("Intent dev JS: neType: " + neType + ", chassisType: " + chassisType + ", neVersion: " + neVersion);
+    var deviationInfoArr = deviationData["deviationInfo"];
+    for (var i = 0; i < deviationInfoArr.length; i++) {
+      var deviationObj = deviationInfoArr[i];
+      var deviationNetype = deviationObj["neType"];
+      var deviationNeVersion = deviationObj["neVersion"];
+      var deviationChassisTypes = deviationObj["chassisTypes"];
+      var chassisFlag = deviationChassisTypes.length == 0;
+      if (!chassisFlag) {
+        chassisFlag = deviationChassisTypes.indexOf(chassisType) != -1;
+      }
+      var result = neType.localeCompare(deviationNetype) == 0 && chassisFlag;
+      var neversionResult = deviationNeVersion.length == 0;
+      if (!neversionResult) {
+        neversionResult = deviationNeVersion.indexOf(neVersion) != -1;
+      }
+      logger.info("neType : " + neType + ", chassisType : " + chassisType + ",result : " + result + ", neVersionResult : " + neversionResult);
+      if (result && neversionResult) {
+        var notSupportedAttributes = deviationObj["NotSupportedAttributes"];
+        for (var j = 0; j < notSupportedAttributes.length; j++) {
+          var segments = notSupportedAttributes[j].split(".");
+          var attributeToDelete = segments.pop();
+          var dataPath = segments.join(".");
+          logger.info("Deleting attribute : " + attributeToDelete + ", from Data Path : " + dataPath);
+          this.deleteAttribute(intentConfig, dataPath, attributeToDelete);
+        }
+      }
+    }
+    logger.info("intent deviation post process config" + JSON.stringify(intentConfig));
+    return intentConfig;
+  }
+
+  /**
+   * @param {object} intentConfig
+   * @param {string} path
+   * @param {string} attribute
+   */
+  deleteAttribute(intentConfig, path, attribute) {
+    if (path !== "") {
+      var segments = path.split(".");
+      for (var segment of segments) {
+        if (!intentConfig.hasOwnProperty(segment)) {
+          return;
+        }
+        intentConfig = intentConfig[segment];
+        //check for Array or Object
+        if (Array.isArray(intentConfig)) {
+          for (var i = 0; i < intentConfig.length; i++) {
+            if (intentConfig[i].hasOwnProperty(attribute)) {
+              delete intentConfig[i][attribute];
+            } else {
+              segments.splice(0, segments.indexOf(segment) + 1);
+              var remSegments = segments.join(".");
+              this.deleteAttribute(intentConfig[i], remSegments, attribute);
+            }
+          }
+        } else if (intentConfig.hasOwnProperty(attribute)) {
+          delete intentConfig[attribute];
+        }
+      }
+    } else {
+      if (intentConfig.hasOwnProperty(attribute)) {
+        delete intentConfig[attribute];
+      }
+    }
+  }
+
+  getNeFamilyRelease(target) {
+    try {
+      const neInfo = mds.getAllInfoFromDevices(target);
+      if (neInfo === null || neInfo.size() === 0) {
+        logger.warn("getNeFamilyRelease: no device info for target={}", target);
+        return "";
+      }
+      const familyRelease = neInfo.get(0).getFamilyTypeRelease();
+      if (familyRelease === null) {
+        logger.warn("getNeFamilyRelease: family/type/release null for target={}", target);
+        return "";
+      }
+      logger.info("getNeFamilyRelease: target={}, familyTypeRelease={}", target, familyRelease);
+      return familyRelease;
+    } catch (e) {
+      logger.error("getNeFamilyRelease: exception for target={}: {}", target, e);
+      return {
+        "Device Not Found": "Device Not Found",
+      };
+    }
+  }
+
+  getNeType(neFamily) {
+    var neFamilyArr = neFamily.split(":");
+    return neFamilyArr[0];
+  }
+
+  getChassisType(neFamily) {
+    var neFamilyArr = neFamily.split(":");
+    return neFamilyArr[2];
+  }
+
+  getNeVersion(neFamily) {
+    var neFamilyArr = neFamily.split(":");
+    return neFamilyArr[1];
+  }
+
+  deviationData() {
+    var deviationObj = resourceProvider.getResource("custom/intent-deviations.json");
+    logger.info("Deviation Info Data : " + deviationObj);
+    return JSON.parse(deviationObj);
+  }
 
   /**
    * Hook to add custom intent-type specific logic to update desired and/or actual
@@ -110,6 +290,11 @@ export class IntentHandlerBase extends WebUI
    */
 
   preAuditHook(neId, path, aConfig, iConfig) {
+    logger.info("Before Deviation ******************" + JSON.stringify(iConfig));
+
+    this.removeIntentConfig(iConfig, neId);
+
+    logger.info("After Deviation ******************" + JSON.stringify(iConfig));
   }
 
   /**
@@ -123,7 +308,58 @@ export class IntentHandlerBase extends WebUI
    * @param {string} state Intent state (choice: active, suspend, delete)
    */
 
-  preSyncHook(intentType, intentTypeVersion, target, config, state) {
+  preSyncHook(intentType, intentTypeVersion, neId, config, state) {
+    
+    this.removeIntentConfig(
+      Array.isArray(config[Object.keys(config)[0]]) 
+          ? config[Object.keys(config)[0]][0] 
+          : config[Object.keys(config)[0]],
+      neId
+    );
+
+    logger.info("After Deviation apply ******************" + JSON.stringify(config));
+    const moduleRef = this.getModuleRefs();
+    logger.info("Before moduleRef apply ******************" + JSON.stringify(config));
+    const result = {};
+    for (const topKey in config) {
+        if (!Object.prototype.hasOwnProperty.call(config, topKey)) continue;
+        config[topKey] = this.transformKeysWithModulePrefixes(config[topKey], moduleRef, []);
+    }
+    logger.info("After moduleRef apply ******************" + JSON.stringify(config));
+
+    
+  }
+
+  transformKeysWithModulePrefixes(obj, moduleRef, path) {
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.transformKeysWithModulePrefixes(item, moduleRef, path));
+    }
+  
+    if (obj !== null && typeof obj === 'object') {
+      const newObj = {};
+      for (const key in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+  
+        const currentPath = path.concat([key]);
+        const keyPath = currentPath.join("/");
+  
+        const prefix = moduleRef[keyPath] || moduleRef[key] || null;
+        const newKey = prefix ? prefix + ":" + key : key;
+  
+        let value = obj[key];
+        // If value is a string and prefix exists, add the prefix
+        if (typeof value === 'string' && prefix && !value.startsWith(prefix + ':')) {
+          value = `${prefix}:${value}`;
+        } else {
+          value = this.transformKeysWithModulePrefixes(value, moduleRef, currentPath);
+        }
+  
+        newObj[newKey] = value;
+      }
+      return newObj;
+    }
+  
+    return obj;
   }
 
   /**
@@ -166,8 +402,8 @@ export class IntentHandlerBase extends WebUI
    */
 
   getNeIdFromTarget(target) {
-    const match = target.match(/ne-id=\x27([^\x27]+)\x27/);
-    return match ? match[1] : target.split("#")[1];
+    const match = target.match(/ne-id='([^']+)'/);
+    return match ? match[1] : target.split('#')[1];
   }
 
   /**
@@ -231,11 +467,11 @@ export class IntentHandlerBase extends WebUI
       return false;
 
     // split addr from prefix-len and validate prefix-len, if present
-    const [addr, prefix] = value.split("/");
+    const [addr, prefix] = value.split('/');
     if (prefix && (!/^\d{1,3}$/.test(prefix) || parseInt(prefix, 10) > 128))
       return false;
 
-    if (addr.split(":").length > 7)
+    if (addr.split(":").length > 8)
       return false;
 
     // strict ipv6 validation with optional embedded ipv4
@@ -282,7 +518,7 @@ export class IntentHandlerBase extends WebUI
     }
 
     // Remove leading zeros from all parts
-    addr = addr.toLowerCase().split(":").map(part => part.replace(/^0+/, "") || "0").join(":");
+    addr = addr.toLowerCase().split(":").map(part => part.replace(/^0+/, '') || '0').join(":");
 
     // Identify the longest zero sequence for "::" compression
     const zeroSequences = addr.match(/(^|:)(0:)+(0$)?/g);
@@ -302,9 +538,9 @@ export class IntentHandlerBase extends WebUI
 
   assertEqual(actual, expected, message) {
     if (actual !== expected) {
-        throw new Error(`❌ Unit Testing Failed: ${message} | Expected: "${expected}", Got: "${actual}"`);
+        throw new Error(`? Unit Testing Failed: ${message} | Expected: '${expected}', Got: '${actual}'`);
     } else {
-        logger.info(`✅ Passed: ${message}`);
+        logger.info(`? Passed: ${message}`);
     }
   }
 
@@ -334,7 +570,7 @@ export class IntentHandlerBase extends WebUI
       { input: "::gggg", expected: false, msg: "Invalid IPv6 address (none-hex characters)" },
     ].forEach(({ input, expected, msg }) => this.assertEqual(this.isIPv6(input), expected, msg));
 
-    logger.info(`🎉 All tests passed!`);
+    logger.info(`? All tests passed!`);
   }
 
   /**
@@ -347,40 +583,24 @@ export class IntentHandlerBase extends WebUI
   
   getListKeys(neId, listPath) {
      // remove instance identifiers from path:
-    const path = listPath.replace(/=[^/]+/g, "");
+    const path = listPath.replace(/=[^/]+/g, '');
 
     if (!(path in this.mdcKeys)) {
       this.mdcKeys[path] = NSP.mdcListKeys(neId, path);
-      logger.info("list-key cache updated: {}", JSON.stringify(this.mdcKeys));
+      logger.info('list-key cache updated: {}', JSON.stringify(this.mdcKeys));
     }
 
     return this.mdcKeys[path];
   }
 
   /**
-   * Unwrap JSON body for intent audits and synchronize operations (merge / replace).
-   * Used for both:
-   *   - intended config (iCfg) — RESTCONF YANG-Patch `replace` request body
-   *   - actual config (aCfg) — RESTCONF `GET` data response body
-   *
-   * The return value is the config root used by recursive `compareConfig` or ignoreChildren merge.
+   * Unwrap a RESTCONF JSON resource body to the inner config object (module key + list unroll).
    *
    * @param {object} body Single RESTCONF resource object (one module-qualified root key).
-   * @returns {*} Unwrapped root value (typically an object; containers skip step 2).
+   * @returns {*} Unwrapped root value (typically an object; containers skip list unroll when not array).
    */
   unwrapRestconfBody(body) {
-    // **Step 1:** Peel the outer wrapper: the last path segment appears once as the sole
-    // top-level property name (module-qualified root). Its value is the subtree for the target.
-    //
-    // Example: {"nokia-conf:port": [{"port-id": "1/1/1", ...}]} → [{"port-id": "1/1/1", ...}]
-
     const config = Object.values(body)[0];
-
-    // **Step 2:** RFC 8040 / RFC 8072 JSON: a single list instance is a one-element array.
-    // Unwrap to the entry object for audits and merge. Empty array → {}.
-    //
-    // Example: [{"port-id": "1/1/1", ...}] → {"port-id": "1/1/1", ...}
-
     if (Array.isArray(config)) {
       if (config.length > 0)
         return config[0];
@@ -391,13 +611,7 @@ export class IntentHandlerBase extends WebUI
   }
 
   /**
-   * Returns if the relativePath belongs to any ignored children. Used as audit helper to avoid
-   * reporting additional subtrees/attributes that are part of pre-approved misalignments.
-   *
-   * `neId` / `basePath` are currently unused. Added for future enhancements to properly support
-   * instance paths, while method needs to figure out list-keys correctly.
-   *
-   * Paths to ignore are taken from `this.ignoreChildren` (prefix match on `relativePath`).
+   * Returns true when `relativePath` is under an ignored subtree (pre-approved misalignments).
    *
    * @param {string} neId              (reserved for future use)
    * @param {string} basePath          (reserved for future use)
@@ -406,43 +620,6 @@ export class IntentHandlerBase extends WebUI
    */
   isPreApproved(neId, basePath, relativePath) {
     return this.ignoreChildren.some(path => relativePath.startsWith(path));
-  }
-
-  /**
-   * Merges subtrees from `actualConfig` (GET response) into `desiredConfig` (in-place mutation), to
-   * preserve nodal configuration for pre-approved misalignments (`this.ignoreChildren`).
-   *
-   * `neId` / `deviceModelPath` are currently unused. Added for future enhancements to properly support
-   * instance paths, while method needs to figure out list-keys correctly.
-   *
-   * Unwraps both envelopes, copies paths segment-by-segment (same as 4.2.1).
-   *
-   * @param {string} neId              (reserved for future use)
-   * @param {string} deviceModelPath   (reserved for future use)
-   * @param {object} desiredConfig     RESTCONF envelope for the intent (replace payload)
-   * @param {object} actualConfig      Configuration response payload (RESTCONF GET)
-   */
-  mergePreservedSubtrees(neId, deviceModelPath, desiredConfig, actualConfig) {
-    const aCfg = this.unwrapRestconfBody(actualConfig);
-    const iCfg = this.unwrapRestconfBody(desiredConfig);
-    this.ignoreChildren.forEach(path => {
-      const keys = path.split("/");
-      let source = aCfg;
-      let target = iCfg;
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        if (key in source)
-          if (i < keys.length - 1) {
-            if (!(key in target))
-              target[key] = {};
-            source = source[key];
-            target = target[key];
-          } else {
-            target[key] = source[key];
-          }
-        else break;
-      }
-    });
   }
 
   /**
@@ -456,7 +633,7 @@ export class IntentHandlerBase extends WebUI
    * @param {string} obj object reference used for report
    * @param {string} path used to build up relative path (recursive)
    */
-  
+
   compareConfig(neId, basePath, aCfg, iCfg, auditReport, obj, path) {
     const startTS = Date.now();
     logger.debug("IntentHandler::compareConfig(neId={}, basePath={}, path={})", neId, basePath, path);
@@ -469,15 +646,18 @@ export class IntentHandlerBase extends WebUI
 
         if (typeof iCfg[key] !== typeof aCfg[key]) {
           // mismatch: type is different
-          auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+path+key, "type "+typeof iCfg[key], "type "+typeof aCfg[key], obj));
+          auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+path+key, "type "+typeof iCfg[key], "type "+typeof aCfg[key], obj));
         } else if (!(iCfg[key] instanceof Object)) {
-          if (iCfg[key] !== aCfg[key]) {
-            if (this.isIPv6(iCfg[key]) && this.normalizeIPv6(iCfg[key]) === aCfg[key])
+          let aComp = aCfg[key];
+          if (typeof aComp === "string")
+            aComp = this.stripMdcModulePrefixFromLeafString(aComp);
+          if (iCfg[key] !== aComp) {
+            if (this.isIPv6(iCfg[key]) && this.normalizeIPv6(iCfg[key]) === aComp)
               // aligned IPv6 addresses (after normalization)
-              logger.debug(`Matching IPv6 addresses: ${iCfg[key]} === ${aCfg[key]}`);
+              logger.debug(`Matching IPv6 addresses: ${iCfg[key]} === ${aComp}`);
             else
               // mismatch: value is different
-              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+path+key, iCfg[key].toString(), aCfg[key].toString(), obj));
+              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+path+key, iCfg[key].toString(), aComp.toString(), obj));
           } else {
             // aligned: type/value are same
           }
@@ -488,7 +668,11 @@ export class IntentHandlerBase extends WebUI
             const keys = this.getListKeys(neId, basePath+"/"+path+key);
 
             const iCfgConverted = iCfg[key].reduce((rdict, entry) => {
-              const value = keys.map( key => encodeURIComponent(entry[key]) ).join(",");
+              const value = keys.map((listKey) => {
+                const v = entry[listKey];
+                const normalized = typeof v === "string" && this.isIPv6(v) ? this.normalizeIPv6(v) : v;
+                return encodeURIComponent(normalized);
+              }).join(",");
               rdict[value] = entry;
               return rdict;
             }, {});
@@ -504,7 +688,20 @@ export class IntentHandlerBase extends WebUI
             const iVal = JSON.stringify(iCfg[key]);
             const aVal = JSON.stringify(aCfg[key]);
             if (iVal !== aVal) {
-              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+path+key, iVal, aVal, obj));
+              let aValRaw = aCfg[key];
+              if (typeof aValRaw === "string") {
+                aValRaw = this.stripMdcModulePrefixFromLeafString(aValRaw);
+              } else if (Array.isArray(aValRaw)) {
+                aValRaw = aValRaw.map(v =>
+                  typeof v === "string" ? this.stripMdcModulePrefixFromLeafString(v) : v
+                );
+              }
+              const aVal = JSON.stringify(aValRaw);
+              if(iVal !== aVal)
+              {
+                auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+path+key, iVal, aVal, obj));
+              }
+              
             }
           }
         } else {
@@ -518,20 +715,20 @@ export class IntentHandlerBase extends WebUI
 
           const iVal = JSON.stringify(iCfg[key]);
           if ((iVal === "{}") || (iVal === "[]") || (iVal === "[null]"))
-            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+path+key, iVal, null, obj));
+            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+path+key, iVal, null, obj));
           else
             // missing object: is-configured=true, is-undesired=default(false)
-            auditReport.addMisAlignedObject(new MisAlignedObject("/"+basePath+"/"+path+key, true, neId));
+            auditReport.addMisAlignedObject(new MisAlignedObject("/"+decodeURIComponent(basePath)+"/"+path+key, false, neId));
         } else {
           // mismatch: leaf is unconfigured
-          auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+path+key, iCfg[key].toString(), null, obj));
+          auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+path+key, iCfg[key].toString(), null, obj));
         }
       }
     }
 
     for (const key in aCfg) {
       if (!(key in iCfg)) {
-        const relativePath = path + key;        
+        const relativePath = path + key;
         if (!this.isPreApproved(neId, basePath, relativePath)) {
 
           if (aCfg[key] instanceof Object) {
@@ -539,13 +736,13 @@ export class IntentHandlerBase extends WebUI
 
             const aVal = JSON.stringify(aCfg[key]);
             if ((aVal === "{}") || (aVal === "[]") || (aVal === "[null]"))
-              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+relativePath, null, aVal, obj));
+              auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+relativePath, null, aVal, obj));
             else
               // undesired object: is-configured=true, is-undesired=default(true)
-              auditReport.addMisAlignedObject(new MisAlignedObject("/"+basePath+"/"+relativePath, true, neId, true));
+              auditReport.addMisAlignedObject(new MisAlignedObject("/"+decodeURIComponent(basePath)+"/"+relativePath, true, neId));
           } else {
             // mismatch: additional leaf
-            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+basePath+"/"+relativePath, null, aCfg[key].toString(), obj));
+            auditReport.addMisAlignedAttribute(new MisAlignedAttribute("/"+decodeURIComponent(basePath)+"/"+relativePath, null, aCfg[key].toString(), obj));
           }
         }
       }
@@ -556,29 +753,68 @@ export class IntentHandlerBase extends WebUI
   }
 
   /**
+   * If value is an object that has any of the subclass's getActionKeys() (e.g. from script-content),
+   * return cleaned object with those keys preserved; otherwise return null (caller should use normal cleanup).
+   */
+  cleanupActionIfPreserved(actionValue) {
+    const actionKeys = this.getActionKeys();
+    if (!actionKeys.length || !actionValue || typeof actionValue !== 'object' ||
+        !actionKeys.some(k => Object.prototype.hasOwnProperty.call(actionValue, k)))
+      return null;
+    const preserved = {};
+    const actionKeySet = new Set(actionKeys);
+    for (const [k, v] of Object.entries(actionValue)) {
+      if (actionKeySet.has(k)) {
+        const cleaned = this.cleanupConfig(v);
+        if (v !== null && typeof v === 'object') {
+          preserved[k] = (cleaned !== undefined && cleaned !== null && typeof cleaned === 'object') ? cleaned : {};
+        } else {
+          preserved[k] = cleaned;
+        }
+      } else {
+        if (v === null || typeof v !== 'object') {
+          preserved[k] = v;
+        } else {
+          const cleaned = this.cleanupConfig(v);
+          if (cleaned !== undefined && (typeof cleaned !== 'object' || cleaned === null || Object.keys(cleaned).length > 0))
+            preserved[k] = cleaned;
+        }
+      }
+    }
+    return preserved;
+  }
+
+  /**
    * Recursive cleanup of provided configuration:
-   * Removes empty lists and containers
+   * Removes empty lists and containers.
    * 
    * Method will be called with an object (container), but due to
    * its recursive nature it accepts arrays and primitive data types
-   * 
+   * Applies to the entire tree. Any object value that has keys from the getActionKeys() will be ignored.
+   *
    * @param {*} cfg configuration to cleanup
    * @returns cleaned up configuration
    */
-
   cleanupConfig(cfg) {
-    // handle YANG lists, leaf-lists
+    // handle YANG lists, leaf-lists (all lists in the tree are processed)
     if (Array.isArray(cfg)) {
       const cleanedArray = cfg.map(v => this.cleanupConfig(v));
-      return cleanedArray.every(v => v === null) ? cleanedArray : cleanedArray.filter(v => typeof v !== "object" || Object.entries(v).length > 0);      
+      return cleanedArray.every(v => v === null) ? cleanedArray : cleanedArray.filter(v => typeof v !== 'object' || Object.entries(v).length > 0);
     }
 
-    // handle YANG containers
-    if (cfg && typeof cfg === "object")
-      return Object.fromEntries(Object.entries(cfg)
-        .map(([k, v]) => [k, this.cleanupConfig(v)])
-        .filter(([_, v]) => typeof v !== "object" || Object.entries(v).length > 0)
+    // handle YANG containers: run through entire cfg; preserve any value that has subclass getActionKeys()
+    if (cfg && typeof cfg === 'object') {
+      return Object.fromEntries(
+        Object.entries(cfg)
+          .map(([k, v]) => {
+            const preserved = this.cleanupActionIfPreserved(v);
+            if (preserved !== null)
+              return [k, preserved];
+            return [k, this.cleanupConfig(v)];
+          })
+          .filter(([_, v]) => typeof v !== 'object' || Object.entries(v).length > 0)
       );
+    }
 
     // handle YANG leafs (primitive types)
     return cfg;
@@ -586,23 +822,23 @@ export class IntentHandlerBase extends WebUI
 
   /**
    * Delete the corresponding path from configuration data (JSON).
-   *
+   * 
    * @param {object} data configuration to cleanup
    * @param {string} path subtree/leaf to be deleted
    * @param {string} separator
    */
-  
-  deletePath(data, path, separator = ".") {
+
+  deletePath(data, path, separator = '.') {
     const [key, ...remains] = path.split(separator);
     if (data !== null && key in data) {
       if (remains.length > 0) {
         if (Array.isArray(data[key]))
           // list hit => iterate entries
           data[key].forEach(listEntry => this.deletePath(listEntry, remains.join(separator), separator));
-        else if (typeof data[key] === "object")
-          // dict hit => follow the path (recurse)         
+        else if (typeof data[key] === 'object')
+          // dict hit => follow the path
           this.deletePath(data[key], remains.join(separator), separator);
-      } else
+      } else 
         delete data[key]; // delete property
     }
   }
@@ -692,7 +928,7 @@ export class IntentHandlerBase extends WebUI
 
     try {
       // hook to be executed before syncing to the network
-      this.preSyncHook(intentType, intentTypeVersion, target, desiredConfig, state);
+      this.preSyncHook(intentType, intentTypeVersion, neId, desiredConfig, state);
 
       const body = {
         "ietf-yang-patch:yang-patch": {
@@ -705,7 +941,43 @@ export class IntentHandlerBase extends WebUI
         if (this.ignoreChildren.length > 0) {
           const result = NSP.mdcGET(neId, deviceModelPath+"?content=config");
           if (result.success) {
-            this.mergePreservedSubtrees(neId, deviceModelPath, desiredConfig, result.response);
+            // Extract content from envelope
+            // example: {"nokia-conf:port": [{"port-id": "1/1/1", ...}]} becomes [{"port-id": "1/1/1", ...}]
+            let aCfg = Object.values(result.response)[0]; // actual config
+            let iCfg = Object.values(desiredConfig)[0]; // intended config
+
+            // YANG list-entries are encoded as single-entry array (rfc8040, rfc8072)
+            // Extract this single entry from the list
+            // example: [{"port-id": "1/1/1", ...}] becomes {"port-id": "1/1/1", ...}
+
+            if (Array.isArray(aCfg)) {
+              if (aCfg.length > 0) aCfg = aCfg[0]; else aCfg = {};
+            }
+
+            if (Array.isArray(iCfg)) {
+              if (iCfg.length > 0) iCfg = iCfg[0]; else iCfg = {};
+            }
+
+            this.ignoreChildren.forEach(path => {
+              const keys = path.split('/');
+              let source = aCfg;
+              let target = iCfg;
+          
+              for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+          
+                if (key in source)
+                  if (i < keys.length - 1) {
+                    if (!(key in target))
+                      target[key] = {};
+                    source = source[key];
+                    target = target[key];
+                  } else {
+                    target[key] = source[key];
+                  }
+                else break; // Stop processing this path
+              }
+            });
           }
           else if (result.errmsg === "Not Found") {
             logger.info("Merge pre-approved misalignments skipped. Object not configured on device.");
@@ -805,14 +1077,18 @@ export class IntentHandlerBase extends WebUI
         let aCfg = this.unwrapRestconfBody(result.response);
         let iCfg = this.unwrapRestconfBody(desiredConfig);
 
+        const moduleRef = this.getModuleRefs();
+
         this.preAuditHook(neId, deviceModelPath, aCfg, iCfg);
+        iCfg = this.transformKeysWithModulePrefixes(iCfg, moduleRef, []);
+
         this.compareConfig(neId, deviceModelPath, aCfg, iCfg, auditReport, neId, "");
       } else {
         // undesired objects: is-configured=true, is-undesired=true
         auditReport.addMisAlignedObject(new MisAlignedObject("/"+deviceModelPath, true, neId, true));
       }
     }
-    else if (result.errmsg === "Not Found") {      
+    else if (result.errmsg === "Not Found") {
       // get failed, because path is not configured
       if (state === "active") {
         // missing object: is-configured=true, is-undesired=default(false)
@@ -850,7 +1126,7 @@ export class IntentHandlerBase extends WebUI
 
     logger.info("IntentHandler::getStateAttributes() in state {}", state);
 
-    const stateXML = "<state-report xmlns=\"http://www.nokia.com/management-solutions/ibn\" />";
+    const stateXML = '<state-report xmlns="http://www.nokia.com/management-solutions/ibn" />';
     
     const duration = Date.now()-startTS;
     logger.info("IntentHandler::getStateAttributes() finished within {} ms", duration|0);
@@ -895,11 +1171,13 @@ export class IntentHandlerBase extends WebUI
       }
 
       if (this.ignoreChildren.length > 0) {
-        this.ignoreChildren.forEach(path => this.deletePath(config, path, "/"));
+        this.ignoreChildren.forEach(path => this.deletePath(config, path, '/'));
         config = this.cleanupConfig(config);
       }
-
+      
       config = this.getTargetDataHook(target, config);
+      config = this.stripPrefixes(config);
+      logger.info("BrownField after the change "+ JSON.stringify(config))
     }
     else if (result.errmsg === "Not Found") {
       logger.warn("Brownfield discovery skipped. Object not configured on device.");
@@ -913,6 +1191,28 @@ export class IntentHandlerBase extends WebUI
     logger.info("IntentHandler::getTargetData() finished within {} ms", duration|0);
 
     return rpcResponseXML;
+  }
+
+  stripPrefixes(obj) {
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.stripPrefixes(item));
+    } else if (obj && typeof obj === 'object') {
+      return Object.entries(obj).reduce((acc, [key, value]) => {
+        const [prefix, actualKey] = key.includes(':') ? key.split(':') : [null, key];
+        let newValue = this.stripPrefixes(value);
+  
+        // If value is string and has the same prefix, remove it
+        if (prefix && typeof newValue === 'string' && newValue.startsWith(prefix + ':')) {
+          newValue = newValue.slice(prefix.length + 1); // Remove prefix and colon
+        }
+  
+        acc[actualKey] = newValue;
+        return acc;
+      }, {});
+    } else {
+      return typeof obj === "string" ? this.stripMdcModulePrefixFromLeafString(obj) : obj;
+    }
   }
 
   /**

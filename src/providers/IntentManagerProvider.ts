@@ -71,6 +71,10 @@ interface mdcAttribute {
 	units: string;
 	choice: string;
 	types: mdcAttribute[];
+	identityName?: string;
+	identities?: {
+		[key: string]: string[];
+	};
 }
 
 interface targetComponentType {
@@ -149,7 +153,10 @@ interface icmGeneratorInput {
 	lastIndex: number,
 	suggestMethods: {suggest: string, devicePath?: string, formPath?: string, devicePathBF?: string, deviceKeyBF?: string}[],
 	suggestPaths: {viewConfigPath: string, isList: boolean, dataType?: string, suggest: string}[],
-	encryptedPaths: string[]
+	encryptedPaths: string[];
+	moduleRefs?: string;
+	/** JSON array of module name prefixes from identityref QName keys (typedef2yang); used to strip device-qualified leaf values during audit. */
+	auditModulePrefixes?: string
 }
 
 interface contextEntry {
@@ -3136,14 +3143,62 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return constraints;
 	}
 
+	private enumsFromIdentityRef(a: any, dataType: string) {
+		const identityEnums : string[] = [];
+
+		
+
+		return identityEnums;
+	}
+
+	private getIdentityRefTypeInfo(a: any): string
+	{
+		const identityName = a.identityName;
+		const identities = a.identities?.[identityName];
+		if (!identities || typeof identities !== "object") {
+			return "enumeration {\n}\n";
+		}
+		let enumString : string = "enumeration {\n";
+		// sort the identities
+		const keys = Object.keys(identities).sort();
+		for (let i = 0; i < keys.length; i++) {
+			let identifyRef = keys[i];
+			const includeModuleRef = identifyRef && identifyRef.includes(":");
+			if (includeModuleRef) {
+				const nameAndModule = identifyRef.split(":");
+				if (nameAndModule.length > 1) {
+					identifyRef = nameAndModule[1].trim();
+				}
+			}
+			enumString =
+			enumString +
+			"\n" +
+			"          enum "+identifyRef+";";
+		}
+		enumString = enumString + "}\n";	  
+		return enumString;
+	}
+
+	/**
+	 * First segment of a QName used in identityref keys (same convention as RESTCONF-qualified leaf values).
+	 */
+	private collectAuditPrefixFromIdentityRefKey(auditPrefixes: Set<string>, line: string): void {
+		if (!line || typeof line !== "string" || !line.includes(":"))
+			return;
+		const first = line.split(":")[0].trim();
+		if (first.length > 0)
+			auditPrefixes.add(first);
+	}
+
 	/**
 	 * Generate YANG type definitions
 	 * 
 	 * @param {Record<string, mdcAttribute>} customYangTypes - YANG type defintions captured
+	 * @param auditModulePrefixes - collects YANG module prefixes from identityref QName keys (for audit-time value stripping)
 	 * @returns {string[]} YANG type definitions (line-by-line)
 	 */
 
-	private typedef2yang(customYangTypes: Record<string, mdcAttribute>) {
+	private typedef2yang(customYangTypes: Record<string, mdcAttribute>, auditModulePrefixes: Set<string>) {
 		const stack = [...Object.values(customYangTypes)];
 
 		while (stack.length > 0) {
@@ -3201,7 +3256,29 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				yang.push(...constraints.map(line => `    ${line}`));
 				yang.push("  }");
 			} else {
-				yang.push(`  type ${a.baseType};`);
+				//
+				if(a.baseType === "identityref")
+				{
+					const idMap = (a.identityName && a.identities) ? a.identities[a.identityName] : undefined;
+					const idKeys = idMap ? Object.keys(idMap) : [];
+					if (a.identityName)
+						this.collectAuditPrefixFromIdentityRefKey(auditModulePrefixes, a.identityName);
+					for (const line of idKeys)
+						this.collectAuditPrefixFromIdentityRefKey(auditModulePrefixes, line);
+					yang.push(`  type enumeration {`);
+					yang.push(
+						...idKeys.map(line => {
+							const enumName = line.replace(/^.*:/, ""); // remove everything before last :
+							return `    enum ${enumName};`;
+						})
+					);
+					yang.push(`  }`);
+				}
+				else
+				{
+					yang.push(`  type ${a.baseType};`);
+				}
+				
 			}
 
 			if (a.units)
@@ -3228,6 +3305,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	private async schema2yang(
+		module_ref:Record<string, string>,
 		input: icmGeneratorInput,
 		subcontext: string,
 		customYangTypes: Record<string, mdcAttribute>,
@@ -3245,8 +3323,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			this._raiseRestconfError("Getting device schema failed!", await response.json());
 
 		const json = await response.json();
+
+		json.attributes = [
+			...json.attributes.filter((a: { nodetype: string }) => a.nodetype === "property" || a.nodetype === "propertylist"),
+			...json.attributes.filter((a: { nodetype: string }) => a.nodetype !== "property" && a.nodetype !== "propertylist")
+		];
 		
 		const yang: string[] = [];
+
 		const depth = subcontext.split('/').length;
 
 		if (json.help)
@@ -3278,21 +3362,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 
 			// identityref is not yet supported (to be done)
-			if (["identityref"].includes(a.baseType)) {
+			/* if (["identityref"].includes(a.baseType)) {
 				yang.push(`// skipped: ${a.name} (identityref not yet supported)`);
 				continue;
-			}
+			} */
 
 			// skip containers/lists at maxlevel
 			if (["group", "list"].includes(a.nodetype) && (depth == input.maxdepth)) {
 				yang.push(`// skipped: ${a.name} (maxdepth reached)`);
-				input.exclude.push(relpath);
-				continue;
-			}
-
-			// skip other modules (to be done)
-			if (a.name.includes(':')) {
-				yang.push(`// skipped: ${a.name} (different namespace)`);
 				input.exclude.push(relpath);
 				continue;
 			}
@@ -3319,7 +3396,24 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			// Build YANG for attribute supporting complex-type (list/container)
 
 			const a_yang: string[] = [];
-			a_yang.push(`${NODETYPE_TO_YANG[a.nodetype]} ${a.name} {`);
+			
+			if (a.name.includes(":")) {
+				const valueAfterColon = a.name.split(":")[1].trim();
+				const parts = relpath.trim().split("/");
+
+				const keyParts = parts.map(part => {
+					return part.includes(":") ? part.split(":")[1] : part;
+				});
+
+				const key = keyParts.join("/");			  
+				const lastPrefix = parts[parts.length - 1].split(":")[0];
+				module_ref[key] = lastPrefix;
+
+				a_yang.push(`${NODETYPE_TO_YANG[a.nodetype]} ${valueAfterColon} {`);
+			} 
+			else {
+				a_yang.push(`${NODETYPE_TO_YANG[a.nodetype]} ${a.name} {`);
+			}
 
 			a.constraints?.when?.forEach(whenstmt => {
 				if (whenstmt.includes('../'.repeat(depth+1)))
@@ -3343,7 +3437,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 
 			if (["group", "list"].includes(a.nodetype)) {
-				const lines = await this.schema2yang(input, `${subcontext}/${a.name}`, customYangTypes, userActivity);
+				const lines = await this.schema2yang(module_ref, input, `${subcontext}/${a.name}`, customYangTypes, userActivity);
 				a_yang.push(...lines.map(line => `  ${line}`));
 			}
 
@@ -3387,7 +3481,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 							if (input.icmstyle)
 								input.suggestPaths.push({
-									"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
+									"viewConfigPath": `${input.intent_type}.${input.root}.${relpath
+														.split('/')
+														.map(part => part.includes(':') ? part.split(':')[1] : part)
+														.join('.')}`,
 									"isList": (a.nodetype === "propertylist"),
 									"dataType": dataType,
 									"suggest": suggest
@@ -3405,6 +3502,11 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 							a.leafRefPath = '../'.repeat(aPath.length)+rPath.join('/');
 						}
 					}
+				}
+
+				if (["identityref"].includes(a.baseType))
+				{
+					dataType = this.getIdentityRefTypeInfo(a);
 				}
 
 				const constraints = this.getConstraints(a, dataType);
@@ -3449,7 +3551,14 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					a_yang.push(...constraints.map(line => `    ${line}`));
 					a_yang.push("  }");
 				} else {
-					a_yang.push(`  type ${dataType};`);
+					if(["identityref"].includes(a.baseType))
+					{
+						a_yang.push(`  type ${dataType}`);
+					}
+					else
+					{
+						a_yang.push(`  type ${dataType};`);
+					}
 				}
 	
 				if (a.units)
@@ -3519,7 +3628,10 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					if (input.icmstyle) {
 						input.suggestPaths.push({
-							"viewConfigPath": `${input.intent_type}.${input.root}.${relpath.split('/').join('.')}`,
+							"viewConfigPath": `${input.intent_type}.${input.root}.${relpath
+												.split('/')
+												.map(part => part.includes(':') ? part.split(':')[1] : part)
+												.join('.')}`,
 							"isList": (a.nodetype === "propertylist"),
 							"suggest": suggest
 						});
@@ -3564,7 +3676,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		return yang;
 	}
-
 	/**
 	 * GET model schema step-by-step from / to the user provided context.
 	 * Used to determine target paraeters from lists with constraints and
@@ -3848,8 +3959,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					// get yang-body and update input
 
 					const customTypes = {};
-					const yang = await this.schema2yang(input, "", customTypes, userActivity);
-					const ydef = this.typedef2yang(customTypes);
+					const module_ref: Record<string, string> = {};
+					const yang = await this.schema2yang(module_ref, input, "", customTypes, userActivity);
+					input.moduleRefs = JSON.stringify(module_ref);
+					const auditModulePrefixSet = new Set<string>();
+					const ydef = this.typedef2yang(customTypes, auditModulePrefixSet);
+					input.auditModulePrefixes = JSON.stringify([...auditModulePrefixSet].sort((a, b) => b.length - a.length));
 
 					// log input for troubleshooting:
 

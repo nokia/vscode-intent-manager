@@ -34,6 +34,15 @@ class IntentHandler extends (IntentHandlerBase) {
     return `{{ pathRC | safe }}`;
   }
 
+  /**
+   * Action keys that must be preserved in cleanupConfig to not remove the keys from config when empty.
+   *
+   *  User has to manually add the keys post generating the intent!
+   */
+  getActionKeys() {
+    return []; 
+  }
+
   getDesiredConfig(target, intentConfigJSON) {
     const items = target.split('#');
     {% if icmstyle -%}
@@ -56,14 +65,15 @@ class IntentHandler extends (IntentHandlerBase) {
     return {"{{ root }}": config};
   }
   {%- endif %}
-  {% if encryptedPaths.length >0 -%}
   preAuditHook(neId, path, aConfig, iConfig) {
-  {%- for e in encryptedPaths %}
+    super.preAuditHook(neId, path, aConfig, iConfig);
+{% if encryptedPaths.length >0 %}
+{%- for e in encryptedPaths %}
     this.deletePath(aConfig, "{{ e }}");
     this.deletePath(iConfig, "{{ e }}");
-  {%- endfor %}
+{%- endfor %}
+{% endif %}
   }
-  {%- endif %}
   // WebUI suggest/picker callouts:
 {% for entry in suggestMethods %}
   {{ entry.suggest }}(context) {
@@ -89,6 +99,19 @@ class IntentHandler extends (IntentHandlerBase) {
 {%- endif %}
   }
 {% endfor %}
+
+{% if moduleRefs and moduleRefs|length > 0 %}
+getModuleRefs() {
+  return JSON.parse('{{ moduleRefs | safe }}');
+}
+{% endif %}
+
+{% if auditModulePrefixes and auditModulePrefixes|length > 0 %}
+getAuditModulePrefixes() {
+  return {{ auditModulePrefixes | safe }};
+}
+{% endif %}
+
 }
 
 new IntentHandler();

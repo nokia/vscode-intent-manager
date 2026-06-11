@@ -364,3 +364,13 @@ Template Refactoring:
 Fix:
 * Change needed for compatibility w/ upcoming NSP release 26.4:
 * New property `default-release` requires special handling aligned with `default-version`.
+
+## [4.3.0]
+
+Below listed are improvements added to Intent Generation:
+
+1) Identityref support ::	Fully supported through enum conversion
+2) Namespace handling	:: Qualified names processed instead of skipping
+3) Audit consistency ::	Prefix normalization improves compare accuracy
+4) IPv6 handling	:: Better grouping and comparison reliability
+5) Deviation processing ::	Implemented deviation logic to remove unsupported attributes.

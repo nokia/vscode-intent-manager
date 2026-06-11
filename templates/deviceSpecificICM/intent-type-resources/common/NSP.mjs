@@ -204,7 +204,7 @@ export class NSP
               break;
           }
 
-          result = { success: false, errmsg: errmsg };
+          result = { success: false, errmsg: errmsg, response: response };
         }
         else {
           // Should be 200 OK
