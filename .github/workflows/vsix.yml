@@ -4,16 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (semver, e.g. 4.2.0 or v4.2.0)"
-        required: true
-      prerelease:
-        description: "Mark as pre-release?"
+        description: "Release version (semver, e.g. 4.2.0). Leave as 'auto' to use the version already set in package.json."
         required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
+        default: "auto"
 
 permissions:
   contents: write
@@ -27,8 +20,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # Use a PAT so the version-bump commit can trigger downstream workflows
+          # GITHUB_TOKEN is sufficient here (push contents only, no downstream
+          # workflows to trigger). If a tag/commit pushed by this job ever needs
+          # to trigger another workflow, swap this for a PAT or deploy key —
+          # pushes made with GITHUB_TOKEN deliberately do not start new runs.
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Full history so softprops/action-gh-release can build release notes.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -40,39 +37,88 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # ── Version validation ──────────────────────────────────────────────────
-      - name: Validate and normalise version
+      # ── Resolve & validate version ───────────────────────────────────────────
+      # "auto" (the default) takes the version straight from package.json, so the
+      # maintainer normally just curates package.json + CHANGELOG in a PR and runs
+      # the workflow. Passing an explicit version overrides package.json instead.
+      - name: Resolve and validate version
         id: version
         env:
           RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${RELEASE_VERSION#v}"
+          if [ -z "$RELEASE_VERSION" ] || [ "$RELEASE_VERSION" = "auto" ]; then
+            VERSION="$(node -p "require('./package.json').version")"
+            echo "No version supplied — using package.json version: ${VERSION}"
+          else
+            # A leading "v" is tolerated but normalised away (e.g. v4.2.0 -> 4.2.0).
+            VERSION="${RELEASE_VERSION#v}"
+            echo "Using version from workflow input: ${VERSION}"
+          fi
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Invalid version '${RELEASE_VERSION}' — expected semver, e.g. 4.2.0 or v4.2.0." >&2
+            echo "::error::Invalid version '${VERSION}' — expected semver, e.g. 4.2.0." >&2
             exit 1
           fi
           echo "version=${VERSION}"   >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}"      >> "$GITHUB_OUTPUT"
 
       # ── Bump package.json ───────────────────────────────────────────────────
+      # Idempotent: --allow-same-version means a re-run (or a version already
+      # bumped by a contributor) is a no-op rather than a hard failure.
       - name: Update package.json version
         run: |
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
-          echo "Updated package.json to ${{ steps.version.outputs.version }}"
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+          echo "package.json is now at ${{ steps.version.outputs.version }}"
+
+      # ── Stamp CHANGELOG ───────────────────────────────────────────────────────
+      # If the CHANGELOG still has an "[Unreleased]" / "[new]" placeholder heading,
+      # rewrite it to the released version heading (matching the "## [x.y.z]" style
+      # used in this file — no date). If there is no placeholder (already stamped,
+      # or maintainer wrote the version heading by hand) it is left untouched, so
+      # this is safe to re-run.
+      - name: Stamp CHANGELOG version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node - "$VERSION" <<'EOF'
+          const fs = require('fs');
+          const version = process.argv[2];
+          const file = 'CHANGELOG.md';
+          const placeholder = /^##\s*\[(unreleased|new)\].*$/im;
+          let md = fs.readFileSync(file, 'utf8');
+          if (placeholder.test(md)) {
+            md = md.replace(placeholder, `## [${version}]`);
+            fs.writeFileSync(file, md);
+            console.log(`CHANGELOG: placeholder stamped as [${version}]`);
+          } else {
+            console.log('::notice::No [Unreleased]/[new] placeholder in CHANGELOG.md — left unchanged.');
+          }
+          EOF
 
       - name: Commit and push version bump
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: release ${{ steps.version.outputs.version }}"
-          git push
+          git add package.json package-lock.json CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "Nothing changed (version + CHANGELOG already up to date) — nothing to push."
+          else
+            git commit -m "chore: release ${{ steps.version.outputs.version }}"
+            git push
+          fi
 
       # ── Tag ─────────────────────────────────────────────────────────────────
+      # Skip if the tag already exists locally or on the remote, so re-running
+      # the workflow for the same version does not fail here.
       - name: Create and push release tag
         run: |
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin ${{ steps.version.outputs.tag }}
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null \
+             || git ls-remote --exit-code --tags origin "${TAG}" >/dev/null 2>&1; then
+            echo "::notice::Tag ${TAG} already exists — skipping tag creation."
+          else
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
 
       # ── Build ────────────────────────────────────────────────────────────────
       # `vsce package` automatically runs the `vscode:prepublish` lifecycle
@@ -96,7 +142,6 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: "Release ${{ steps.version.outputs.version }}"
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
             ${{ env.PACKAGE_FILE }}
