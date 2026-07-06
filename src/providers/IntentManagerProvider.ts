@@ -5,6 +5,8 @@ import * as path from 'path';
 import { ActivityStatus } from './ActivityStatus';
 import { raiseRestconfError, printRestconfError } from '../common/errors';
 import { isAtLeastRelease } from '../common/paths';
+import { IntentTypeScaffolder } from '../generators/IntentTypeScaffolder';
+import { TemplateEngine } from '../generators/TemplateEngine';
 import { NspRestClient } from '../nsp/NspRestClient';
 
 import yaml = require('yaml');
@@ -199,6 +201,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	extensionUri: vscode.Uri;
 
 	private nspClient: NspRestClient;
+	private templateEngine: TemplateEngine;
+	private intentTypeScaffolder: IntentTypeScaffolder;
 
 	timeout: number;
 	fileIgnore: Array<string>;
@@ -326,9 +330,18 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.extensionPath = context.extensionPath;
 		this.extensionUri = context.extensionUri;
 
-		console.log("IntentManagerProvider("+this.nspAddr+")");
-
 		this.intentTypes = {};
+
+		this.templateEngine = new TemplateEngine(this.extensionUri, this.pluginLogs);
+		this.intentTypeScaffolder = new IntentTypeScaffolder({
+			extensionUri: this.extensionUri,
+			pluginLogs: this.pluginLogs,
+			intentTypes: this.intentTypes,
+			getUriList: (args) => this._getUriList(args),
+			callNSP: (url, options) => this._callNSP(url, options),
+		});
+
+		console.log("IntentManagerProvider("+this.nspAddr+")");
 
 		this._addViewConfigSchema();
 	}
@@ -375,35 +388,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	private async _getNspPassword(): Promise<string> {
 		return (await this.secretStorage.get("nsp_im_password")) ?? process.env.NSP_PASSWORD ?? "";
-	}
-
-	private _mergeCommonUri(mergeSuffix: string): vscode.Uri {
-		const map: Record<string, string> = {
-			common_abstract: 'common/abstract',
-			common_classic: 'common/classic',
-			common_fixed: 'common/fixed',
-		};
-		const relative = map[mergeSuffix] ?? mergeSuffix;
-		return vscode.Uri.joinPath(this.extensionUri, 'templates', ...relative.split('/'));
-	}
-
-	private _getTemplateQuickPickItems(): vscode.QuickPickItem[] {
-		const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
-		const templates: {label: string; description: string; category?: string}[] =
-			JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
-		const items: vscode.QuickPickItem[] = [];
-		const sorted = [...templates].sort((a, b) =>
-			(a.category ?? '').localeCompare(b.category ?? '') || a.label.localeCompare(b.label));
-		let lastCategory = '';
-		for (const template of sorted) {
-			const category = template.category ?? 'other';
-			if (category !== lastCategory) {
-				items.push({ label: category, kind: vscode.QuickPickItemKind.Separator });
-				lastCategory = category;
-			}
-			items.push({ label: template.label, description: template.description });
-		}
-		return items;
 	}
 
 	private async _getAuthToken(): Promise<string | undefined> {
@@ -2541,183 +2525,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	public async newRemoteIntentType(args:any[]): Promise<void> {
-		const patharg = this._getUriList(args)[0].toString();
-		const parts   = patharg.split('/').map(decodeURIComponent);
-		const pattern = /^([a-z][a-z0-9_-]+)(_v\d+)?$/;
-
-		let intent_type_name = "default";
-		if (parts.length===2 && pattern.test(parts[1]))
-			intent_type_name = parts[1].replace(/_v\d+$/, "");
-
-		const data:{
-			intent_type?: string,
-			author?: string,
-			template?: string,
-			date?: string
-		} = {
-			intent_type: intent_type_name,
-			author: "NSP DevOps",
-			template: "none",
-			date: new Date().toISOString().slice(0,10)
-		};
-
-		// todo: Using multi-step input using QuickPick and InputBox
-		//   https://github.com/microsoft/vscode-extension-samples/tree/main/quickinput-sample
-		//
-		// desired improvements:
-		//   navigation between the steps (forward/backward)
-		//   instant validation (intent-types exist, all small caps, ...)
-
-		data.intent_type = await vscode.window.showInputBox({
-			title: "Create intent-type | Step 1 NAME",
-			prompt: "Provide a name for the new intent-type!",
-			value: data.intent_type
-		});
-		if (!data.intent_type) return;
-
-		if ((data.intent_type+"_v1") in this.intentTypes)
-			throw vscode.FileSystemError.FileExists("Intent-type already exists! Use unique intent-type name!");
-
-		data.author = await vscode.window.showInputBox({
-			title: "Create intent-type | Step 2 AUTHOR",
-			prompt: "Provide an author for the new intent",
-			value: data.author
-		});
-		if (!data.author) return;
-
-		const items = this._getTemplateQuickPickItems();
-
-        const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
-        if (selection) data.template = selection.label; else return;
-
-		const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', data.template);
-		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, 'meta-info.json').fsPath)) {
-			vscode.window.showErrorMessage("meta-info.json not found");
-			return;
-		}
-		const j2root = nunjucks.configure(templatePath.fsPath);
-		const meta:{[key:string]: any} = JSON.parse(j2root.render('meta-info.json', data));
-
-		if (!('mapping-engine' in meta))
-			meta["mapping-engine"] = 'js-scripted';
-
-		let script: string|undefined;
-		switch(meta["mapping-engine"]) {
-			case 'js-scripted':
-				script = 'script-content.js';
-				break;
-			case 'js-scripted-graal':
-				script = 'script-content.mjs';
-				break;
-		}
-		if (!script) {
-			vscode.window.showErrorMessage("Unsupported mapping-engine "+meta["mapping-engine"]+"!");
-			return;
-		}
-		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, script).fsPath)) {
-			vscode.window.showErrorMessage(script+" not found");
-			return;
-		}
-		meta["script-content"] = j2root.render(script, data);
-
-		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules").fsPath)) {
-			vscode.window.showErrorMessage("YANG modules not found");
-			return;
-		}
-		if (!fs.existsSync(vscode.Uri.joinPath(templatePath, "yang-modules", "[intent_type].yang").fsPath)) {
-			vscode.window.showErrorMessage("Intent-type templates must have '[intent_type].yang' module!");
-			return;
-		}
-
-		// create modules
-
-		if (!('module' in meta)) meta.module=[];
-
-		const modulesPath = vscode.Uri.joinPath(templatePath, "yang-modules");
-		for (const filename of fs.readdirSync(modulesPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-			const fullpath = vscode.Uri.joinPath(modulesPath, filename).fsPath;
-			const j2modules = nunjucks.configure(path.dirname(fullpath));
-
-			if (!fs.lstatSync(fullpath).isFile())
-				this.pluginLogs.info("ignore "+filename+" (not a file)");
-			else if (filename.startsWith('.'))
-				this.pluginLogs.info("ignore hidden file "+filename);
-			else if (filename!="[intent_type].yang")
-				meta.module.push({name: filename.split('\\').join('/'), "yang-content": fs.readFileSync(fullpath, {encoding: 'utf8', flag: 'r'})});
-			else
-				meta.module.push({name: data.intent_type+".yang", "yang-content": j2modules.render(filename, data)});
-		}
-
-		// create resources
-
-		if (!('resource' in meta)) meta.resource=[];
-		const resourcefiles:string[] = [];
-		
-		const resourcesPath = vscode.Uri.joinPath(templatePath, "intent-type-resources");
-		if (fs.existsSync(resourcesPath.fsPath))
-			for (const filename of fs.readdirSync(resourcesPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-				const fullpath = vscode.Uri.joinPath(resourcesPath, filename).fsPath;
-				const j2resources = nunjucks.configure(path.dirname(fullpath));
-
-				if (!fs.lstatSync(fullpath).isFile())
-					this.pluginLogs.info("ignore "+filename+" (not a file)");
-				else if (filename.startsWith('.') || filename.includes('/.'))
-					this.pluginLogs.info("ignore hidden file/folder "+filename);
-				else
-					meta.resource.push({name: filename.split('\\').join('/'), value: j2resources.render(path.basename(fullpath), data)});
-
-				resourcefiles.push(filename);
-			}
-		else vscode.window.showWarningMessage("Intent-type template has no resources");
-
-		// merge common resources
-
-		for (const folder of fs.readdirSync(templatePath.fsPath).filter((item: string) => item.startsWith('merge_')).map((item: string) => item.substring(6))) {
-			const commonsPath = this._mergeCommonUri(folder);
-
-			this.pluginLogs.info("merge common resources from "+folder);
-			for (const filename of fs.readdirSync(commonsPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-				const fullpath = vscode.Uri.joinPath(commonsPath, filename).fsPath;
-				const j2resources = nunjucks.configure(path.dirname(fullpath));
-
-				if (!fs.lstatSync(fullpath).isFile())
-					this.pluginLogs.info("ignore "+filename+" (not a file)");
-				else if (filename.startsWith('.') || filename.includes('/.'))
-					this.pluginLogs.info("ignore hidden file/folder "+filename);
-				else if (resourcefiles.includes(filename))
-					this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
-				else
-					meta.resource.push({name: filename.split('\\').join('/'), value: j2resources.render(path.basename(fullpath), data)});
-			}
-		}
-	
-		// Intent-type "meta" may contain the parameter "intent-type"
-		// RESTCONF API required parameter "name" instead
-
-		meta.name = data.intent_type;
-		meta.version = 1;
-		delete meta["intent-type"];
-
-		// IBN expects targetted-device to contain an index as key, which is not contained in exported intent-types (ZIP)
-		if ('targetted-device' in meta) {
-			let index=0;
-			for (const entry of meta["targetted-device"]) {
-				if (!('index' in entry)) entry.index = index;
-				index+=1;
-			}
-		}
-	
-		vscode.window.showInformationMessage("Creating new Intent-Type");
-		const body = {"ibn-administration:intent-type": meta};
-		const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog";
-		const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
-		if (!response)
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		if (!response.ok)
-			raiseRestconfError("Create intent-type failed!", await response.json(), true);
-
-		vscode.window.showInformationMessage("Intent-Type "+data.intent_type+" successfully created!");
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");			
+		return this.intentTypeScaffolder.newRemoteIntentType(args);
 	}
 
 	/**
@@ -2728,120 +2536,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	public async newLocalIntentType(args:any[]): Promise<void> {
-		this.pluginLogs.info("newLocalIntentType(", JSON.stringify(args), ")");
-		
-		if (args.length>1 && args[0] instanceof vscode.Uri) {
-			const userinput : {
-				intent_type?: string,
-				author?: string,
-				template?: string,
-				date?: string
-			} = {
-				intent_type: "default",
-				author: "NSP DevOps",
-				template: "none",
-				date: new Date().toISOString().slice(0,10)
-			};
-
-			userinput.intent_type = await vscode.window.showInputBox({
-				title: "Create intent-type | Step 1 NAME",
-				prompt: "Provide a name for the new intent-type!",
-				value: userinput.intent_type
-			});
-			if (!userinput.intent_type) return;
-
-			let rootUri = args[0];
-			if (fs.lstatSync(rootUri.fsPath).isFile())
-				rootUri = vscode.Uri.file(path.dirname(rootUri.fsPath));
-
-			const intentTypePath = vscode.Uri.joinPath(rootUri, userinput.intent_type+"_v1");
-			if (fs.existsSync(intentTypePath.fsPath)) {
-				vscode.window.showErrorMessage("Intent-type exists");
-				return;
-			}
-
-			userinput.author = await vscode.window.showInputBox({
-				title: "Create intent-type | Step 2 AUTHOR",
-				prompt: "Provide an author for the new intent",
-				value: userinput.author
-			});
-			if (!userinput.author) return;
-
-			const items = this._getTemplateQuickPickItems();
-	
-			const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
-			if (selection) userinput.template = selection.label; else return;
-
-			const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', userinput.template);
-			fs.mkdirSync(intentTypePath.fsPath);
-
-			// create folders/folders from template
-
-			const mergelist = [];
-			for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-				const srcpath = vscode.Uri.joinPath(templatePath, filename).fsPath;
-				const dstpath = vscode.Uri.joinPath(intentTypePath, filename).fsPath;
-
-				if (fs.lstatSync(srcpath).isDirectory())
-					fs.mkdirSync(dstpath);
-				else if (filename.startsWith('.') || filename.includes('/.'))
-					this.pluginLogs.info("skip file/folder ", filename);
-				else if (filename.startsWith('merge_'))
-					mergelist.push(filename.substring(6));
-				else {
-					this.pluginLogs.info("processing: ", filename);
-					const jinja = nunjucks.configure(path.dirname(srcpath));
-					const data = jinja.render(path.basename(srcpath), userinput);
-
-					if (filename === "jsconfig.json")
-						fs.writeFileSync(dstpath, JSON.stringify({
-							"compilerOptions": {
-								"baseUrl": "./intent-type-resources"
-							},
-							"include": ["*.js", "*.mjs", "intent-type-resources/*.js", "intent-type-resources/**/*.mjs"]
-						}));
-					else if (filename === "yang-modules/[intent_type].yang")
-						fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${userinput.intent_type}.yang`).fsPath, data);
-					else
-						fs.writeFileSync(dstpath, data);
-				}
-			}
-
-			// merge common resource folders/files
-
-			const resourcePath = vscode.Uri.joinPath(intentTypePath, 'intent-type-resources');
-
-			if (!fs.existsSync(resourcePath.fsPath))
-				fs.mkdirSync(resourcePath.fsPath);
-
-			for (const folder of mergelist) {
-				this.pluginLogs.info("merging: ", folder);
-
-				const mergePath = this._mergeCommonUri(folder);
-				for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-					this.pluginLogs.info("filename: ", filename);
-
-					const srcpath = vscode.Uri.joinPath(mergePath, filename).fsPath;
-					const dstpath = vscode.Uri.joinPath(resourcePath, filename).fsPath;
-
-					if (fs.existsSync(dstpath)) {
-						this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
-					}
-					else if (fs.lstatSync(srcpath).isDirectory())
-						fs.mkdirSync(dstpath);
-					else if (filename.startsWith('.') || filename.includes('/.'))
-						this.pluginLogs.info("skip file/folder ", filename);
-					else {
-						this.pluginLogs.info("processing: ", filename);
-						const jinja = nunjucks.configure(path.dirname(srcpath));
-						const data = jinja.render(path.basename(srcpath), userinput);
-						fs.writeFileSync(dstpath, data);
-
-						// fs.copyFileSync(srcpath, dstpath);
-					}
-				}
-			}
-		}
+		return this.intentTypeScaffolder.newLocalIntentType(args);
 	}
 	
 	/**
@@ -4039,7 +3734,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				for (const folder of mergelist) {
 					this.pluginLogs.info("merging: ", folder);
 
-					const mergePath = this._mergeCommonUri(folder);
+					const mergePath = this.templateEngine.mergeCommonUri(folder);
 					for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
 						this.pluginLogs.info("filename: ", filename);
 
