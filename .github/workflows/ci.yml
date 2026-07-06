@@ -49,6 +49,30 @@ jobs:
       - name: Run TypeScript compiler
         run: npm run compile
 
+  test:
+    name: Test (Mocha)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nsp-version: ['25.10']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        env:
+          NSP_VERSION: ${{ matrix.nsp-version }}
+        run: npm test
+
   build-check:
     name: Build Check (esbuild)
     runs-on: ubuntu-latest

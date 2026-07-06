@@ -1,0 +1,129 @@
+{
+	"release": "25.10",
+	"releaseVersion": {
+		"response": {
+			"data": {
+				"nspOSVersion": "25.10.0.1"
+			}
+		}
+	},
+	"osdVersion": "2.11.0",
+	"devices": {
+		"1034::cafe:1": {
+			"name": "madrid",
+			"osType": "SR OS",
+			"osRelease": "25.10.R1",
+			"type": "sr-1",
+			"mode": "model-driven"
+		},
+		"1034::cafe:2": {
+			"name": "barcelona",
+			"osType": "SR OS",
+			"osRelease": "25.10.R1",
+			"type": "sr-1",
+			"mode": "model-driven"
+		},
+		"1034::cafe:3": {
+			"name": "valencia",
+			"osType": "SR Linux",
+			"osRelease": "25.10.1",
+			"type": "ixr-h2",
+			"mode": "model-driven"
+		},
+		"1034::cafe:4": {
+			"name": "sevilla",
+			"osType": "SR Linux",
+			"osRelease": "25.10.1",
+			"type": "ixr-d2l",
+			"mode": "model-driven"
+		},
+		"1034::cafe:5": {
+			"name": "bilbao",
+			"osType": "SR Linux",
+			"osRelease": "25.10.1",
+			"type": "ixr-d2l",
+			"mode": "model-driven"
+		}
+	},
+	"responses": {
+		"POST /rest-gateway/rest/api/v1/auth/token": {
+			"access_token": "fixture-token-25.10",
+			"expires_in": 3600,
+			"token_type": "Bearer"
+		},
+		"GET /internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version": {
+			"response": {
+				"data": {
+					"nspOSVersion": "25.10.0.1"
+				}
+			}
+		},
+		"GET /logviewer/api/status": {
+			"version": {
+				"number": "2.11.0"
+			}
+		},
+		"GET /restconf/meta/api/v1/model/schema/1034::cafe:1/nokia-conf:/configure/router/isis": {
+			"ietf-restconf:yang-data": {
+				"schema": {
+					"children": []
+				}
+			}
+		},
+		"GET /restconf/meta/api/v1/model/schema/1034::cafe:3/srl_nokia-interfaces:/interface": {
+			"ietf-restconf:yang-data": {
+				"schema": {
+					"children": []
+				}
+			}
+		},
+		"GET /restconf/operations/nsp-inventory:find": {
+			"nsp-inventory:output": {
+				"data": [
+					{ "ne-id": "1034::cafe:1" },
+					{ "ne-id": "1034::cafe:2" },
+					{ "ne-id": "1034::cafe:3" },
+					{ "ne-id": "1034::cafe:4" },
+					{ "ne-id": "1034::cafe:5" }
+				]
+			}
+		}
+	},
+	"errors": {
+		"GET /restconf/meta/api/v1/model/schema/unknown-ne-id/nokia-conf:/configure/router/isis": {
+			"status": 404,
+			"body": {
+				"ietf-restconf:errors": {
+					"error": [
+						{
+							"error-tag": "invalid-value",
+							"error-message": "Unknown ne-id: unknown-ne-id"
+						}
+					]
+				}
+			}
+		},
+		"GET /restconf/data/network-device:devices/device[ne-id='1034::cafe:1']/root/nokia-conf:configure/missing-context?content=config": {
+			"status": 404,
+			"body": {
+				"ietf-restconf:errors": {
+					"error": [
+						{
+							"error-tag": "data-missing",
+							"error-message": "Context does not exist on device"
+						}
+					]
+				}
+			}
+		}
+	},
+	"readOnly": {
+		"nokia-conf:/configure/security/keychains": [
+			"keychain-name",
+			"password"
+		],
+		"srl_nokia-interfaces:/interface": [
+			"oper-state"
+		]
+	}
+}

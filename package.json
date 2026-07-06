@@ -380,16 +380,25 @@
         "build": "tsc",
         "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/main.js --external:vscode --format=cjs --platform=node --loader:.node=file",
         "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-        "esbuild": "npm run esbuild-base -- --sourcemap"
+        "esbuild": "npm run esbuild-base -- --sourcemap",
+        "test": "npm run test:unit && npm run test:gen",
+        "test:unit": "TS_NODE_PROJECT=test/tsconfig.json mocha --require test/setup.ts --require ts-node/register --extension ts \"test/unit/**/*.test.ts\"",
+        "test:gen": "TS_NODE_PROJECT=test/tsconfig.json mocha --require test/setup.ts --require ts-node/register --extension ts \"test/gen/**/*.test.ts\"",
+        "capture:nsp": "node scripts/capture-nsp.mjs"
     },
     "devDependencies": {
+        "@types/chai": "^5.2.3",
+        "@types/mocha": "^10.0.10",
         "@types/node": "18.x",
         "@types/vscode": "^1.75.0",
         "@typescript-eslint/eslint-plugin": "^8.57.2",
         "@typescript-eslint/parser": "^8.57.2",
         "@vscode/vsce": "^3.7.1",
+        "chai": "^6.2.2",
         "esbuild": "^0.27.4",
         "eslint": "^8.26.0",
+        "mocha": "^11.7.5",
+        "ts-node": "^10.9.2",
         "typescript": "5.x"
     },
     "dependencies": {
