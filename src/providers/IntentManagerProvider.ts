@@ -5,13 +5,10 @@ import * as path from 'path';
 import { ActivityStatus } from './ActivityStatus';
 import { raiseRestconfError, printRestconfError } from '../common/errors';
 import { isAtLeastRelease } from '../common/paths';
+import { NspRestClient } from '../nsp/NspRestClient';
 
 import yaml = require('yaml');
 
-// @ts-expect-error module node-fetch does not have a declaration file
-import fetch = require('node-fetch');
-// @ts-expect-error module node-fetch does not have a declaration file
-import base64 = require('base-64');
 // @ts-expect-error module nunjucks does not have a declaration file
 import nunjucks = require('nunjucks');
 
@@ -201,12 +198,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	extensionPath: string;
 	extensionUri: vscode.Uri;
 
-	nspAddr: string;
-	username: string;
-	password?: string;
-	port: string;
-	authToken?: Promise<string | undefined>;
-	private authTokenRevokeTimer?: ReturnType<typeof setTimeout>;
+	private nspClient: NspRestClient;
 
 	timeout: number;
 	fileIgnore: Array<string>;
@@ -218,8 +210,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	logLimit: number;
 	queryLimit: number;
 
-	nspVersion?: string;
-	osdVersion?: string;
 	secretStorage: vscode.SecretStorage;
 
 	serverLogs: vscode.OutputChannel;
@@ -239,6 +229,48 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>; // = new vscode.EventEmitter(); it is defined in constructor
+
+	get nspAddr(): string {
+		return this.nspClient.nspAddr;
+	}
+	set nspAddr(value: string) {
+		this.nspClient.nspAddr = value;
+	}
+
+	get username(): string {
+		return this.nspClient.username;
+	}
+	set username(value: string) {
+		this.nspClient.username = value;
+	}
+
+	get password(): string | undefined {
+		return this.nspClient.password;
+	}
+	set password(value: string | undefined) {
+		this.nspClient.password = value;
+	}
+
+	get port(): string {
+		return this.nspClient.port;
+	}
+	set port(value: string) {
+		this.nspClient.port = value;
+	}
+
+	get nspVersion(): string | undefined {
+		return this.nspClient.nspVersion;
+	}
+	set nspVersion(value: string | undefined) {
+		this.nspClient.nspVersion = value;
+	}
+
+	get osdVersion(): string | undefined {
+		return this.nspClient.osdVersion;
+	}
+	set osdVersion(value: string | undefined) {
+		this.nspClient.osdVersion = value;
+	}
 
 	/**
 	 * Create IntentManagerProvider
@@ -264,24 +296,39 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.logLimit = config.get("logLimit") ?? 5000;
 		this.queryLimit = config.get("queryLimit") ?? 1000;
 
-		this.nspAddr = this._getNspServer();
-		this.username = this._getNspUser();
-		this.port = config.get("port") ?? "443";
+		const nspAddr = this._getNspServer();
+		const username = this._getNspUser();
+		const port: string = config.get("port") ?? "443";
+
+		this._eventEmiter = new vscode.EventEmitter();
+        this.onDidChangeFileDecorations = this._eventEmiter.event;
+
+		this.nspClient = new NspRestClient(
+			{ nspAddr, username, port, timeout: this.timeout },
+			{
+				pluginLogs: this.pluginLogs,
+				onAuthFailure: (error, username) => {
+					DECORATION_DISCONNECTED.tooltip = 'Authentication failure (user:' + username + ', error:' + error + ')!';
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+				},
+				onUnreachable: (nspAddr) => {
+					DECORATION_DISCONNECTED.tooltip = nspAddr + ' unreachable!';
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+				},
+				onVersionUpdated: (info) => {
+					const msg = 'Connected to ' + info.nspAddr + ', NSP version: ' + (info.nspVersion ?? 'unknown') + ', OSD version: ' + (info.osdVersion ?? 'unknown');
+					vscode.window.showInformationMessage(msg);
+					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
+				},
+			},
+		);
 
 		this.extensionPath = context.extensionPath;
 		this.extensionUri = context.extensionUri;
 
 		console.log("IntentManagerProvider("+this.nspAddr+")");
 
-		this.nspVersion = undefined;
-		this.osdVersion = undefined;
-
-		this.authToken = undefined;
-
 		this.intentTypes = {};
-
-		this._eventEmiter = new vscode.EventEmitter();
-        this.onDidChangeFileDecorations = this._eventEmiter.event;
 
 		this._addViewConfigSchema();
 	}
@@ -295,7 +342,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	dispose() {
 		console.log('disposing IntentManagerProvider()');
 
-		this._revokeAuthToken();
+		void this._revokeAuthToken();
 		this.serverLogs.dispose();
 		this.pluginLogs.dispose();
 	}
@@ -359,214 +406,21 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return items;
 	}
 
-	private _clearAuthTokenRevokeTimer(): void {
-		if (this.authTokenRevokeTimer !== undefined) {
-			clearTimeout(this.authTokenRevokeTimer);
-			this.authTokenRevokeTimer = undefined;
-		}
-	}
-
-	private _scheduleAuthTokenRevoke(expiresInSeconds: number): void {
-		this._clearAuthTokenRevokeTimer();
-		const ms = Math.max(expiresInSeconds * 1000, 60000);
-		this.authTokenRevokeTimer = setTimeout(() => this._revokeAuthToken(), ms);
-	}
-
-	/**
-	 * Retrieves auth-token from NSP. Uses promise memoization so concurrent callers
-	 * share a single in-flight token request. Returns the bearer token string.
-	 */
 	private async _getAuthToken(): Promise<string | undefined> {
-        if (this.authToken) {
-			const token = await this.authToken;
-            if (token) {
-				return token;
-			}
-			this.authToken = undefined;
-        }
-
 		this.password = await this._getNspPassword();
-
-		if (!this.password) {
-			return undefined;
-		}
-
-        if (!this.authToken) {
-            this.authToken = new Promise<string | undefined>((resolve) => {
-                this.pluginLogs.warn("No valid auth-token for IM plugin; Getting a new one...");
-                process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-				const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), 10000);
-
-                const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
-				const startTS = Date.now();
-
-                fetch(url, {
-                    method: "POST",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache',
-                        'Authorization': 'Basic ' + base64.encode(this.username+ ":" +this.password)
-                    },
-                    body: '{"grant_type": "client_credentials"}',
-                    signal: timeout.signal
-                }).then(async (response:any) => {
-					const duration = Date.now()-startTS;
-                    this.pluginLogs.info("POST", url, "finished within", duration, "ms");
-
-					const json = await response.json();
-                    if (response.ok) {
-						this.pluginLogs.info("IM response:", response.status);
-						const accessToken: string = json.access_token;
-						const expiresIn: number = json.expires_in ?? 600;
-						this.pluginLogs.info("new authToken:", accessToken);
-						this._scheduleAuthTokenRevoke(expiresIn);
-						this._getNSPversion();
-						resolve(accessToken);
-                    } else {
-						this.pluginLogs.warn("IM response:", response.status, json.error);
-						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
-						this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-						this.authToken = undefined;
-                        resolve(undefined);
-					}
-                }).catch((error:any) => {
-					if (error.message.includes('user aborted'))
-						this.pluginLogs.error("Getting authToken for IM plugin timed out (no response within 10sec)");
-					else
-						this.pluginLogs.error("Getting authToken for IM plugin failed with", error.message);
-
-					this.nspVersion = undefined;
-					this.osdVersion = undefined;
-					
-					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
-					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-
-					this.authToken = undefined;
-                    resolve(undefined);
-                });
-            });
-        }
-
-		return await this.authToken;
-    }
-
-	/**
-	 * Gracefully revoke NSP auth-token.
-	 */
-	private async _revokeAuthToken(): Promise<void> {
-		this._clearAuthTokenRevokeTimer();
-		if (this.authToken) {
-			const token = await this.authToken;
-			this.pluginLogs.debug("_revokeAuthToken("+token+")");
-			this.authToken = undefined;
-
-			const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/revocation";
-			fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type":  "application/x-www-form-urlencoded",
-					"Authorization": "Basic " + base64.encode(this.username+ ":" +this.password)
-				},
-				body: "token="+token+"&token_type_hint=token"
-			})
-			.then((response:any) => {
-				this.pluginLogs.info("POST", url, response.status);
-			});
-		}
+		return this.nspClient.getToken();
 	}
 
-	/**
-	 * Private wrapper method to call NSP APIs. Method sets http request timeout.
-	 * Common error handling and logging is centralized here.
-	 * 
-	 * @param {string} url API endpoint for http request
-	 * @param {{method: string, body: string, headers: object, signal: AbortSignal}} options HTTP method, header, body
-	 */	
+	private async _revokeAuthToken(): Promise<void> {
+		return this.nspClient.revokeToken();
+	}
 
-	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<any> {
-		const timeout = new AbortController();
-        setTimeout(() => timeout.abort(), this.timeout*1000);
-		options.signal = timeout.signal;
+	private async _callNSP(url: string, options: { method: string; body?: string; headers?: object; signal?: AbortSignal }): Promise<any> {
+		return this.nspClient.call(url, options);
+	}
 
-		if (!('headers' in options)) {
-			const token = await this._getAuthToken();
-			if (!token) {
-				if (!this.password)
-					throw vscode.FileSystemError.Unavailable('NSP credentials not configured');
-				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-			}
-
-			if (url.startsWith('/restconf/data') || url.startsWith('/restconf/operations') || url.startsWith('/mdt/rest/restconf'))
-				options.headers = {
-					"Content-Type": "application/yang-data+json",
-					"Accept": "application/yang-data+json",
-					"Authorization": "Bearer " + token
-				};
-			else 
-				options.headers = {
-					'Content-Type': "application/json",
-					'Accept': "application/json",	
-					"Authorization": "Bearer " + token
-				};
-		}
-
-		if (!url.startsWith('https://')) {
-			if (["443",""].includes(this.port))
-				url = "https://"+this.nspAddr+url;
-			else if (url.startsWith('/logviewer'))
-				url = "https://"+this.nspAddr+url;
-			else if (url.startsWith('/mdt/rest'))
-				// use port for intent-manager (default: 8547)
-				url = "https://"+this.nspAddr+":"+this.port+url;
-			else
-				// use port for restconf-gateway (default: 8545)
-				url = "https://"+this.nspAddr+":8545"+url;
-		}
-
-		const startTS = Date.now();
-		const response: any = new Promise((resolve, reject) => {
-			fetch(url, options).then((response:any) => {
-				response.clone().text().then((body:string) => {
-					const duration = Date.now()-startTS;
-
-					this.pluginLogs.info(options.method, url, options.body??"", "finished within", duration, "ms");
-
-					if (response.status >= 400)
-						this.pluginLogs.warn("IM response:", response.status, body);
-					else if ((body.length < 1000) || (this.pluginLogs.logLevel == vscode.LogLevel.Trace))
-						this.pluginLogs.info("IM response:", response.status, body);
-					else
-						this.pluginLogs.info("IM response:", response.status, body.substring(0,1000)+'...');
-				});
-				return response;
-			})
-			.then((response:any) => {
-				resolve(response);
-			})
-			.catch((error:any) => {
-				const duration = Date.now()-startTS;
-				let errmsg = options.method+" "+url+" failed with "+error.message+" after "+duration.toString()+"ms!";
-
-				if (error.message.includes("ENETUNREACH")) {
-					this.nspVersion = undefined;
-					this.osdVersion = undefined;
-					this.authToken  = undefined;
-					
-					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
-					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-				}
-
-				if (error.message.includes("user aborted"))
-					errmsg = "No response for "+options.method+" "+url+". Call terminated after "+duration.toString()+"ms.";
-
-				this.pluginLogs.error(errmsg);
-				vscode.window.showErrorMessage(errmsg);
-				resolve(undefined);
-			});
-		});
-		return response;
+	private async _getNSPversion(): Promise<void> {
+		await this.nspClient.fetchNspVersion();
 	}
 
 	/**
@@ -587,51 +441,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			url = "https://"+this.nspAddr+url;
 
 		vscode.env.openExternal(vscode.Uri.parse(url));
-	}
-
-	/**
-	 * Retrieve and store NSP release in this.nspVersion.
-	 * Release information will be shown to vsCode user.
-	 * 
-	 * Note: currently used to select OpenSearch API version
-	 */	
-
-	private async _getNSPversion(): Promise<void> {
-		let updated = false;
-
-		if (!this.nspVersion) {
-			this.pluginLogs.info("IM plugin is getting NSP release");
-			const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
-			const response: any = await this._callNSP(url, {method: "GET"});
-			if (!response)
-				this.pluginLogs.error("Lost connection to IM");
-			else if (response.ok) {
-				const json = await response.json();		
-				this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
-				updated = true;
-			} else
-				this.pluginLogs.error("Getting NSP release failed!");
-		}
-
-		if (!this.osdVersion) {
-			this.pluginLogs.info("Requesting OSD version");
-			const response: any = await this._callNSP("/logviewer/api/status", {method: "GET"});
-			if (!response)
-				this.pluginLogs.error("Lost connection to NSP logviewer (opensearch)");
-			else if (response.ok) {
-				const json = await response.json();		
-				this.osdVersion = json.version.number;
-				updated = true;
-			} else
-				this.pluginLogs.error("Getting OSD version failed!");	
-		}
-
-		if (updated) {
-			const msg = "Connected to "+this.nspAddr+", NSP version: "+(this.nspVersion??"unknown")+", OSD version: "+(this.osdVersion??"unknown");
-			this.pluginLogs.info(msg);
-			vscode.window.showInformationMessage(msg);
-			this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-		}
 	}
 
 	/**
@@ -1644,6 +1453,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		const config = vscode.workspace.getConfiguration('intentManager');
 
 		this.timeout = config.get("timeout") ?? 90; // default: 1:30min
+		this.nspClient.timeout = this.timeout;
 		this.fileIgnore = config.get("ignoreLabels") ?? [];
 		this.fileInclude = config.get("includeLabels") ?? [];
 		this.parallelOps = config.get("parallelOperations.enable") ?? false;
