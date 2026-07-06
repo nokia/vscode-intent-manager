@@ -328,6 +328,16 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return (await this.secretStorage.get("nsp_im_password")) ?? process.env.NSP_PASSWORD ?? "";
 	}
 
+	private _mergeCommonUri(mergeSuffix: string): vscode.Uri {
+		const map: Record<string, string> = {
+			common_abstract: 'common/abstract',
+			common_classic: 'common/classic',
+			common_fixed: 'common/fixed',
+		};
+		const relative = map[mergeSuffix] ?? mergeSuffix;
+		return vscode.Uri.joinPath(this.extensionUri, 'templates', ...relative.split('/'));
+	}
+
 	private _clearAuthTokenRevokeTimer(): void {
 		if (this.authTokenRevokeTimer !== undefined) {
 			clearTimeout(this.authTokenRevokeTimer);
@@ -2895,7 +2905,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		// merge common resources
 
 		for (const folder of fs.readdirSync(templatePath.fsPath).filter((item: string) => item.startsWith('merge_')).map((item: string) => item.substring(6))) {
-			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
+			const commonsPath = this._mergeCommonUri(folder);
 
 			this.pluginLogs.info("merge common resources from "+folder);
 			for (const filename of fs.readdirSync(commonsPath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
@@ -3040,7 +3050,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			for (const folder of mergelist) {
 				this.pluginLogs.info("merging: ", folder);
 
-				const mergePath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
+				const mergePath = this._mergeCommonUri(folder);
 				for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
 					this.pluginLogs.info("filename: ", filename);
 
@@ -4217,7 +4227,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					}
 				}
 
-				const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common_fixed');
+				const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common', 'fixed');
 				fs.mkdirSync(intentTypePath.fsPath);
 
 				// copy files and templatize
@@ -4262,7 +4272,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 				for (const folder of mergelist) {
 					this.pluginLogs.info("merging: ", folder);
 
-					const mergePath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
+					const mergePath = this._mergeCommonUri(folder);
 					for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
 						this.pluginLogs.info("filename: ", filename);
 
