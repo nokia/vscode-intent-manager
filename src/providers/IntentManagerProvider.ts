@@ -338,6 +338,25 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return vscode.Uri.joinPath(this.extensionUri, 'templates', ...relative.split('/'));
 	}
 
+	private _getTemplateQuickPickItems(): vscode.QuickPickItem[] {
+		const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
+		const templates: {label: string; description: string; category?: string}[] =
+			JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
+		const items: vscode.QuickPickItem[] = [];
+		const sorted = [...templates].sort((a, b) =>
+			(a.category ?? '').localeCompare(b.category ?? '') || a.label.localeCompare(b.label));
+		let lastCategory = '';
+		for (const template of sorted) {
+			const category = template.category ?? 'other';
+			if (category !== lastCategory) {
+				items.push({ label: category, kind: vscode.QuickPickItemKind.Separator });
+				lastCategory = category;
+			}
+			items.push({ label: template.label, description: template.description });
+		}
+		return items;
+	}
+
 	private _clearAuthTokenRevokeTimer(): void {
 		if (this.authTokenRevokeTimer !== undefined) {
 			clearTimeout(this.authTokenRevokeTimer);
@@ -2816,8 +2835,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		});
 		if (!data.author) return;
 
-		const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
-		const items:{label:string, description:string}[] = JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
+		const items = this._getTemplateQuickPickItems();
 
         const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
         if (selection) data.template = selection.label; else return;
@@ -2999,8 +3017,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			});
 			if (!userinput.author) return;
 
-			const templatesInfoPath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'templates.json').fsPath;
-			const items:{label:string, description:string}[] = JSON.parse(fs.readFileSync(templatesInfoPath, {encoding:'utf8', flag:'r'})).templates;
+			const items = this._getTemplateQuickPickItems();
 	
 			const selection = await vscode.window.showQuickPick(items, { title: "Create intent-type | Step 3 TEMPLATE" });
 			if (selection) userinput.template = selection.label; else return;
@@ -3997,7 +4014,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 					// create files/folders from template
 
-					const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'deviceSpecificICM');
+					const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'icm', 'device-specific');
 					fs.mkdirSync(intentTypePath.fsPath);
 
 					for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {

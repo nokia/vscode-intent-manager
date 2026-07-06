@@ -1,64 +1,79 @@
 {
     "templates": [
         {
-            "label": "helloWorld",
-            "description": "basic intent-type using classic js-engine"
+            "label": "tutorial/hello-world-classic",
+            "category": "tutorial",
+            "description": "Basic intent-type using classic js-engine"
         },
         {
-            "label": "helloWorld2",
-            "description": "basic intent-type using next-gen js-engine"
+            "label": "tutorial/hello-world-nextgen",
+            "category": "tutorial",
+            "description": "Basic intent-type using next-gen js-engine"
         },
         {
-            "label": "helloWorld3",
-            "description": "basic intent-type applying best practices"
+            "label": "tutorial/hello-world-bestpractice",
+            "category": "tutorial",
+            "description": "Basic intent-type applying best practices"
         },
         {
-            "label": "ICM ipInterfaceLogical",
-            "description": "abstracted base-router interface w/ port config (ICM logical)"
+            "label": "tutorial/getting-started",
+            "category": "tutorial",
+            "description": "Getting started with intent-type design"
         },
         {
-            "label": "ICM ipInterfacePhysical",
-            "description": "abstracted base-router interface w/ port config (ICM physical)"
+            "label": "icm/abstract/ipinterface-logical",
+            "category": "icm-abstract",
+            "description": "Abstract base-router interface with port config (logical)"
         },
         {
-            "label": "ICM ipLink",
-            "description": "ipl!nk, abstraction and assurance (ICM logical)"
+            "label": "icm/abstract/ipinterface-physical",
+            "category": "icm-abstract",
+            "description": "Abstract base-router interface with port config (physical)"
         },
         {
-            "label": "ICM linkagg",
-            "description": "Link Aggregation Group with physical interfaces (ICM logical)"
+            "label": "icm/abstract/iplink",
+            "category": "icm-abstract",
+            "description": "IP link abstraction and assurance (logical)"
         },
         {
-            "label": "SRX goldenConfiguration",
-            "description": "SReXperts | device base configure (day1)"
+            "label": "icm/abstract/linkagg",
+            "category": "icm-abstract",
+            "description": "Link aggregation group with physical interfaces"
         },
         {
-            "label": "SRX iplink",
-            "description": "SReXperts | ipl!nk (abstraction and assurance)"
+            "label": "ibn-abstract/golden-config",
+            "category": "ibn-abstract",
+            "description": "Device base configuration (day-1)"
         },
         {
-            "label": "SRX linkagg",
-            "description": "SReXperts | Link Aggregation Group with physical interfaces"
+            "label": "ibn-abstract/iplink",
+            "category": "ibn-abstract",
+            "description": "IP link abstraction and assurance"
         },
         {
-            "label": "SRX oamTwampLight",
-            "description": "SReXperts | latency measurement using TWAMP/light"
+            "label": "ibn-abstract/linkagg",
+            "category": "ibn-abstract",
+            "description": "Link aggregation group with physical interfaces"
         },
         {
-            "label": "SRX deviceSecurity",
-            "description": "SReXperts | device security"
+            "label": "ibn-abstract/oam-twamp-light",
+            "category": "ibn-abstract",
+            "description": "Latency measurement using TWAMP light"
         },
         {
-            "label": "SRX serviceL3vpn",
-            "description": "SReXperts | abstract l3vpn service | classic js-engine"
+            "label": "ibn-abstract/device-security",
+            "category": "ibn-abstract",
+            "description": "Device security configuration"
         },
         {
-            "label": "SRX serviceEvpnEline",
-            "description": "SReXperts | abstract EVWS service | classic js-engine"
+            "label": "ibn-abstract/service-l3vpn",
+            "category": "ibn-abstract",
+            "description": "Abstract L3VPN service (classic js-engine)"
         },
         {
-            "label": "basic",
-            "description": "NSP Intent Design Tutorial | 01 Getting Started"
+            "label": "ibn-abstract/service-evpn-eline",
+            "category": "ibn-abstract",
+            "description": "Abstract EVPN E-Line service (classic js-engine)"
         }
     ]
 }

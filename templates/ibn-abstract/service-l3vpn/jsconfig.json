@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "baseUrl": "../../common/classic/"
+    },
+    "include": [
+        "*.js",
+        "../../common/classic/*.js"
+    ]
+}
