@@ -6,6 +6,7 @@ import { ActivityStatus } from './ActivityStatus';
 import { raiseRestconfError, printRestconfError } from '../common/errors';
 import { isAtLeastRelease } from '../common/paths';
 import { IntentTypeScaffolder } from '../generators/IntentTypeScaffolder';
+import { FixedIntentGenerator } from '../generators/FixedIntentGenerator';
 import { generateFromIgenFile } from '../generators/IcmGenerator';
 import { TemplateEngine } from '../generators/TemplateEngine';
 import { NspRestClient } from '../nsp/NspRestClient';
@@ -39,36 +40,6 @@ const DECORATION_MISALIGNED = { badge: '💔', tooltip: 'Intent: Misaligned', co
 const myStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 myStatusBarItem.command = 'nokia-intent-manager.intentStatus';
 
-interface contextEntry {
-    path: string;        // identity path of object/subtree
-    exclude?: string[];  // subtree paths to exclude
-}
-
-interface icmFixedGeneratorInput {
-	// user input (mandatory)
-	contexts: Record<string, contextEntry>;   // configuration objects
-	device: string,			// ne-id of the device used for auto-generation
-
-	// user input (optional)
-	author: string,			// intent-type author (default: NOKIA)
-	labels: string[],		// labels
-	date?: string,			// example: 2025-02-28
-
-	// generated from user input
-	intent_type: string,	// derived from filename.ifxgen
-	intent_type_version: number,
-
-	// fetched from NSP inventory and MDC meta
-	vendor?: string,		// example: Nokia
-	family?: string,		// example: 7750 SR
-	version?: string,		// example: 24.10.R1
-	swversion?: string,		// example: TiMOS-B-24.10.R1
-	chassis?: string,		// example: 7750 SR-1
-
-	template?:string		// example: SR OS.ftl
-}
-
-
 /*
 	Class implementing FileSystemProvider for Intent Manager
 */
@@ -82,6 +53,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	private nspClient: NspRestClient;
 	private templateEngine: TemplateEngine;
 	private intentTypeScaffolder: IntentTypeScaffolder;
+	private fixedIntentGenerator: FixedIntentGenerator;
 
 	timeout: number;
 	fileIgnore: Array<string>;
@@ -218,6 +190,15 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			intentTypes: this.intentTypes,
 			getUriList: (args) => this._getUriList(args),
 			callNSP: (url, options) => this._callNSP(url, options),
+		});
+		this.fixedIntentGenerator = new FixedIntentGenerator({
+			nspClient: this.nspClient,
+			logger: this.pluginLogs,
+			extensionUri: this.extensionUri,
+			intentTypes: this.intentTypes,
+			getUriList: (args) => this._getUriList(args),
+			mergeCommonUri: (suffix) => this.templateEngine.mergeCommonUri(suffix),
+			fireUriChange: (uri) => this._eventEmiter.fire(vscode.Uri.parse(uri)),
 		});
 
 		console.log("IntentManagerProvider("+this.nspAddr+")");
@@ -1481,247 +1462,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */	
 
 	public async uploadIntentType(args:any[]): Promise<void> {
-		const matchIntentType = /^([a-z][a-z0-9_-]+_v\d+)$/;
-		const matchImportedIntentType = /^intent-([a-z][a-z0-9_-]+-v\d+)$/;
-
-		const uri:vscode.Uri = this._getUriList(args)[0];
-		const allparts = uri.toString().split('/');
-		const parts:string[] = [];
-		for (const part of allparts) {
-			parts.push(part);
-			if (matchIntentType.test(part) || matchImportedIntentType.test(part))
-				break;
-		}
-		const path = vscode.Uri.parse(parts.join("/"));
-		let intent_type_folder = parts.pop() ?? "";
-
-		if (matchImportedIntentType.test(intent_type_folder))
-			intent_type_folder = intent_type_folder.slice(7).replace(/-v(?=\d+)/, '_v'); 
-
-		if (matchIntentType.test(intent_type_folder))
-			this.pluginLogs.debug("uploadIntentType("+path.fsPath+")");
-		else {
-			vscode.window.showErrorMessage("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
-			throw vscode.FileSystemError.FileNotFound("Intent-type must be stored in directory {intent_type}_v{version} or intent-{intent_type}-v{version}");
-		}
-
-		// load meta, script, resource-files, yang modules and views
-
-		let meta:{[key:string]: any};
-		if (fs.existsSync(vscode.Uri.joinPath(path, "meta-info.json").fsPath))
-			meta = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(path, "meta-info.json").fsPath, {encoding:'utf8', flag:'r'}));
-		else {
-			vscode.window.showErrorMessage("meta-info.json not found");
-			throw vscode.FileSystemError.FileNotFound("meta-info.json not found");
-		}
-
-		if (fs.existsSync(vscode.Uri.joinPath(path, "script-content.js").fsPath))
-			meta["script-content"] = fs.readFileSync(vscode.Uri.joinPath(path, "script-content.js").fsPath, {encoding:'utf8', flag:'r'});
-		else if (fs.existsSync(vscode.Uri.joinPath(path, "script-content.mjs").fsPath))
-			meta["script-content"] = fs.readFileSync(vscode.Uri.joinPath(path, "script-content.mjs").fsPath, {encoding:'utf8', flag:'r'});
-		else {
-			vscode.window.showErrorMessage("script-content not found");
-			throw vscode.FileSystemError.FileNotFound("script-content not found");
-		}
-
-		const modules:string[] = [];
-		if (fs.existsSync(vscode.Uri.joinPath(path, "yang-modules").fsPath)) {
-			fs.readdirSync(vscode.Uri.joinPath(path, "yang-modules").fsPath).forEach((filename: string) => {
-				if (fs.lstatSync(vscode.Uri.joinPath(path, "yang-modules", filename).fsPath).isFile() && !filename.startsWith('.')) modules.push(filename);
-			});
-			this.pluginLogs.info("modules: " + JSON.stringify(modules));
-		} else {
-			vscode.window.showErrorMessage("YANG modules not found");
-			throw vscode.FileSystemError.FileNotFound("YANG modules not found");
-		}
-
-		const resources:string[] = [];
-		if (fs.existsSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath)) {
-			fs.readdirSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath, {recursive: true, encoding: 'utf8'}).forEach((filename: string) => {
-				if (fs.lstatSync(vscode.Uri.joinPath(path, "intent-type-resources", filename).fsPath).isFile() && !filename.startsWith('.') && !filename.includes('/.'))
-					resources.push(filename);
-			});
-			this.pluginLogs.info("resources: " + JSON.stringify(resources));
-		} else
-			vscode.window.showWarningMessage("Intent-type has no resources");
-
-		const views:string[] = [];
-		if (fs.existsSync(vscode.Uri.joinPath(path, "views").fsPath)) {
-			fs.readdirSync(vscode.Uri.joinPath(path, "views").fsPath).forEach((filename: string) => {
-				if (filename.endsWith(".viewConfig")) views.push(filename);
-			});
-			this.pluginLogs.info("views: " + JSON.stringify(views));
-		}
-
-		const intents:string[] = [];
-		if (fs.existsSync(vscode.Uri.joinPath(path, "intents").fsPath)) {
-			fs.readdirSync(vscode.Uri.joinPath(path, "intents").fsPath).forEach((filename: string) => {
-				if (filename.endsWith(".json")) intents.push(filename);
-			});
-			this.pluginLogs.info("intents: " + JSON.stringify(intents));
-		}
-
-		// Intent-type meta-info.json may contain the parameter "intent-type" and "version"
-		//   We always use intent-type-name and version from foldername
-		//   RESTCONF API requires "name" to be added (and intent-type to be removed)
-		//   RESTCONF API required "version" to be a number
-
-		const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-		const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
-	
-		if ('intent-type' in meta && 'version' in meta && intent_type_folder!==meta["intent-type"]+'_v'+meta.version)
-			vscode.window.showWarningMessage("Mismatch with meta-info: "+meta["intent-type"]+'_v'+meta.version+"! Uploading under: "+intent_type_folder);
-
-		delete meta["intent-type"];
-		meta.name = intent_type;
-		meta.version = parseInt(intent_type_version);
-
-		// IBN expects targetted-device to contain an index as key, which is not contained in exported intent-types (ZIP)
-		if ('targetted-device' in meta) {
-			let index=0;
-			for (const entry of meta["targetted-device"]) {
-				if (!('index' in entry))
-					entry.index = index;
-				index+=1;
-			}
-		}
-
-		meta["module"]=[];
-		for (const module of modules) {
-			meta["module"].push({"name": module, "yang-content": fs.readFileSync(vscode.Uri.joinPath(path, "yang-modules", module).fsPath, {encoding: 'utf8', flag: 'r'})});
-		}
-
-		meta["resource"]=[];
-		for (const filename of resources)
-			meta["resource"].push({"name": filename.split('\\').join('/'), "value": fs.readFileSync(vscode.Uri.joinPath(path, "intent-type-resources", filename).fsPath, {encoding: 'utf8', flag: 'r'})});
-
-		// Parameters "resourceDirectory" and "supported-hardware-types" are not supported in the
-		// RESTCONF API payload, and must be removed.
-
-		const undesiredAttributes = ['resourceDirectory', 'supported-hardware-types'];
-		for (const key of undesiredAttributes) delete meta[key];
-
-		// Parameter "custom-field" is provided as native JSON in "meta", but must be converted
-		// to JSON string to comply to the RESTCONF API.
-
-		if ('custom-field' in meta)
-			meta["custom-field"] = JSON.stringify(meta["custom-field"]);
-
-		if (intent_type_folder in this.intentTypes) {
-			const body = {"ibn-administration:intent-type": meta};
-			const url = `/restconf/data/ibn-administration:ibn-administration/intent-type-catalog/intent-type=${intent_type},${intent_type_version}`;
-
-			this.pluginLogs.info("update intent-type", intent_type);
-			const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (!response.ok)
-				raiseRestconfError("Update intent-type failed!", await response.json(), true);
-
-			this.pluginLogs.info("Update intentType entry in cache");
-			this.intentTypes[intent_type_folder].signed = meta.label.includes('ArtifactAdmin');
-			this.intentTypes[intent_type_folder].data = meta;
-		} else {
-			const body = {"ibn-administration:intent-type": meta};
-			const url = "/restconf/data/ibn-administration:ibn-administration/intent-type-catalog";
-
-			this.pluginLogs.info("create intent-type", intent_type);
-			const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (!response.ok)
-				raiseRestconfError("Create intent-type failed!", await response.json(), true);
-
-			this.pluginLogs.info("Create missing intentType entry in cache");
-			this.intentTypes[intent_type_folder] = {
-				signed:  meta.label.includes('ArtifactAdmin'),
-				timestamp: Date.now(), // We don't have the real timestamp yet!
-				data:    meta,
-				intents: {},
-				aligned: {},
-				desired: {},
-				views:   {}
-			};
-		}
-		vscode.window.showInformationMessage("Intent-Type "+intent_type_folder+" successfully uploaded");
-
-		// update decorations, just in case we've toggled between signed vs unsigned
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder));
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/meta-info.json"));
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.js"));
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/script-content.mjs"));
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/intent-type-resources"));
-		this._eventEmiter.fire(vscode.Uri.parse("im:/"+intent_type_folder+"/yang-modules"));
-
-		// Upload views
-
-		for (const view of views) {
-			const viewname = view.slice(0,-11);			
-			const content = fs.readFileSync(vscode.Uri.joinPath(path, "views", view).fsPath, {encoding:'utf8', flag:'r'});
-
-			const url = `/restconf/data/nsp-intent-type-config-store:intent-type-config/intent-type-configs=${intent_type},${intent_type_version}`;			
-			const body = {
-				"nsp-intent-type-config-store:intent-type-configs": [{
-					"views": [{
-						"name": viewname,
-						"viewconfig": content
-					}]
-				}]
-			};
-			this.pluginLogs.info("upload view ", intent_type, viewname);
-			const response: any = await this._callNSP(url, {method: "PATCH", body: JSON.stringify(body)});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (response.ok) {
-				vscode.window.showInformationMessage("View "+intent_type_folder+"/"+viewname+" successfully uploaded");
-				this.intentTypes[intent_type_folder].views[view] = JSON.parse(content);
-			} else printRestconfError("Upload view(s) failed!", await response.json());
-		}
-
-		// Upload intents
-
-		for (const filename of intents) {
-			const target = decodeURIComponent(filename.slice(0,-5));
-			const content = fs.readFileSync(vscode.Uri.joinPath(path, "intents", filename).fsPath, {encoding:'utf8', flag:'r'});
-
-			if (target in this.intentTypes[intent_type_folder].intents) {
-				const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/intent-specific-data`;
-				const body = {"ibn:intent-specific-data": JSON.parse(content)};
-				this.pluginLogs.info("update intent", intent_type, target);
-				const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (response.ok) {
-					vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully updated");
-					this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
-					this.intentTypes[intent_type_folder].aligned[target] = false;
-					this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+filename));
-				} else printRestconfError("Update intent failed!", await response.json());
-			} else {
-				const url = "/restconf/data/ibn:ibn";
-				const body = {
-					"ibn:intent": {
-						"target": target,
-						"intent-type": intent_type,
-						"intent-type-version": intent_type_version,
-						"ibn:intent-specific-data": JSON.parse(content),
-						"required-network-state": "active"
-					}
-				};
-				this.pluginLogs.info("create intent", intent_type, target);
-				const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (response.ok) {
-					vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully uploaded");
-					this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
-					this.intentTypes[intent_type_folder].aligned[target] = false;
-					this.intentTypes[intent_type_folder].desired[target] = "active";
-				} else printRestconfError("Create intent failed!", await response.json());
-			}
-		}
-
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");		
+		return this.fixedIntentGenerator.uploadIntentType(args);
 	}
 
 	/**
@@ -1732,63 +1473,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */	
 
 	public async uploadIntents(args:any[]): Promise<void> {
-		const matchIntentType = /^([a-z][a-z0-9_-]+_v\d+)$/;
-
-		const uriList:vscode.Uri[] = this._getUriList(args);
-		for (const entry of uriList) {
-			const parts = entry.toString().split('/');
-			const filename           = parts.pop();
-			const intent_folder      = parts.pop();
-			const intent_type_folder = parts.pop();
-
-			if (intent_type_folder && matchIntentType.test(intent_type_folder) && intent_folder &&  intent_folder==="intents" && filename && filename.endsWith(".json")) {
-				const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-				const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
-				const target = decodeURIComponent(decodeURIComponent(filename.slice(0,-5)));
-				const content = fs.readFileSync(entry.fsPath, {encoding:'utf8', flag:'r'});
-		
-				if (target in this.intentTypes[intent_type_folder].intents) {
-					const url = `/restconf/data/ibn:ibn/intent=${encodeURIComponent(target)},${intent_type}/intent-specific-data`;
-					const body = {"ibn:intent-specific-data": JSON.parse(content)};
-					this.pluginLogs.info("update intent", intent_type, target);
-					const response: any = await this._callNSP(url, {method: "PUT", body: JSON.stringify(body)});
-					if (!response)
-						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-					if (response.ok) {
-						vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully updated");
-						this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
-						this.intentTypes[intent_type_folder].aligned[target] = false;
-						this._eventEmiter.fire(vscode.Uri.parse('im:/'+intent_type_folder+'/intents/'+filename));
-					} else printRestconfError("Update intent failed!", await response.json());
-				} else {
-					const url = "/restconf/data/ibn:ibn";
-					const body = {
-						"ibn:intent": {
-							"target": target,
-							"intent-type": intent_type,
-							"intent-type-version": intent_type_version,
-							"ibn:intent-specific-data": JSON.parse(content),
-							"required-network-state": "active"
-						}
-					};
-					this.pluginLogs.info("create intent", intent_type, target);
-					const response: any = await this._callNSP(url, {method: "POST", body: JSON.stringify(body)});
-					if (!response)
-						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-					if (response.ok) {
-						vscode.window.showInformationMessage("Intent "+intent_type+"/"+target+" successfully uploaded");
-						this.intentTypes[intent_type_folder].intents[target] = JSON.parse(content);
-						this.intentTypes[intent_type_folder].aligned[target] = false;
-						this.intentTypes[intent_type_folder].desired[target] = "active";
-					} else printRestconfError("Create intent failed!", await response.json());
-				}
-			} else {
-				this.pluginLogs.warn("uploadIntent(", filename, ") failed! URI does not match expected folder structure!");
-				vscode.window.showErrorMessage("Failed to upload "+entry.toString()+"! Intents must be stored in directory {intent_type}_v{version}/intents/{target}.json"); 
-			}
-		}
-		
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		return this.fixedIntentGenerator.uploadIntents(args);
 	}
 
 	/**
@@ -2331,27 +2016,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	public async newVersion(args:any[]): Promise<void> {
-		const uriList:vscode.Uri[] = this._getUriList(args);
-
-		if (uriList.length>0) {
-			const path = uriList[0].toString();
-			const parts = path.split('/').map(decodeURIComponent);
-			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
-			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-
-			this.pluginLogs.debug("newVersion(", path, ")");
-	
-			const url = "/mdt/rest/ibn/save/"+intent_type+"/"+intent_type_version;
-			const response: any = await this._callNSP(url, {method: "POST", body: "{}"});
-			if (!response)
-				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-			if (!response.ok)
-				raiseRestconfError("Intent-type version creation failed!", await response.json(), true);
-
-			vscode.window.showInformationMessage("New version created for intent-type "+intent_type);
-			vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-		}
+		return this.fixedIntentGenerator.newVersion(args);
 	}
 
 	/**
@@ -2361,40 +2026,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 	
 	public async clone(args:any[]): Promise<void> {
-		const uriList:vscode.Uri[] = this._getUriList(args);
-
-		if (uriList.length>0) {
-			const path = uriList[0].toString();
-			const parts = path.split('/').map(decodeURIComponent);
-			const intent_type_folder = parts[1];
-			const intent_type_version = intent_type_folder.substring(intent_type_folder.lastIndexOf('_v')+2);
-			const intent_type = intent_type_folder.substring(0, intent_type_folder.lastIndexOf('_v'));
-
-			this.pluginLogs.debug("clone(", path, ")");
-
-			const new_intent_type = await vscode.window.showInputBox({
-				placeHolder: "Intent Name",
-				prompt: "Provide a name for the new intent-type",
-				value: intent_type+"_copy"
-			});
-
-			if (new_intent_type) {
-				if ((new_intent_type+"_v1") in this.intentTypes) {
-					vscode.window.showErrorMessage("The intent-type "+new_intent_type+" already exists!");
-					throw vscode.FileSystemError.FileExists("The intent-type "+new_intent_type+" already exists!");
-				}
-
-				const url = "/mdt/rest/ibn/save/"+intent_type+"/"+intent_type_version+"?newIntentTypeName="+new_intent_type;		
-				const response: any = await this._callNSP(url, {method: "POST", body: "{}"});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (!response.ok)
-					raiseRestconfError("Intent-type cloning failed!", await response.json(), true);
-
-				vscode.window.showInformationMessage("New intent-type "+new_intent_type+" created!");
-				vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-			}
-		}
+		return this.fixedIntentGenerator.clone(args);
 	}
 
 	/**
@@ -2483,230 +2115,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 */
 
 	public async newFixedIntentType(args:any[]): Promise<void> {
-		this.pluginLogs.info("newFixedIntentType(", JSON.stringify(args), ")");
-
-		if (args.length>1 && args[0] instanceof vscode.Uri) {
-			const fileUri = args[0];
-			if (fs.lstatSync(fileUri.fsPath).isFile()) {
-				// Read *.ifxgen file
-				const pathUri = vscode.Uri.file(path.dirname(fileUri.fsPath));
-				const input: icmFixedGeneratorInput = JSON.parse(fs.readFileSync(vscode.Uri.joinPath(args[0]).fsPath, {encoding:'utf8', flag:'r'}));
-
-				// Initialize remaining variables
-
-				if (!input.intent_type)
-					input.intent_type = path.basename(fileUri.fsPath, '.ifxgen');
-
-				if (!input.date)
-					input.date = new Date().toISOString().slice(0,10);
-
-				if (!input.author)
-					input.author = "NOKIA";
-
-				// determine intent-type version
-
-				input.intent_type_version = 1;
-
-				for (const entry of fs.readdirSync(pathUri.fsPath, { withFileTypes: true })) {
-					if (!entry.isDirectory()) continue;
-
-					const match = entry.name.match(new RegExp(`^${input.intent_type}_v(\\d+)$`));
-					if (match) {
-						const version = parseInt(match[1], 10);
-						if (input.intent_type_version <= version) {
-							input.intent_type_version = version + 1;
-						}
-					}
-				}
-
-				const intentTypePath = vscode.Uri.joinPath(pathUri, `${input.intent_type}_v${input.intent_type_version}`);
-
-				let url = `/restconf/data/nsp-ne-control:ne-control/discovered-ne=${encodeURI(input.device)}`;
-				let response: any = await this._callNSP(url, {method: "GET"});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (!response.ok)
-					raiseRestconfError("Getting device info failed!", await response.json());
-
-				let json = await response.json();
-				input.vendor    = json['nsp-ne-control:discovered-ne'][0]['ne-vendor'];         // example: Nokia
-				input.family    = json['nsp-ne-control:discovered-ne'][0]['ne-family'];         // example: 7750 SR
-				input.version   = json['nsp-ne-control:discovered-ne'][0]['version'];           // example: 24.10.R1
-				input.swversion = json['nsp-ne-control:discovered-ne'][0]['software-version'];  // example: TiMOS-B-24.10.R1
-				input.chassis   = json['nsp-ne-control:discovered-ne'][0]['ne-chassis-type'];   // example: 7750 SR-1
-
-				url = `/restconf/data/manager-directory-service:manager-directory/manager-info=MDC/device=${encodeURI(input.device)}`;
-				response = await this._callNSP(url, {method: "GET"});
-				if (!response)
-					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-				if (!response.ok)
-					raiseRestconfError("Getting mediator info failed!", await response.json());
-
-				json = await response.json();
-				const familyTypeRelease = json["manager-directory-service:device"]["family-type-release"];
-				const neType = familyTypeRelease.split(":")[0];
-
-				if (["7250 IXR", "7450 ESS", "7750 SR", "7950 XRS"].includes(neType))
-					input.template = "mappers/SR OS.ftl";
-				else if (familyTypeRelease.includes("SRLinux"))
-					input.template = "mappers/SRLinux.ftl";
-				else if (familyTypeRelease.includes("Ciena"))
-					input.template = "mappers/SAOS.ftl";
-				else if (familyTypeRelease.includes("IOS-XR"))
-					input.template = "mappers/IOS-XR.ftl";
-				else if (familyTypeRelease.includes("Juniper"))
-					input.template = "mappers/JunOS MX.ftl";
-				else
-					// default: OpenConfig
-					input.template = "mappers/OpenConfig.ftl";
-
-
-				const mapping: Record<string, any> = {};
-
-				for (const key of Object.keys(input.contexts)) {
-					const ctx = input.contexts[key];
-
-					const path = ctx.path
-						.replace(/^\/+/, "")                 // strip leading slash
-						.replace(/^([^:]+):\/?/, "$1:/");    // ensure prefix namespace:/
-
-					const url =
-						`/restconf/data/network-device-mgr:network-devices/` +
-						`network-device=${input.device}/root/${path}?content=config`;
-
-					const response: any = await this._callNSP(url, { method: "GET" });
-					if (!response)
-						throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-
-					if (!response.ok)
-						throw vscode.FileSystemError.Unavailable("Get NE Configuration Failed");
-
-					const json = await response.json();
-
-					// strip down json received based on exclusion rules
-
-					if (ctx.exclude && ctx.exclude.length > 0) {
-						const removePath = (node: any, parts: string[]): void => {
-							if (!node || parts.length === 0) return;
-							const [head, ...rest] = parts;
-							if (Array.isArray(node)) {
-								for (const item of node) {
-									removePath(item, parts);
-								}
-							} else if (typeof node === "object") {
-								if (rest.length === 0) {
-									// Final key → delete it
-									delete node[head];
-								} else if (node[head] !== undefined) {
-									removePath(node[head], rest);
-								}
-							}
-						};
-
-						let cfg: any = Object.values(json)[0];  // could be object or array
-
-						if (Array.isArray(cfg)) {
-							cfg = cfg.length > 0 ? cfg[0] : {};
-						}
-
-						for (const rule of ctx.exclude) {
-							removePath(cfg, rule.split("/"));
-						}
-
-						mapping[key] = {
-							config: {
-								target: path,
-								operation: "replace",
-								value: json,
-								ignoreChildren: ctx.exclude
-							}
-						};
-					} else {
-						mapping[key] = {
-							config: {
-								target: path,
-								operation: "replace",
-								value: json
-							}
-						};
-					}
-				}
-
-				const templatePath = vscode.Uri.joinPath(this.extensionUri, 'templates', 'common', 'fixed');
-				fs.mkdirSync(intentTypePath.fsPath);
-
-				// copy files and templatize
-
-				const mergelist = [];
-				for (const filename of fs.readdirSync(templatePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-					const srcpath = vscode.Uri.joinPath(templatePath, filename).fsPath;
-					const dstpath = vscode.Uri.joinPath(intentTypePath, filename).fsPath;
-
-					if (fs.lstatSync(srcpath).isDirectory())
-						fs.mkdirSync(dstpath);
-					else if (filename.startsWith('.') || filename.includes('/.'))
-						this.pluginLogs.info("skip file/folder ", filename);
-					else if (filename.startsWith('merge_'))
-						mergelist.push(filename.substring(6));
-					else {
-						this.pluginLogs.info("processing: ", filename);
-						const jinja = nunjucks.configure(path.dirname(srcpath));
-						const data = jinja.render(path.basename(srcpath), input);
-
-						if (filename === "jsconfig.json")
-							fs.writeFileSync(dstpath, JSON.stringify({
-								"compilerOptions": {
-									"baseUrl": "./intent-type-resources"
-								},
-								"include": ["*.js", "*.mjs", "intent-type-resources/*.js", "intent-type-resources/**/*.mjs"]
-							}));
-						else if (filename === "yang-modules/[intent_type].yang")
-							fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `yang-modules/${input.intent_type}.yang`).fsPath, data);
-						else
-							fs.writeFileSync(dstpath, data);
-					}
-				}
-
-				// merge common resource folders/files
-
-				const resourcePath = vscode.Uri.joinPath(intentTypePath, 'intent-type-resources');
-
-				if (!fs.existsSync(resourcePath.fsPath))
-					fs.mkdirSync(resourcePath.fsPath);
-
-				for (const folder of mergelist) {
-					this.pluginLogs.info("merging: ", folder);
-
-					const mergePath = this.templateEngine.mergeCommonUri(folder);
-					for (const filename of fs.readdirSync(mergePath.fsPath, {recursive: true, encoding: 'utf8', withFileTypes: false })) {
-						this.pluginLogs.info("filename: ", filename);
-
-						const srcpath = vscode.Uri.joinPath(mergePath, filename).fsPath;
-						const dstpath = vscode.Uri.joinPath(resourcePath, filename).fsPath;
-
-						if (fs.existsSync(dstpath)) {
-							this.pluginLogs.info(filename+" (common) skipped, overwritten in template");
-						}
-						else if (fs.lstatSync(srcpath).isDirectory())
-							fs.mkdirSync(dstpath);
-						else if (filename.startsWith('.') || filename.includes('/.'))
-							this.pluginLogs.info("skip file/folder ", filename);
-						else {
-							this.pluginLogs.info("processing: ", filename);
-							const jinja = nunjucks.configure(path.dirname(srcpath));
-							const data = jinja.render(path.basename(srcpath), input);
-							fs.writeFileSync(dstpath, data);
-
-							// fs.copyFileSync(srcpath, dstpath);
-						}
-					}
-				}
-
-				// write mapper
-
-				fs.writeFileSync(vscode.Uri.joinPath(intentTypePath, `intent-type-resources/${input.template}`).fsPath, JSON.stringify(mapping, null, 4));
-			}
-		}
+		return this.fixedIntentGenerator.newFixedIntentType(args);
 	}
 
     /**
@@ -2718,23 +2127,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
      */
 
     public async exportIntentType(folder:string, intent_type:string, intent_type_version:string): Promise<void> {
-		const url = `/mdt/export/${intent_type}/${intent_type_version}`;
-        const response: any = await this._callNSP(url, {method: "GET"});
-        if (!response)
-            this.pluginLogs.error("Lost connection to NSP");
-        else if (!response.ok)
-			vscode.window.showErrorMessage("Issue exporting intent-type");
-		else {
-            const buf = await response.buffer();
-            this.pluginLogs.info("Exporting intent-type");
-			try {
-				const filename = vscode.Uri.joinPath(vscode.Uri.parse(folder), `${intent_type}_v${intent_type_version}.zip`).fsPath;
-                fs.writeFileSync(filename, buf);
-			}
-			catch(error:any) {
-				vscode.window.showErrorMessage("Issue exporting intent-type");
-			}
-		}
+		return this.fixedIntentGenerator.exportIntentType(folder, intent_type, intent_type_version);
     }
 
 	public getStatusBarItem(): vscode.StatusBarItem {
