@@ -21,7 +21,7 @@
             "description": "abstracted base-router interface w/ port config (ICM physical)"
         },
         {
-            "label": "ICM iplink",
+            "label": "ICM ipLink",
             "description": "ipl!nk, abstraction and assurance (ICM logical)"
         },
         {
