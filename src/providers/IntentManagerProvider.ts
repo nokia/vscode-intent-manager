@@ -203,7 +203,8 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	username: string;
 	password?: string;
 	port: string;
-	authToken?: any;
+	authToken?: Promise<string | undefined>;
+	private authTokenRevokeTimer?: ReturnType<typeof setTimeout>;
 
 	timeout: number;
 	fileIgnore: Array<string>;
@@ -327,31 +328,44 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return (await this.secretStorage.get("nsp_im_password")) ?? process.env.NSP_PASSWORD ?? "";
 	}
 
-	/**
-	 * Retrieves auth-token from NSP. Implementation uses promises to ensure that only
-	 * one token is used at any given moment of time. The token will automatically be
-	 * revoked after 10min.
-	 */	
+	private _clearAuthTokenRevokeTimer(): void {
+		if (this.authTokenRevokeTimer !== undefined) {
+			clearTimeout(this.authTokenRevokeTimer);
+			this.authTokenRevokeTimer = undefined;
+		}
+	}
 
-	private async _getAuthToken(): Promise<void> {
+	private _scheduleAuthTokenRevoke(expiresInSeconds: number): void {
+		this._clearAuthTokenRevokeTimer();
+		const ms = Math.max(expiresInSeconds * 1000, 60000);
+		this.authTokenRevokeTimer = setTimeout(() => this._revokeAuthToken(), ms);
+	}
+
+	/**
+	 * Retrieves auth-token from NSP. Uses promise memoization so concurrent callers
+	 * share a single in-flight token request. Returns the bearer token string.
+	 */
+	private async _getAuthToken(): Promise<string | undefined> {
         if (this.authToken) {
 			const token = await this.authToken;
-            if (!token) {
-                this.authToken = undefined; // Reset authToken, if it is undefined
-            } else {
-				return; // If we have a valid token, no need to proceed further
+            if (token) {
+				return token;
 			}
+			this.authToken = undefined;
         }
 
 		this.password = await this._getNspPassword();
 
-        if (this.password && !this.authToken) {
-            this.authToken = new Promise((resolve, reject) => {
+		if (!this.password) {
+			return undefined;
+		}
+
+        if (!this.authToken) {
+            this.authToken = new Promise<string | undefined>((resolve) => {
                 this.pluginLogs.warn("No valid auth-token for IM plugin; Getting a new one...");
                 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-				// for getting the auth-token, we are using a reduced timeout of 10sec
-                const timeout = new AbortController();
+				const timeout = new AbortController();
                 setTimeout(() => timeout.abort(), 10000);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
@@ -373,16 +387,18 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					const json = await response.json();
                     if (response.ok) {
 						this.pluginLogs.info("IM response:", response.status);
-						resolve(json.access_token);
-						this.pluginLogs.info("new authToken:", json.access_token);
-						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
+						const accessToken: string = json.access_token;
+						const expiresIn: number = json.expires_in ?? 600;
+						this.pluginLogs.info("new authToken:", accessToken);
+						this._scheduleAuthTokenRevoke(expiresIn);
 						this._getNSPversion();
+						resolve(accessToken);
                     } else {
 						this.pluginLogs.warn("IM response:", response.status, json.error);
 						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
 						this._eventEmiter.fire(vscode.Uri.parse('im:/'));
-						this.authToken = undefined; // Reset authToken on error
-                        reject("Authentication Error!");
+						this.authToken = undefined;
+                        resolve(undefined);
 					}
                 }).catch((error:any) => {
 					if (error.message.includes('user aborted'))
@@ -396,17 +412,20 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
 					this._eventEmiter.fire(vscode.Uri.parse('im:/'));
 
-					this.authToken = undefined; // Reset authToken on error					
+					this.authToken = undefined;
                     resolve(undefined);
                 });
             });
         }
+
+		return await this.authToken;
     }
 
 	/**
 	 * Gracefully revoke NSP auth-token.
 	 */
 	private async _revokeAuthToken(): Promise<void> {
+		this._clearAuthTokenRevokeTimer();
 		if (this.authToken) {
 			const token = await this.authToken;
 			this.pluginLogs.debug("_revokeAuthToken("+token+")");
@@ -435,16 +454,18 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 	 * @param {{method: string, body: string, headers: object, signal: AbortSignal}} options HTTP method, header, body
 	 */	
 
-	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<void> {
+	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<any> {
 		const timeout = new AbortController();
         setTimeout(() => timeout.abort(), this.timeout*1000);
 		options.signal = timeout.signal;
 
 		if (!('headers' in options)) {
-			await this._getAuthToken();
-			const token = await this.authToken;
-			if (!token)
+			const token = await this._getAuthToken();
+			if (!token) {
+				if (!this.password)
+					throw vscode.FileSystemError.Unavailable('NSP credentials not configured');
 				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+			}
 
 			if (url.startsWith('/restconf/data') || url.startsWith('/restconf/operations') || url.startsWith('/mdt/rest/restconf'))
 				options.headers = {
@@ -1745,7 +1766,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			else
 				items.push({label:state, description:""});
 
-		await vscode.window.showQuickPick(items).then( async selection => {
+		await vscode.window.showQuickPick(items).then( async (selection: vscode.QuickPickItem | undefined) => {
 			if (selection) {
 				const state = states[selection.label];
 				let body={};
@@ -1874,8 +1895,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		const resources:string[] = [];
 		if (fs.existsSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath)) {
-			// @ts-expect-error fs.readdirSync() returns string[] for utf-8 encoding (default)
-			fs.readdirSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath, {recursive: true}).forEach((filename: string) => {
+			fs.readdirSync(vscode.Uri.joinPath(path, "intent-type-resources").fsPath, {recursive: true, encoding: 'utf8'}).forEach((filename: string) => {
 				if (fs.lstatSync(vscode.Uri.joinPath(path, "intent-type-resources", filename).fsPath).isFile() && !filename.startsWith('.') && !filename.includes('/.'))
 					resources.push(filename);
 			});
@@ -2148,7 +2168,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		this.pluginLogs.debug("setLogLevel()");
 
 		const loglevels = [{label: "default"}, {label: "trace"}, {label: "debug"}, {label: "info"}, {label: "warn"}, {label: "error"}];
-		await vscode.window.showQuickPick(loglevels).then( async selection => {
+		await vscode.window.showQuickPick(loglevels).then( async (selection: vscode.QuickPickItem | undefined) => {
 			if (selection) {
 				const url = "/mdt/rest/restconf/data/anv-platform:platform/anv-logging:logging/logger-config=ibn.intent,debug,global";
 				const body = {"anv-logging:logger-config": {"log-level": selection.label}};
@@ -2222,10 +2242,12 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			}
 		}
 
-		await this._getAuthToken();
-		const token = await this.authToken;
-		if (!token)
+		const token = await this._getAuthToken();
+		if (!token) {
+			if (!this.password)
+				throw vscode.FileSystemError.Unavailable('NSP credentials not configured');
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
 
 		if (!this.osdVersion)
 			await this._getNSPversion();
@@ -2490,7 +2512,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 									text += yaml.stringify(data[container]);
 
 									vscode.workspace.openTextDocument({content: text, language: 'yaml'})
-									.then((textDocument) => {
+									.then((textDocument: vscode.TextDocument) => {
 										vscode.window.showTextDocument(textDocument);
 									});
 								}
@@ -2541,7 +2563,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 			else
 				items.push({label:version, description:`${intent_type}_v${version}`});
 
-		await vscode.window.showQuickPick(items).then( async selection => {
+		await vscode.window.showQuickPick(items).then( async (selection: vscode.QuickPickItem | undefined) => {
 			if (selection) {
 				const newVersion = selection.label;
 
@@ -2872,7 +2894,7 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 
 		// merge common resources
 
-		for (const folder of fs.readdirSync(templatePath.fsPath).filter(item => item.startsWith('merge_')).map(item => item.substring(6))) {
+		for (const folder of fs.readdirSync(templatePath.fsPath).filter((item: string) => item.startsWith('merge_')).map((item: string) => item.substring(6))) {
 			const commonsPath = vscode.Uri.joinPath(this.extensionUri, 'templates', folder);
 
 			this.pluginLogs.info("merge common resources from "+folder);
@@ -3143,13 +3165,6 @@ export class IntentManagerProvider implements vscode.FileSystemProvider, vscode.
 		return constraints;
 	}
 
-	private enumsFromIdentityRef(a: any, dataType: string) {
-		const identityEnums : string[] = [];
-
-		
-
-		return identityEnums;
-	}
 
 	private getIdentityRefTypeInfo(a: any): string
 	{
