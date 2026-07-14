@@ -374,3 +374,30 @@ Below listed are improvements added to Intent Generation:
 3) Audit consistency ::	Prefix normalization improves compare accuracy
 4) IPv6 handling	:: Better grouping and comparison reliability
 5) Deviation processing ::	Implemented deviation logic to remove unsupported attributes.
+
+## [Unreleased]
+
+Improvements (NSP 25+):
+* Support for more than 300 NEs (#53): NE lookups in the WebUI/SchemaForm now
+  call the Inventory RESTCONF API directly via server-side REST callouts, adding
+  proper pagination and improved performance.
+* Ports (including access ports) now use viewConfig/WebUI REST callouts as well.
+
+Template consistency:
+* Consistent viewConfig attribute ordering across templates.
+
+Cleanup (NSP connectivity / authentication):
+* Single-flight auth-token retrieval: concurrent callers now share one in-flight
+  token request, avoiding duplicate token requests and races on the shared field.
+* Auth-token is proactively revoked on a fixed 10-minute hygiene lease, tracked by
+  a single timer that is cleared on (re)schedule and on revoke. This prevents a
+  stale timer from prematurely revoking a freshly issued token after a reconnect
+  or credential change.
+* Authentication failures (NSP reachable but credentials rejected) are now handled
+  distinctly from an unreachable NSP: the user is notified and callers report an
+  accurate error message instead of a generic "not reachable".
+
+Developer experience:
+* Type hygiene: typed `_callNSP` return value, fixed implicit-any callbacks,
+  removed a dead stub, and added Node type definitions to tsconfig.
+* Added CONTRIBUTING.md documenting prerequisites and the build steps.
