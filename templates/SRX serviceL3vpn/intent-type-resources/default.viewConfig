@@ -9,13 +9,26 @@
       "title": "Bandwidth"
   },
   "{{ intent_type }}.site.ne-id": {
-      "suggest": "getNodes",
+        "restCallout": {
+            "url": "/restconf/operations/nsp-inventory:find",
+            "method": "POST",
+            "input": {
+                "fields": "ne-id;ne-name;type;version;ip-address",
+                "xpath-filter": "/nsp-equipment:network/network-element"
+            },
+            "output": {
+                "responsePathToData": [
+                    "nsp-inventory:output"
+                ]
+            }
+        },
       "title": "NE ID",
       "type": "leafref",
       "displayKey": "ne-id",
       "componentProps": {
           "isObject": false,
           "isPagination": true,
+          "isServerSide": true,
           "paginationProps": {
               "pageLabel": "Page"
           }
@@ -99,7 +112,7 @@
               "name": "mtu-value",
               "type": "number",
               "floatingFilter": true
-          }          
+          }
       ]
   }
 }

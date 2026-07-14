@@ -17,11 +17,24 @@
     "componentProps": {
       "isPagination": true,
       "isObject": false,
+      "isServerSide": true,
       "paginationProps": {
         "pageLabel": "Page"
       }
     },
-    "suggest": "getNodes",
+    "restCallout": {
+      "url": "/restconf/operations/nsp-inventory:find",
+      "method": "POST",
+      "input": {
+        "fields": "ne-id;ne-name;type;version;ip-address",
+        "xpath-filter": "/nsp-equipment:network/network-element"
+      },
+      "output": {
+        "responsePathToData": [
+          "nsp-inventory:output"
+        ]
+      }
+    },
     "title": "NODE",
     "type": "leafref",
     "properties": [
@@ -119,11 +132,24 @@
     "componentProps": {
       "isPagination": true,
       "isObject": false,
+      "isServerSide": true,
       "paginationProps": {
         "pageLabel": "Page"
       }
     },
-    "suggest": "getNodes",
+    "restCallout": {
+      "url": "/restconf/operations/nsp-inventory:find",
+      "method": "POST",
+      "input": {
+        "fields": "ne-id;ne-name;type;version;ip-address",
+        "xpath-filter": "/nsp-equipment:network/network-element"
+      },
+      "output": {
+        "responsePathToData": [
+          "nsp-inventory:output"
+        ]
+      }
+    },
     "title": "NODE",
     "type": "leafref",
     "properties": [

@@ -16,7 +16,7 @@ class CustomIntentHandler extends IntentHandler {
 
   constructor() {
     super();
-    NSP.checkRelease(24, 11);
+    NSP.checkRelease(25, 11);
     ResourceAdmin.createIpPool("ip-pool", "global", "used for iplink", "192.168.192.0/18", "network-link");
   }
 

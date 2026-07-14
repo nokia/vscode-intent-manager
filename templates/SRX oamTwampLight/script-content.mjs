@@ -15,7 +15,7 @@ class CustomIntentHandler extends (IntentHandler) {
 
   constructor() {
     super();
-    NSP.checkRelease(24, 11);
+    NSP.checkRelease(25, 11);
   }
 
   getSites(target, config) {
