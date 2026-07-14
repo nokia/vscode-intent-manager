@@ -7,11 +7,29 @@
     "componentProps": {
       "isPagination": true,
       "isObject": false,
+      "isServerSide": true,
       "paginationProps": {
         "pageLabel": "Page"
       }
     },
-    "suggest": "getPorts",
+    "restCallout": {
+      "url": "/restconf/operations/nsp-inventory:find",
+      "method": "POST",
+      "input": {
+        "xpath-filter": "/nsp-equipment:network/network-element[ne-id='{%0}']/hardware-component/port[boolean(port-details[port-type='ethernet-port'])]",
+        "fields": "name;description;port-details",
+        "include-meta": false,
+        "depth": 3,
+        "substitutionList": [
+          "endpoint-a.ne-id"
+        ]
+      },
+      "output": {
+        "responsePathToData": [
+          "nsp-inventory:output"
+        ]
+      }
+    },
     "properties": [
       {
         "floatingFilter": true,
@@ -29,25 +47,25 @@
       },
       {
         "floatingFilter": true,
-        "name": "port-mode",
+        "name": "port-details[0].port-mode",
         "title": "MODE",
         "type": "string"
       },
       {
         "floatingFilter": true,
-        "name": "encap-type",
+        "name": "port-details[0].encap-type",
         "title": "ENCAP",
         "type": "string"
       },
       {
         "floatingFilter": true,
-        "name": "actual-rate",
+        "name": "port-details[0].actual-rate",
         "title": "RATE",
         "type": "number"
       },
       {
         "floatingFilter": true,
-        "name": "mtu-value",
+        "name": "port-details[0].mtu-value",
         "title": "MTU",
         "type": "number"
       }
@@ -122,11 +140,29 @@
     "componentProps": {
       "isPagination": true,
       "isObject": false,
+      "isServerSide": true,
       "paginationProps": {
         "pageLabel": "Page"
       }
     },
-    "suggest": "getPorts",
+    "restCallout": {
+      "url": "/restconf/operations/nsp-inventory:find",
+      "method": "POST",
+      "input": {
+        "xpath-filter": "/nsp-equipment:network/network-element[ne-id='{%0}']/hardware-component/port[boolean(port-details[port-type='ethernet-port'])]",
+        "fields": "name;description;port-details",
+        "include-meta": false,
+        "depth": 3,
+        "substitutionList": [
+          "endpoint-b.ne-id"
+        ]
+      },
+      "output": {
+        "responsePathToData": [
+          "nsp-inventory:output"
+        ]
+      }
+    },
     "properties": [
       {
         "floatingFilter": true,
@@ -144,25 +180,25 @@
       },
       {
         "floatingFilter": true,
-        "name": "port-mode",
+        "name": "port-details[0].port-mode",
         "title": "MODE",
         "type": "string"
       },
       {
         "floatingFilter": true,
-        "name": "encap-type",
+        "name": "port-details[0].encap-type",
         "title": "ENCAP",
         "type": "string"
       },
       {
         "floatingFilter": true,
-        "name": "actual-rate",
+        "name": "port-details[0].actual-rate",
         "title": "RATE",
         "type": "number"
       },
       {
         "floatingFilter": true,
-        "name": "mtu-value",
+        "name": "port-details[0].mtu-value",
         "title": "MTU",
         "type": "number"
       }

@@ -66,10 +66,29 @@
       "title": "PORT",
       "displayKey": "name",
       "type": "leafref",
-      "suggest": "getAccessPorts",
+      "dependsOn": "site.ne-id",
+      "restCallout": {
+          "url": "/restconf/operations/nsp-inventory:find",
+          "method": "POST",
+          "input": {
+              "xpath-filter": "/nsp-equipment:network/network-element[ne-id='{%0}']/hardware-component/port[boolean(port-details[port-type='ethernet-port'][port-mode='access'])]",
+              "fields": "name;description;port-details",
+              "include-meta": false,
+              "depth": 3,
+              "substitutionList": [
+                  "site.ne-id"
+              ]
+          },
+          "output": {
+              "responsePathToData": [
+                  "nsp-inventory:output"
+              ]
+          }
+      },
       "componentProps": {
           "isObject": false,
           "isPagination": true,
+          "isServerSide": true,
           "paginationProps": {
               "pageLabel": "Page"
           }
@@ -91,25 +110,25 @@
           },
           {
               "title": "MODE",
-              "name": "port-mode",
+              "name": "port-details[0].port-mode",
               "type": "string",
               "floatingFilter": true
           },
           {
               "title": "ENCAP",
-              "name": "encap-type",
+              "name": "port-details[0].encap-type",
               "type": "string",
               "floatingFilter": true
           },
           {
               "title": "RATE",
-              "name": "actual-rate",
+              "name": "port-details[0].actual-rate",
               "type": "number",
               "floatingFilter": true
           },
           {
               "title": "MTU",
-              "name": "mtu-value",
+              "name": "port-details[0].mtu-value",
               "type": "number",
               "floatingFilter": true
           }
