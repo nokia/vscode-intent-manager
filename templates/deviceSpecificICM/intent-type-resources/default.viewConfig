@@ -3,7 +3,9 @@
         "default": "none"
     },
     "_target.objectidentifier": {
+        "title": "NODE",
         "displayKey": "ne-id",
+        "type": "leafref",
         "componentProps": {
           "isPagination": true,
           "isObject": false,
@@ -25,8 +27,6 @@
                 ]
             }
         },
-        "title": "NODE",
-        "type": "leafref",
         "properties": [
           {
             "floatingFilter": true,
@@ -67,11 +67,11 @@
     ,
     "{{ e.viewConfigPath }}": {
 {%- if e.isList %}
+      "type": "list",
       "component": {
         "input": "simpleAutoCompletePicker",
         "list": "simplePropertyList"
       },
-      "type": "list",
 {%- else %}
       "component": "autoComplete",
 {%- endif %}

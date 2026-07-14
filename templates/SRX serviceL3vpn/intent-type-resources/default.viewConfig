@@ -9,22 +9,22 @@
       "title": "Bandwidth"
   },
   "{{ intent_type }}.site.ne-id": {
-        "restCallout": {
-            "url": "/restconf/operations/nsp-inventory:find",
-            "method": "POST",
-            "input": {
-                "fields": "ne-id;ne-name;type;version;ip-address",
-                "xpath-filter": "/nsp-equipment:network/network-element"
-            },
-            "output": {
-                "responsePathToData": [
-                    "nsp-inventory:output"
-                ]
-            }
-        },
       "title": "NE ID",
-      "type": "leafref",
       "displayKey": "ne-id",
+      "type": "leafref",
+      "restCallout": {
+          "url": "/restconf/operations/nsp-inventory:find",
+          "method": "POST",
+          "input": {
+              "fields": "ne-id;ne-name;type;version;ip-address",
+              "xpath-filter": "/nsp-equipment:network/network-element"
+          },
+          "output": {
+              "responsePathToData": [
+                  "nsp-inventory:output"
+              ]
+          }
+      },
       "componentProps": {
           "isObject": false,
           "isPagination": true,
@@ -63,10 +63,10 @@
       ]
   },
   "{{ intent_type }}.site.interface.port-id": {
-      "suggest": "getAccessPorts",
       "title": "PORT",
-      "type": "leafref",
       "displayKey": "name",
+      "type": "leafref",
+      "suggest": "getAccessPorts",
       "componentProps": {
           "isObject": false,
           "isPagination": true,

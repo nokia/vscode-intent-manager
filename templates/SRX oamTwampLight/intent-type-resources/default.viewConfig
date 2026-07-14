@@ -1,6 +1,8 @@
 {
   "{{ intent_type }}.endpoint-a": {
+    "title": "Endpoint A",
     "displayKey": "ne-id",
+    "type": "leafref",
     "componentProps": {
       "isPagination": true,
       "isObject": false,
@@ -22,8 +24,6 @@
         ]
       }
     },
-    "title": "Endpoint A",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,
@@ -61,7 +61,9 @@
     ]
   },
   "{{ intent_type }}.endpoint-b": {
+    "title": "Endpoint B",
     "displayKey": "ne-id",
+    "type": "leafref",
     "componentProps": {
       "isPagination": true,
       "isObject": false,
@@ -83,8 +85,6 @@
         ]
       }
     },
-    "title": "Endpoint B",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,

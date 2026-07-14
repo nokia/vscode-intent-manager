@@ -1,6 +1,8 @@
 {
   "{{ intent_type }}.endpoint-a.port-id": {
+    "title": "PORT",
     "displayKey": "name",
+    "type": "leafref",
     "dependsOn": "endpoint-a.ne-id",
     "componentProps": {
       "isPagination": true,
@@ -10,8 +12,6 @@
       }
     },
     "suggest": "getPorts",
-    "title": "PORT",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,
@@ -54,7 +54,9 @@
     ]
   },
   "{{ intent_type }}.endpoint-b.ne-id": {
+    "title": "NODE",
     "displayKey": "ne-id",
+    "type": "leafref",
     "componentProps": {
       "isPagination": true,
       "isObject": false,
@@ -76,8 +78,6 @@
         ]
       }
     },
-    "title": "NODE",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,
@@ -115,7 +115,9 @@
     ]
   },
   "{{ intent_type }}.endpoint-b.port-id": {
+    "title": "PORT",
     "displayKey": "name",
+    "type": "leafref",
     "dependsOn": "endpoint-b.ne-id",
     "componentProps": {
       "isPagination": true,
@@ -125,8 +127,6 @@
       }
     },
     "suggest": "getPorts",
-    "title": "PORT",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,
@@ -172,7 +172,9 @@
     "columnSpan": 1
   },
   "{{ intent_type }}.endpoint-a.ne-id": {
+    "title": "NODE",
     "displayKey": "ne-id",
+    "type": "leafref",
     "componentProps": {
       "isPagination": true,
       "isObject": false,
@@ -194,8 +196,6 @@
         ]
       }
     },
-    "title": "NODE",
-    "type": "leafref",
     "properties": [
       {
         "floatingFilter": true,

@@ -1,7 +1,7 @@
 {
   "{{ intent_type }}.if-name": {
+    "title": "Interface Name",
     "component": "autoComplete",
-    "suggest": "suggestInterfaceName",
-    "title": "Interface Name"
+    "suggest": "suggestInterfaceName"
   }
 }

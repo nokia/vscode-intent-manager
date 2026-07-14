@@ -12,6 +12,9 @@
         "title": "VLAN"
     },
     "{{ intent_type }}.endpoint-a.ne-id": {
+        "title": "NE ID",
+        "displayKey": "ne-id",
+        "type": "leafref",
         "restCallout": {
             "url": "/restconf/operations/nsp-inventory:find",
             "method": "POST",
@@ -25,9 +28,6 @@
                 ]
             }
         },
-        "title": "NE ID",
-        "type": "leafref",
-        "displayKey": "ne-id",
         "componentProps": {
             "isObject": false,
             "isPagination": true,
@@ -66,10 +66,10 @@
         ]
     },
     "{{ intent_type }}.endpoint-a.port-id": {
-        "suggest": "getAccessPorts",
         "title": "PORT",
-        "type": "leafref",
         "displayKey": "name",
+        "type": "leafref",
+        "suggest": "getAccessPorts",
         "componentProps": {
             "isObject": false,
             "isPagination": true,
@@ -119,6 +119,9 @@
         ]
     },
     "{{ intent_type }}.endpoint-b.ne-id": {
+        "title": "NE ID",
+        "displayKey": "ne-id",
+        "type": "leafref",
         "restCallout": {
             "url": "/restconf/operations/nsp-inventory:find",
             "method": "POST",
@@ -132,9 +135,6 @@
                 ]
             }
         },
-        "title": "NE ID",
-        "type": "leafref",
-        "displayKey": "ne-id",
         "componentProps": {
             "isObject": false,
             "isPagination": true,
@@ -173,10 +173,10 @@
         ]
     },
     "{{ intent_type }}.endpoint-b.port-id": {
-        "suggest": "getAccessPorts",
         "title": "PORT",
-        "type": "leafref",
         "displayKey": "name",
+        "type": "leafref",
+        "suggest": "getAccessPorts",
         "componentProps": {
             "isObject": false,
             "isPagination": true,
