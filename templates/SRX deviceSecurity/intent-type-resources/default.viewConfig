@@ -16,7 +16,8 @@
             "method": "POST",
             "input": {
                 "fields": "ne-id;ne-name;type;version;ip-address",
-                "xpath-filter": "/nsp-equipment:network/network-element"
+                "xpath-filter": "/nsp-equipment:network/network-element",
+                "include-meta": false
             },
             "output": {
                 "responsePathToData": [
