@@ -375,7 +375,7 @@ Below listed are improvements added to Intent Generation:
 4) IPv6 handling	:: Better grouping and comparison reliability
 5) Deviation processing ::	Implemented deviation logic to remove unsupported attributes.
 
-## [Unreleased]
+## [4.4.0]
 
 Improvements (NSP 25+):
 * Support for more than 300 NEs (#53): NE lookups in the WebUI/SchemaForm now
