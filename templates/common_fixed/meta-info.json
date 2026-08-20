@@ -3,6 +3,7 @@
   "version": {{ intent_type_version }},
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
+  "resourceDirectory" : "intent-type-resources",
   "label": [
     "ApprovedMisalignments",
     "Fixed"

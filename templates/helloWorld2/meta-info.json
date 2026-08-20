@@ -4,7 +4,10 @@
   "build": "-",
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
-  "label": ["NSP DevOps using vsCode"],
+  "resourceDirectory" : "intent-type-resources",
+  "label": [
+    "DevOpsCommunity"
+  ],
   "priority": 50,
   "return-config-as-json": true,
   "support-nested-type-in-es": false,

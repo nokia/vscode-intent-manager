@@ -401,3 +401,11 @@ Developer experience:
 * Type hygiene: typed `_callNSP` return value, fixed implicit-any callbacks,
   removed a dead stub, and added Node type definitions to tsconfig.
 * Added CONTRIBUTING.md documenting prerequisites and the build steps.
+
+## [Unreleased]
+
+Template compatibility:
+* Updated `meta-info.json` across the bundled templates to ensure compatibility
+  with newer NSP versions when importing ZIPped intent-types via the WebUI or CAM.
+  Added the `resourceDirectory` (`intent-type-resources`) property and normalized
+  the `label` formatting.

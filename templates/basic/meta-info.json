@@ -4,11 +4,14 @@
   "build": "-",
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
-  "label": ["DevOpsNSP"],
+  "resourceDirectory" : "intent-type-resources",
   "priority": 50,
   "return-config-as-json": true,
   "support-nested-type-in-es": false,
   "supports-network-state-suspend": true,
+  "label": [
+    "DevOpsCommunity"
+  ],
   "target-component": [
     {
       "order": 1,

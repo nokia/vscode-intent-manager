@@ -5,8 +5,8 @@
   "mapping-engine": "js-scripted-graal",
   "resourceDirectory" : "intent-type-resources",
   "label": [
-    "GraalJS",
-    "ApprovedMisalignments"
+    "ApprovedMisalignments",
+    "DevOpsCommunity"
   ],
   "target-component": [
     {

@@ -4,11 +4,14 @@
   "build": "-",
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
-  "label": ["NSP DevOps using vsCode"],
+  "resourceDirectory" : "intent-type-resources",
   "priority": 50,
   "return-config-as-json": true,
   "support-nested-type-in-es": false,
   "supports-network-state-suspend": false,
+  "label": [
+    "DevOpsCommunity"
+  ],
   "target-component": [
     {
       "i18n-text": "Target Device",

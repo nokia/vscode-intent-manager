@@ -3,8 +3,10 @@
   "version": "1",
   "author": "{{ author }}",
   "mapping-engine": "js-scripted-graal",
+  "resourceDirectory" : "intent-type-resources",
   "label": [
-    "InfrastructureConfiguration"
+    "InfrastructureConfiguration",
+    "DevOpsCommunity"
   ],
   "target-component": [
     {
