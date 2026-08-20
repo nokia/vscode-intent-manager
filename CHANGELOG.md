@@ -402,7 +402,7 @@ Developer experience:
   removed a dead stub, and added Node type definitions to tsconfig.
 * Added CONTRIBUTING.md documenting prerequisites and the build steps.
 
-## [Unreleased]
+## [4.4.1]
 
 Template compatibility:
 * Updated `meta-info.json` across the bundled templates to ensure compatibility
